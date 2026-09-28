@@ -3,19 +3,29 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [2, 4, 6, 8], rooms = new Map();
+const MAX_SOCKET_BUFFER = 256 * 1024;
 let uid = 0;
 
+// Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
+const STATIC = {
+  'index.html': fs.readFileSync(path.join(__dirname, 'public', 'index.html')),
+  'shared.js': fs.readFileSync(path.join(__dirname, 'public', 'shared.js'))
+};
 const srv = http.createServer((q, r) => {
   const f = q.url.startsWith('/shared.js') ? 'shared.js' : 'index.html';
-  fs.readFile(path.join(__dirname, 'public', f), (e, d) => {
-    if (e) { r.writeHead(500); return r.end('erro'); }
-    r.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8' });
-    r.end(d);
+  r.writeHead(200, {
+    'Content-Type': f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8',
+    'Cache-Control': f === 'index.html' ? 'no-cache' : 'public, max-age=300'
   });
+  r.end(STATIC[f]);
 });
-const wss = new WebSocketServer({ server: srv });
-const tx = (p, o) => { if (p.ws.readyState === 1) p.ws.send(JSON.stringify(o)); };
-const bc = (R, o) => R.ps.forEach(p => tx(p, o));
+const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
+const canSend = ws => ws.readyState === 1 && ws.bufferedAmount < MAX_SOCKET_BUFFER;
+const tx = (p, o) => { if (canSend(p.ws)) p.ws.send(JSON.stringify(o)); };
+const bc = (R, o) => {
+  const data = JSON.stringify(o);
+  R.ps.forEach(p => { if (canSend(p.ws)) p.ws.send(data); });
+};
 const msg = (R, s) => bc(R, { t: 'm', s });
 const get = (R, x, y, z) => (y < 0 || x < 0 || z < 0 || x >= S.W || z >= S.D || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
 function setb(R, x, y, z, v, f = 0) {
@@ -32,7 +42,13 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0,
-  up: { sharp: 0, prot: 0, forge: 0 }, inv: { wool: 24, planks: 0, tnt: 0, apple: 0, iron: 0, gold: 0, dia: 0, em: 0 } });
+  rl: Object.create(null), up: { sharp: 0, prot: 0, forge: 0 }, inv: { wool: 24, planks: 0, tnt: 0, apple: 0, iron: 0, gold: 0, dia: 0, em: 0 } });
+const allow = (p, key, gap) => {
+  const n = Date.now(), last = p.rl[key] || 0;
+  if (n - last < gap) return false;
+  p.rl[key] = n; return true;
+};
+const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up });
 function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.hp = 20; p.alive = 1; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
 const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q => [q.id, q.name, q.team]) });
@@ -78,6 +94,8 @@ function boom(R, q) {
 
 wss.on('connection', ws => {
   let R, p;
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', raw => {
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
     if (m.t === 'join' && !p) {
@@ -101,14 +119,14 @@ wss.on('connection', ws => {
         }
         R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t: 'start', bed: R.bed }); break;
       case 'mv': {
-        if (!p.alive) break;
+        if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
         const d = Math.hypot(m.x - p.x, m.z - p.z);
         if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > dt * 12 + 1.5 || m.y - p.y > dt * 11 + 1.2 || m.x < -5 || m.x > S.W + 5 || m.z < -5 || m.z > S.D + 5 || m.y > 45) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
         p.dy = (m.y - p.y) / dt; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'hit': {
-        if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
+        if (!play || !allow(p, 'hit', 90) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const cy = Math.cos(m.pitch), d = [-Math.sin(m.yaw) * cy, Math.sin(m.pitch), -Math.cos(m.yaw) * cy];
         let best = null, bd = 3.6;
         R.ps.forEach(q => {
@@ -120,6 +138,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'place': {
+        if (!allow(p, 'place', 45)) break;
         const k = { wool: p.team + 1, planks: 5, tnt: 13 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
@@ -128,6 +147,7 @@ wss.on('connection', ws => {
         setb(R, x, y, z, k, 1); p.inv[m.k]--; if (k === 13) R.tnt.push({ x, y, z, t: 3.2, o: p }); pinv(p); break;
       }
       case 'break': {
+        if (!allow(p, 'break', 70)) break;
         const { x, y, z } = m;
         if (!play || ![x, y, z].every(Number.isInteger) || Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
         const b = get(R, x, y, z);
@@ -136,7 +156,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'buy': {
-        const s = S.SH[m.i]; if (!play || !s || p.inv[s[1]] < s[2]) break;
+        const s = S.SH[m.i]; if (!play || !allow(p, 'buy', 120) || !nearBase(p) || !s || p.inv[s[1]] < s[2]) break;
         let ok = 1;
         if (s[3] === 'inv') p.inv[s[4]] += s[5];
         else if (s[3] === 'sw' && p.sw < s[5]) p.sw = s[5];
@@ -146,7 +166,7 @@ wss.on('connection', ws => {
         if (ok) { p.inv[s[1]] -= s[2]; pinv(p); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
         break;
       }
-      case 'apple': if (play && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
+      case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
     }
   });
   ws.on('close', () => {
@@ -163,6 +183,7 @@ setInterval(() => {
   rooms.forEach(R => {
     R.t += dt;
     if (R.st === 'play') {
+      const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih = Math.max(0, p.ih - dt);
         if (p.alive) { p.hp = Math.min(20, p.hp + .4 * dt); if (p.y < -8) die(R, p); }
@@ -170,10 +191,10 @@ setInterval(() => {
       });
       R.g.forEach((g, i) => {
         const gx = i < 4 ? S.IS[i][0] + .5 : 32.5, gz = i < 4 ? S.IS[i][1] + .5 : 32.5;
-        const near = [...R.ps.values()].filter(q => q.alive && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
+        const near = players.filter(q => q.alive && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
         g.a += dt; g.b += dt; g.c += dt;
         if (i < 4) {
-          const o = [...R.ps.values()].find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
+          const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
           if (g.a > 1.2 / fm) { g.a = 0; near.forEach(q => { q.inv.iron++; q.dirty = 1; }); }
           if (g.b > 5 / fm) { g.b = 0; near.forEach(q => { q.inv.gold++; q.dirty = 1; }); }
         } else {
@@ -185,8 +206,17 @@ setInterval(() => {
       for (let i = R.tnt.length; i--;) { const q = R.tnt[i]; if ((q.t -= dt) <= 0) { R.tnt.splice(i, 1); boom(R, q); } }
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    bc(R, { t: 's', p: [...R.ps.values()].map(p => [p.id, +p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(2), +p.pitch.toFixed(2), Math.ceil(p.hp), p.alive, p.team]) });
+    if (R.st === 'play') bc(R, { t: 's', p: [...R.ps.values()].map(p => [p.id, +p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(2), +p.pitch.toFixed(2), Math.ceil(p.hp), p.alive, p.team]) });
   });
 }, 50);
+
+const heartbeat = setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (ws.isAlive === false) return ws.terminate();
+    ws.isAlive = false;
+    try { ws.ping(); } catch (e) {}
+  });
+}, 30000);
+wss.on('close', () => clearInterval(heartbeat));
 
 srv.listen(PORT, () => console.log('Bed Wars online na porta ' + PORT));
