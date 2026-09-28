@@ -36,7 +36,12 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, g: [0, 1, 2, 3, 4].map(() => ({ a: 0, b: 0, c: 0 })) };
+    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null,
+      g: {
+        base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
+        dia: S.DI.map(() => ({ t:0 })),
+        em: { t:0 }
+      } };
     rooms.set(code, R);
   }
   return R;
@@ -126,20 +131,20 @@ wss.on('connection', ws => {
         p.dy = (m.y - p.y) / dt; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'hit': {
-        if (!play || !allow(p, 'hit', 90) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
+        if (!play || !allow(p, 'hit', 90) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
+        const q = R.ps.get(m.id);
+        if (!q || q === p || !q.alive || q.team === p.team) break;
         const cy = Math.cos(m.pitch), d = [-Math.sin(m.yaw) * cy, Math.sin(m.pitch), -Math.cos(m.yaw) * cy];
-        let best = null, bd = 3.6;
-        R.ps.forEach(q => {
-          if (q === p || !q.alive || q.team === p.team) return;
-          const dx = q.x - p.x, dy = q.y + .9 - (p.y + 1.62), dz = q.z - p.z, L = Math.hypot(dx, dy, dz);
-          if (L < bd && (dx * d[0] + dy * d[1] + dz * d[2]) / L > .93) { best = q; bd = L; }
-        });
-        if (best) { const cr = p.dy < -1; hurt(R, best, (DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1), d[0], d[2], p, cr); }
+        const dx = q.x - p.x, dy = q.y + .9 - (p.y + 1.62), dz = q.z - p.z, L = Math.hypot(dx, dy, dz);
+        if (L > 3.8 || L < .01 || (dx * d[0] + dy * d[1] + dz * d[2]) / L < .9) break;
+        const cr = p.dy < -1;
+        hurt(R, q, (DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1), d[0], d[2], p, cr);
+        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });
         break;
       }
       case 'place': {
         if (!allow(p, 'place', 45)) break;
-        const k = { wool: p.team + 1, planks: 5, tnt: 13 }[m.k], { x, y, z } = m;
+        const k = { wool: p.team + 1, planks: 5, stone: 12, tnt: 13 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
         if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
@@ -189,19 +194,31 @@ setInterval(() => {
         if (p.alive) { p.hp = Math.min(20, p.hp + .4 * dt); if (p.y < -8) die(R, p); }
         else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
-      R.g.forEach((g, i) => {
-        const gx = i < 4 ? S.IS[i][0] + .5 : 32.5, gz = i < 4 ? S.IS[i][1] + .5 : 32.5;
-        const near = players.filter(q => q.alive && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
-        g.a += dt; g.b += dt; g.c += dt;
-        if (i < 4) {
-          const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
-          if (g.a > 1.2 / fm) { g.a = 0; near.forEach(q => { q.inv.iron++; q.dirty = 1; }); }
-          if (g.b > 5 / fm) { g.b = 0; near.forEach(q => { q.inv.gold++; q.dirty = 1; }); }
-        } else {
-          if (g.a > 18) { g.a = 0; near.forEach(q => { q.inv.dia++; q.dirty = 1; }); }
-          if (g.c > 30) { g.c = 0; near.forEach(q => { q.inv.em++; q.dirty = 1; }); }
-        }
+      R.g.base.forEach((g, i) => {
+        const gx = S.IS[i][0] + .5, gz = S.IS[i][1] + .5;
+        const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
+        const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
+        g.iron += dt; g.gold += dt;
+        if (g.iron > 1.2 / fm) { g.iron = 0; near.forEach(q => { q.inv.iron++; q.dirty = 1; }); }
+        if (g.gold > 5 / fm) { g.gold = 0; near.forEach(q => { q.inv.gold++; q.dirty = 1; }); }
       });
+      R.g.dia.forEach((g, i) => {
+        g.t += dt;
+        if (g.t <= 12) return;
+        g.t = 0;
+        const [gx,gz] = S.DI[i];
+        players.forEach(q => {
+          if (q.alive && Math.hypot(q.x-(gx+.5), q.z-(gz+.5)) < 3 && Math.abs(q.y-11) < 4) { q.inv.dia++; q.dirty=1; }
+        });
+      });
+      R.g.em.t += dt;
+      if (R.g.em.t > 22) {
+        R.g.em.t = 0;
+        const [gx,gz] = S.EM;
+        players.forEach(q => {
+          if (q.alive && Math.hypot(q.x-(gx+.5), q.z-(gz+.5)) < 4 && Math.abs(q.y-12) < 5) { q.inv.em++; q.dirty=1; }
+        });
+      }
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
       for (let i = R.tnt.length; i--;) { const q = R.tnt[i]; if ((q.t -= dt) <= 0) { R.tnt.splice(i, 1); boom(R, q); } }
     }
