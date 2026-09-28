@@ -12,7 +12,7 @@
   });
   // [nome, moeda, preço, tipo, chave, valor]
   E.SH = [
-    ['Lã ×16', 'iron', 4, 'inv', 'wool', 16], ['Tábuas ×16', 'gold', 4, 'inv', 'planks', 16], ['Pedra Clara ×12', 'iron', 12, 'inv', 'stone', 12],
+    ['Lã ×16', 'iron', 4, 'inv', 'wool', 16], ['Tábuas ×16', 'gold', 4, 'inv', 'planks', 16],
     ['Espada de pedra', 'iron', 10, 'sw', 0, 1], ['Espada de ferro', 'gold', 7, 'sw', 0, 2], ['Espada de diamante', 'dia', 4, 'sw', 0, 3],
     ['Armadura de ferro', 'iron', 12, 'ar', 0, 1], ['Armadura de diamante', 'dia', 6, 'ar', 0, 2],
     ['Maçã dourada', 'gold', 3, 'inv', 'apple', 1], ['TNT', 'gold', 4, 'inv', 'tnt', 1], ['TNT ×4', 'em', 2, 'inv', 'tnt', 4],
