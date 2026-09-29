@@ -43,7 +43,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0,
+const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0,
   rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
@@ -52,7 +52,25 @@ const allow = (p, key, gap) => {
 };
 const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
-function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+const sfx = (p,k) => tx(p,{t:'sfx',k});
+function playerHitsBlock(q,x,y,z){
+  if(!q.alive)return false;
+  const samples=[[q.x,q.y,q.z],[q.px??q.x,q.py??q.y,q.pz??q.z]];
+  // Também verifica o trecho entre o último snapshot e a posição atual.
+  for(let i=1;i<=2;i++){
+    const a=i/3;samples.push([
+      (q.px??q.x)+(q.x-(q.px??q.x))*a,
+      (q.py??q.y)+(q.y-(q.py??q.y))*a,
+      (q.pz??q.z)+(q.z-(q.pz??q.z))*a
+    ]);
+  }
+  return samples.some(([px,py,pz])=>{
+    const horizontal=px+.34>x&&px-.34<x+1&&pz+.34>z&&pz-.34<z+1;
+    const vertical=py+.03<y+1&&py+1.77>y;
+    return horizontal&&vertical;
+  });
+}
+function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
 const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q => [q.id, q.name, q.team]) });
 
 function win(R) {
@@ -61,7 +79,7 @@ function win(R) {
   if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 60000); }
 }
 function die(R, q) {
-  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q);
+  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
   const k = q.src && R.t - q.st < 5 ? q.src : null; if (k) k.k++;
   msg(R, q.name + (k ? ' foi derrubado por ' + k.name : ' morreu'));
   if (!R.bed[q.team]) { q.out = 1; msg(R, q.name + ' foi eliminado!'); win(R); }
@@ -70,7 +88,7 @@ function hurt(R, q, d, kx, kz, src, cr) {
   if (!q.alive || q.ih > 0) return;
   q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; q.hp -= d;
   if (src) { q.src = src; q.st = R.t; }
-  tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 });
+  tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
   bc(R, { t: 'fx', x: q.x, y: q.y + 1, z: q.z, c: cr ? 0xffd23d : 0xd23c3c });
   if (q.hp <= 0) die(R, q);
 }
@@ -146,7 +164,7 @@ function pickupDrops(R, players){
   for(let i=R.drops.length-1;i>=0;i--){
     const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.25&&Math.abs(q.y-d.y)<2.5);
     if(!p) continue;
-    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;R.drops.splice(i,1);changed=true;
+    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;sfx(p,'pickup');R.drops.splice(i,1);changed=true;
   }
   if(changed)bc(R,{t:'drops',l:R.drops});
 }
@@ -186,7 +204,7 @@ wss.on('connection', ws => {
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
         const d = Math.hypot(m.x - p.x, m.z - p.z);
         if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > dt * 12 + 1.5 || m.y - p.y > dt * 11 + 1.2 || m.x < -5 || m.x > S.W + 5 || m.z < -5 || m.z > S.D + 5 || m.y > 45) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
-        p.dy = (m.y - p.y) / dt; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
+        p.dy = (m.y - p.y) / dt; p.px=p.x;p.py=p.y;p.pz=p.z; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'hit': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
@@ -208,8 +226,8 @@ wss.on('connection', ws => {
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
         if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
-        if ([...R.ps.values()].some(q => q.alive && Math.abs(q.x - x - .5) < .8 && Math.abs(q.z - z - .5) < .8 && q.y < y + 1 && q.y + 1.8 > y)) break;
-        setb(R, x, y, z, k, 1); p.inv[m.k]--; if (k === 13) R.tnt.push({ x, y, z, t: 3.2, o: p }); pinv(p); break;
+        if ([...R.ps.values()].some(q => playerHitsBlock(q,x,y,z))) { sfx(p,'blocked'); break; }
+        setb(R, x, y, z, k, 1); p.inv[m.k]--; if (k === 13) R.tnt.push({ x, y, z, t: 3.2, o: p }); pinv(p); sfx(p,'place'); break;
       }
       case 'breakStart': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
@@ -234,7 +252,7 @@ wss.on('connection', ws => {
         else if (s[3] === 'tool' && (p.tools[s[4]]||0) < s[5]) p.tools[s[4]] = s[5];
         else if (s[3] === 'up' && p.up[s[4]] === s[5] - 1) p.up[s[4]] = s[5];
         else ok = 0;
-        if (ok) { p.inv[s[1]] -= s[2]; pinv(p); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
+        if (ok) { p.inv[s[1]] -= s[2]; pinv(p); sfx(p,'buy'); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
         break;
       }
       case 'shoot': {
@@ -308,7 +326,7 @@ setInterval(() => {
             const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
             const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
-            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)])setb(R,br.x,br.y,br.z,0);p.breaking=null;}
+            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
           }
           if (p.y < -8) die(R, p);
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
