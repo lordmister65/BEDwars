@@ -36,7 +36,7 @@ input{font:inherit;width:100%;box-sizing:border-box;padding:6px;background:#0d15
 <button id="st" style="display:none;text-align:center;margin-top:10px">Iniciar partida</button><p id="wt"></p></div></div>
 <div class="ov" id="ov"><div><h1>Pronto?</h1>
 <p>WASD anda · Espaço pula · Shift agacha</p><p>Esquerdo bate ou quebra · direito usa o item</p>
-<p>1–5 ou roda do mouse troca o item · B abre a loja</p>
+<p>1–8 ou roda do mouse troca o item · B abre a loja</p>
 <p>Cada clique é um golpe. Golpe caindo = crítico.</p><p><b>Clique para jogar</b></p></div></div>
 <div class="ov" id="shop"><div><h1>Loja</h1><div id="sl"></div><button onclick="closeShop()">Fechar (B)</button></div></div>
 <div class="ov" id="end"><div><h1 id="et"></h1><button onclick="location.reload()">Jogar de novo</button></div></div>
@@ -94,16 +94,16 @@ function step(e,dt){const k=Math.max(0,1-5*dt),vx=e.vx+e.kx,vz=e.vz+e.kz;e.kx*=k
 let n=e.x+vx*dt;if(!hit(n,e.y,e.z))e.x=n;n=e.z+vz*dt;if(!hit(e.x,e.y,n))e.z=n;
 e.vy-=28*dt;n=e.y+e.vy*dt;e.g=false;if(!hit(e.x,n,e.z))e.y=n;else{if(e.vy<0)e.g=true;e.vy=0}}
 // estado
-const K={},SL=['Espada','Lã','Tábuas','TNT','Maçã'],KY=[0,'wool','planks','tnt','apple'],SC=['#ccc','#3d6fe0','#b58a4e','#d83030','#ffd23d'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
-let inv={wool:0,planks:0,tnt:0,apple:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,up={sharp:0,prot:0,forge:0},cur=1,started=0,over=0,shopOpen=0,bed=[1,1,1,1],INFO={},tg=null,ws;const clk=[],PL=new Map(),PT=[];
+const K={},SL=['Espada','Lã','Tábuas','TNT','Maçã','Arco','B. Fogo','B. Neve'],KY=[0,'wool','planks','tnt','apple','bow','fireball','snowball'],SC=['#ccc','#3d6fe0','#b58a4e','#d83030','#ffd23d','#8b5a2b','#ff7a20','#eef6ff'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
+let inv={wool:0,planks:0,tnt:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,up={sharp:0,prot:0,forge:0},cur=1,started=0,over=0,shopOpen=0,bed=[1,1,1,1],INFO={},tg=null,ws;const clk=[],PL=new Map(),PT=[];
 let AC;const snd=(f,d=.1,ty='square',v=.05)=>{try{AC=AC||new AudioContext();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(t+d)}catch(e){}};
 let mt;const msg=t=>{$('msg').textContent=t;clearTimeout(mt);mt=setTimeout(()=>$('msg').textContent='',2600)};
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
-function hud(){html('bar',SL.map((s,i)=>`<div class="s${i===cur?' on':''}" title="${s}" onclick="pick(${i})"><i style="background:${SC[i]}"></i><em>${i+1}</em><b>${i?inv[KY[i]]:''}</b></div>`).join(''));
+function hud(){html('bar',SL.map((s,i)=>{const q=i===5?(inv.bow?('F'+inv.arrow):0):(i?inv[KY[i]]:'');return `<div class="s${i===cur?' on':''}" title="${s}" onclick="pick(${i})"><i style="background:${SC[i]}"></i><em>${i+1}</em><b>${q}</b></div>`}).join(''));
 html('res',`<img class="ri" src="${RI.iron}">Ferro ${inv.iron}<br><img class="ri" src="${RI.gold}">Ouro ${inv.gold}<br><img class="ri" src="${RI.dia}">Diamante ${inv.dia}<br><img class="ri" src="${RI.em}">Esmeralda ${inv.em}`);
 html('hp',`Vida ${me.hp}/20<br>Espada: ${SN[sw]}<br>Armadura: ${AN[ar]}<br>Afiação ${up.sharp} · Prot. ${up.prot} · Forja ${up.forge}<br>CPS ${clk.filter(t=>performance.now()-t<1000).length}`);
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t);return `<span style="color:#${hex(TC[t])}">■</span> ${o?o.n:'vazio'}: ${!o?'—':bed[t]?'cama':'sem cama'}`}).join('<br>'))}
-const pick=n=>{cur=(n+5)%5;hud()};
+const pick=n=>{cur=(n+8)%8;hud()};
 $('sl').innerHTML=SH.map((s,i)=>`<button onclick="send({t:'buy',i:${i}})"><img class="shopri" src="${RI[s[1]]}">${s[0]} — ${s[2]} ${CN[s[1]]}</button>`).join('');
 const scr=n=>['menu','lobby','ov','shop','end'].forEach(k=>$(k).style.display=k===n?'flex':'none'),cv=R.domElement;
 function closeShop(){shopOpen=0;cv.requestPointerLock()}
@@ -122,8 +122,11 @@ lm(-.15,.6,.25,.6,0x333366);lm(.15,.6,.25,.6,0x333366);lm(-.4,1.2,.2,.6,0xe8b98a
 const c=document.createElement('canvas');c.width=256;c.height=48;const x=c.getContext('2d');x.font='bold 30px monospace';x.textAlign='center';x.lineWidth=5;x.strokeStyle='#000';x.fillStyle='#fff';x.strokeText(info.n,128,34);x.fillText(info.n,128,34);
 const lb=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));lb.scale.set(2,.38,1);lb.position.y=2.4;g.add(lb);
 sc.add(g);return{m:g,tx:0,ty:0,tz:0,yaw:0,al:1,init:0}}
-const FX_GEO=new THREE.BoxGeometry(.15,.15,.15),FX_MAT=new Map();
+const FX_GEO=new THREE.BoxGeometry(.15,.15,.15),FX_MAT=new Map(),PJ=[];
+const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereGeometry(.18,6,6),snowball:new THREE.SphereGeometry(.13,6,6)};
+const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff})};
 function fx(x,y,z,c,n=8){let mm=FX_MAT.get(c);if(!mm){mm=new THREE.MeshBasicMaterial({color:c});FX_MAT.set(c,mm)}for(let i=0;i<n;i++){const m=new THREE.Mesh(FX_GEO,mm);m.position.set(x,y,z);sc.add(m);PT.push({m,vx:(Math.random()-.5)*8,vy:Math.random()*6,vz:(Math.random()-.5)*8,t:.6})}}
+function projectile(m){const q=new THREE.Mesh(PJ_GEO[m.k]||PJ_GEO.snowball,PJ_MAT[m.k]||PJ_MAT.snowball);q.position.set(m.x,m.y,m.z);sc.add(q);PJ.push({m:q,x:m.x,y:m.y,z:m.z,tx:m.tx,ty:m.ty,tz:m.tz,t:0,d:m.k==='arrow'?.16:m.k==='fireball'?.28:.2});}
 function on(m){switch(m.t){
 case'init':me.id=m.id;me.team=m.team;m.ed.forEach(a=>sb(...a));flush();pl.yaw=Math.atan2(IS[m.team][0]-32,IS[m.team][1]-32);break;
 case'lobby':INFO={};m.l.forEach(([id,n,t])=>INFO[id]={n,t});
@@ -137,13 +140,14 @@ case'bb':m.l.forEach(a=>sb(...a));flush();break;
 case'tp':pl.x=m.x;pl.y=m.y;pl.z=m.z;pl.vy=0;pl.kx=pl.kz=0;break;
 case'kb':pl.kx+=m.kx;pl.kz+=m.kz;pl.vy=Math.max(pl.vy,m.vy);snd(150,.08,'sawtooth',.09);break;
 case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').style.transform='',70);snd(m.cr?520:330,.06,'square',.075);msg((m.cr?'CRÍTICO · ':'')+'Vida inimiga: '+m.hp);break;
+case'proj':projectile(m);snd(m.k==='fireball'?85:m.k==='arrow'?420:260,.06,m.k==='fireball'?'sawtooth':'square',.055);break;
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;hud();break;
 case'bed':bed=m.bed;snd(120,.6,'sawtooth',.15);hud();break;
 case'm':msg(m.s);break;case'fx':fx(m.x,m.y,m.z,m.c);snd(m.c===0xff8a2a?60:200,m.c===0xff8a2a?.5:.08,'sawtooth',.1);break;
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':over=1;document.exitPointerLock();$('et').textContent='Fim de jogo — venceu: '+m.w;scr('end');break}}
 // entrada
-addEventListener('keydown',e=>{K[e.code]=1;if(e.code>='Digit1'&&e.code<='Digit5')pick(+e.code[5]-1);
+addEventListener('keydown',e=>{K[e.code]=1;if(e.code>='Digit1'&&e.code<='Digit8')pick(+e.code[5]-1);
 if(e.code==='KeyB'&&started&&!over){if(shopOpen)closeShop();else{const bx=IS[me.team][0]+.5,bz=IS[me.team][1]+.5;if(Math.hypot(pl.x-bx,pl.z-bz)>6||Math.abs(pl.y-11)>=4){msg('A loja só pode ser usada na sua base');return}shopOpen=1;document.exitPointerLock()}}});
 addEventListener('keyup',e=>K[e.code]=0);addEventListener('wheel',e=>pick(cur+(e.deltaY>0?1:-1)));
 addEventListener('mousemove',e=>{if(!document.pointerLockElement)return;pl.yaw-=e.movementX*.0023;pl.pitch=Math.max(-1.55,Math.min(1.55,pl.pitch-e.movementY*.0023))});
@@ -166,7 +170,13 @@ if(e.button===0){
   if(enemy!==null)send({t:'hit',id:enemy,yaw:pl.yaw,pitch:pl.pitch});
   else if(tg)send({t:'break',x:tg.h[0],y:tg.h[1],z:tg.h[2]});
 }
-else if(e.button===2){if(cur===4)send({t:'apple'});else if(cur>0&&tg&&tg.p)send({t:'place',k:KY[cur],x:tg.p[0],y:tg.p[1],z:tg.p[2]})}});
+else if(e.button===2){
+  if(cur===4)send({t:'apple'});
+  else if(cur===5)send({t:'shoot',k:'bow',yaw:pl.yaw,pitch:pl.pitch});
+  else if(cur===6)send({t:'shoot',k:'fireball',yaw:pl.yaw,pitch:pl.pitch});
+  else if(cur===7)send({t:'shoot',k:'snowball',yaw:pl.yaw,pitch:pl.pitch});
+  else if(cur>0&&tg&&tg.p)send({t:'place',k:KY[cur],x:tg.p[0],y:tg.p[1],z:tg.p[2]});
+}});
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0;hud();
 function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;
@@ -180,6 +190,7 @@ const lerpA=1-Math.exp(-12*dt);
 PL.forEach(r=>{const p=r.m.position;p.x+=(r.tx-p.x)*lerpA;p.y+=(r.ty-p.y)*lerpA;p.z+=(r.tz-p.z)*lerpA;r.m.rotation.y=r.yaw;r.m.visible=!!r.al;
 const mv=Math.hypot(r.tx-p.x,r.tz-p.z)>.05?Math.sin(now/90)*.7:0;const c=r.m.children;c[2].rotation.x=mv;c[3].rotation.x=-mv;c[4].rotation.x=-mv;c[5].rotation.x=mv});
 for(let i=PT.length;i--;){const p=PT[i];p.t-=dt;p.vy-=20*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;if(p.t<=0){sc.remove(p.m);PT.splice(i,1)}}
+for(let i=PJ.length;i--;){const p=PJ[i];p.t+=dt;const a=Math.min(1,p.t/p.d);p.m.position.set(p.x+(p.tx-p.x)*a,p.y+(p.ty-p.y)*a,p.z+(p.tz-p.z)*a);if(a>=1){sc.remove(p.m);PJ.splice(i,1)}}
 if(acc>.25){acc=0;hud()}
 cam.position.set(pl.x,pl.y+(K.ShiftLeft?1.42:1.62),pl.z);cam.rotation.set(pl.pitch,pl.yaw,0);
 tg=me.alive&&started?ray():null;sel.visible=!!tg;if(tg)sel.position.set(tg.h[0]+.5,tg.h[1]+.5,tg.h[2]+.5);

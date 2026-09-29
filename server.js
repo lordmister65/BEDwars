@@ -47,7 +47,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0,
-  rl: Object.create(null), up: { sharp: 0, prot: 0, forge: 0 }, inv: { wool: 24, planks: 0, tnt: 0, apple: 0, iron: 0, gold: 0, dia: 0, em: 0 } });
+  rl: Object.create(null), up: { sharp: 0, prot: 0, forge: 0 }, inv: { wool: 24, planks: 0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
   if (n - last < gap) return false;
@@ -94,6 +94,40 @@ function boom(R, q) {
     if (!e.alive) return;
     const dx = e.x - q.x - .5, dy = e.y + .9 - q.y - .5, dz = e.z - q.z - .5, L = Math.hypot(dx, dy, dz);
     if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o);
+  });
+}
+
+function aimRay(R, p, yaw, pitch, range) {
+  const cy = Math.cos(pitch), dx = -Math.sin(yaw) * cy, dy = Math.sin(pitch), dz = -Math.cos(yaw) * cy;
+  let best = null, bd = range;
+  R.ps.forEach(q => {
+    if (q === p || !q.alive || q.team === p.team) return;
+    const x = q.x - p.x, y = q.y + .9 - (p.y + 1.62), z = q.z - p.z, L = Math.hypot(x, y, z);
+    if (L < bd && L > .01 && (x * dx + y * dy + z * dz) / L > .985) { best = q; bd = L; }
+  });
+  let bx = p.x + dx * range, by = p.y + 1.62 + dy * range, bz = p.z + dz * range;
+  for (let t = .25; t <= range; t += .2) {
+    const x = p.x + dx * t, y = p.y + 1.62 + dy * t, z = p.z + dz * t;
+    if (get(R, Math.floor(x), Math.floor(y), Math.floor(z))) {
+      bx = x; by = y; bz = z;
+      if (t < bd) { bd = t; best = null; }
+      break;
+    }
+  }
+  return { dx, dy, dz, best, dist: bd, x: p.x + dx * bd, y: p.y + 1.62 + dy * bd, z: p.z + dz * bd, bx, by, bz };
+}
+function fireballBoom(R, x, y, z, owner) {
+  const r = 2;
+  for (let a=-r;a<=r;a++) for (let b=-r;b<=r;b++) for (let c=-r;c<=r;c++) {
+    if (a*a+b*b+c*c>r*r) continue;
+    const X=Math.floor(x)+a,Y=Math.floor(y)+b,Z=Math.floor(z)+c;
+    if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]) setb(R,X,Y,Z,0);
+  }
+  bc(R,{t:'fx',x,y,z,c:0xff6a00});
+  R.ps.forEach(q=>{
+    if(!q.alive)return;
+    const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
+    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner);
   });
 }
 
@@ -163,12 +197,42 @@ wss.on('connection', ws => {
       case 'buy': {
         const s = S.SH[m.i]; if (!play || !allow(p, 'buy', 120) || !nearBase(p) || !s || p.inv[s[1]] < s[2]) break;
         let ok = 1;
-        if (s[3] === 'inv') p.inv[s[4]] += s[5];
+        if (s[3] === 'inv' && s[4] === 'bow') { if (p.inv.bow > 0) ok = 0; else p.inv.bow = 1; }
+        else if (s[3] === 'inv') p.inv[s[4]] += s[5];
         else if (s[3] === 'sw' && p.sw < s[5]) p.sw = s[5];
         else if (s[3] === 'ar' && p.ar < s[5]) p.ar = s[5];
         else if (s[3] === 'up' && p.up[s[4]] === s[5] - 1) p.up[s[4]] = s[5];
         else ok = 0;
         if (ok) { p.inv[s[1]] -= s[2]; pinv(p); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
+        break;
+      }
+      case 'shoot': {
+        if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
+        const kind = m.k;
+        const gap = kind === 'bow' ? 500 : kind === 'fireball' ? 900 : kind === 'snowball' ? 300 : 999999;
+        if (!allow(p, 'shoot_' + kind, gap)) break;
+        if (kind === 'bow') {
+          if (p.inv.bow < 1 || p.inv.arrow < 1) break;
+          p.inv.arrow--;
+          const r = aimRay(R, p, m.yaw, m.pitch, 28);
+          bc(R,{t:'proj',k:'arrow',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
+          if (r.best) hurt(R, r.best, 5, r.dx, r.dz, p);
+          pinv(p);
+        } else if (kind === 'fireball') {
+          if (p.inv.fireball < 1) break;
+          p.inv.fireball--;
+          const r = aimRay(R, p, m.yaw, m.pitch, 24);
+          bc(R,{t:'proj',k:'fireball',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
+          fireballBoom(R, r.x, r.y, r.z, p);
+          pinv(p);
+        } else if (kind === 'snowball') {
+          if (p.inv.snowball < 1) break;
+          p.inv.snowball--;
+          const r = aimRay(R, p, m.yaw, m.pitch, 20);
+          bc(R,{t:'proj',k:'snowball',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
+          if (r.best) hurt(R, r.best, 1, r.dx * 1.15, r.dz * 1.15, p);
+          pinv(p);
+        }
         break;
       }
       case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
