@@ -18,8 +18,8 @@ const heldRoot=new THREE.Group();heldRoot.position.set(.52,-.26,-.92);hand.add(h
 const HMAT=new Map();const hmat=(c,o=1)=>{const k=c+':'+o;if(!HMAT.has(k))HMAT.set(k,new THREE.MeshBasicMaterial({color:c,transparent:o<1,opacity:o}));return HMAT.get(k)};
 const box=(w,h,d,c)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),hmat(c));
 const sphere=(r,c,o=1)=>new THREE.Mesh(new THREE.SphereGeometry(r,7,6),hmat(c,o));
-function swordModel(){
- const g=new THREE.Group(),cols=[0xc7c7c7,0x898989,0xd9d9d9,0x57e8ee],b=box(.10,.62,.10,cols[sw]||cols[0]),gr=box(.32,.07,.09,0x76513a),h=box(.09,.27,.09,0x5b3c2b);
+function swordModel(level=sw){
+ const g=new THREE.Group(),cols=[0xc7c7c7,0x898989,0xd9d9d9,0x57e8ee],b=box(.10,.62,.10,cols[level]||cols[0]),gr=box(.32,.07,.09,0x76513a),h=box(.09,.27,.09,0x5b3c2b);
  b.position.y=.22;gr.position.y=-.08;h.position.y=-.24;g.add(b,gr,h);g.rotation.z=-.35;return g
 }
 function blockModel(c,o=1){const g=new THREE.Group(),b=new THREE.Mesh(new THREE.BoxGeometry(.42,.42,.42),hmat(c,o));g.add(b);g.rotation.set(.15,.45,.05);return g}
@@ -28,10 +28,10 @@ function bowModel(){const g=new THREE.Group();for(const y of [-.22,0,.22]){const
 function appleModel(){const g=new THREE.Group(),a=sphere(.18,0xffc928),st=box(.05,.12,.05,0x6d4828);st.position.y=.19;g.add(a,st);return g}
 function tntModel(){const g=blockModel(0xd7352f),band=box(.44,.13,.44,0xe8e0d2);band.position.y=0;g.add(band);return g}
 function toolModel(k){const g=new THREE.Group(),h=box(.06,.48,.06,0x76513a);h.position.y=-.05;g.add(h);if(k==='pick'){const p=box(.42,.08,.08,0xbfc5c7);p.position.y=.22;g.add(p)}else if(k==='axe'){const p=box(.24,.26,.08,0xbfc5c7);p.position.set(.09,.18,0);g.add(p)}else{const a=box(.28,.05,.05,0xc7c7c7),b=a.clone();a.rotation.z=.5;b.rotation.z=-.5;a.position.y=b.position.y=.15;g.add(a,b)}g.rotation.z=-.45;return g}
-function heldModel(slot){
+function heldModel(slot,team=me.team,swordLevel=sw){
  const k=KY[slot];
- if(slot===0)return swordModel();
- if(k==='wool')return blockModel(TC[me.team]||0x3d6fe0);
+ if(slot===0)return swordModel(swordLevel);
+ if(k==='wool')return blockModel(TC[team]||0x3d6fe0);
  if(k==='planks')return blockModel(0xb58a4e);
  if(k==='endstone')return blockModel(0xe8dfb0);
  if(k==='glass')return blockModel(0xbfe9ff,.55);
@@ -188,7 +188,7 @@ const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereG
 const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff}),pearl:new THREE.MeshBasicMaterial({color:0x8b4bc7})};
 function fx(x,y,z,c,n=8){let mm=FX_MAT.get(c);if(!mm){mm=new THREE.MeshBasicMaterial({color:c});FX_MAT.set(c,mm)}for(let i=0;i<n;i++){const m=new THREE.Mesh(FX_GEO,mm);m.position.set(x,y,z);sc.add(m);PT.push({m,vx:(Math.random()-.5)*8,vy:Math.random()*6,vz:(Math.random()-.5)*8,t:.6})}}
 function projectile(m){const q=new THREE.Mesh(PJ_GEO[m.k]||PJ_GEO.snowball,PJ_MAT[m.k]||PJ_MAT.snowball);q.position.set(m.x,m.y,m.z);sc.add(q);PJ.push({m:q,x:m.x,y:m.y,z:m.z,tx:m.tx,ty:m.ty,tz:m.tz,t:0,d:m.k==='arrow'?.16:m.k==='fireball'?.28:.2});}
-function remoteHeld(r,slot){if(r.hs===slot)return;r.hs=slot;while(r.held.children.length)r.held.remove(r.held.children[0]);const model=heldModel(slot);model.scale.set(.65,.65,.65);r.held.add(model)}
+function remoteHeld(r,slot,team,swordLevel){const sig=slot+':'+team+':'+swordLevel;if(r.hs===sig)return;r.hs=sig;while(r.held.children.length)r.held.remove(r.held.children[0]);const model=heldModel(slot,team,swordLevel);model.scale.set(.65,.65,.65);r.held.add(model)}
 const DROP=new Map();
 function syncDrops(l){const seen=new Set();l.forEach(d=>{seen.add(d.id);let o=DROP.get(d.id);if(!o){const tex=iconTex[d.k]||iconTex.iron,m=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));m.scale.set(.55,.55,1);sc.add(m);o={m};DROP.set(d.id,o)}o.m.position.set(d.x,d.y,d.z)});DROP.forEach((o,id)=>{if(!seen.has(id)){sc.remove(o.m);DROP.delete(id)}})}
 function on(m){switch(m.t){
@@ -197,8 +197,8 @@ case'lobby':INFO={};m.l.forEach(([id,n,t])=>INFO[id]={n,t});
 $('pl').innerHTML=m.l.map(([id,n,t])=>`<p style="color:#${hex(TC[t])}">■ ${n}${id===me.id?' (você)':''}${id===m.host?' ★ anfitrião':''}</p>`).join('');
 $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?'Precisa de 2 ou mais jogadores.':'Aguardando o anfitrião iniciar.';scr('lobby');hud();break;
 case'start':started=1;bed=m.bed;scr(touchMode||document.pointerLockElement?null:'ov');hud();break;
-case's':{const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
-let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;remoteHeld(r,hs||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
+case's':{const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
+let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;remoteHeld(r,hs||0,tm,rsw||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id)}});break}
 case'bb':m.l.forEach(a=>sb(...a));unstick();break;
 case'breakp':breakDur=m.d;breakAt=performance.now();$('breakBox').style.display='block';break;
