@@ -7,16 +7,13 @@ const MAX_SOCKET_BUFFER = 256 * 1024;
 let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
-const STATIC = {
-  'index.html': fs.readFileSync(path.join(__dirname, 'public', 'index.html')),
-  'shared.js': fs.readFileSync(path.join(__dirname, 'public', 'shared.js'))
-};
+const STATIC = {};
+for (const f of ['index.html','shared.js','game.js','style.css']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
 const srv = http.createServer((q, r) => {
-  const f = q.url.startsWith('/shared.js') ? 'shared.js' : 'index.html';
-  r.writeHead(200, {
-    'Content-Type': f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8',
-    'Cache-Control': f === 'index.html' ? 'no-cache' : 'public, max-age=300'
-  });
+  const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
+  if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
+  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
+  r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
   r.end(STATIC[f]);
 });
 const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
@@ -36,7 +33,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null,
+    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -47,24 +44,24 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0,
-  rl: Object.create(null), up: { sharp: 0, prot: 0, forge: 0 }, inv: { wool: 24, planks: 0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, iron: 0, gold: 0, dia: 0, em: 0 } });
+  rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
   if (n - last < gap) return false;
   p.rl[key] = n; return true;
 };
 const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
-const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up });
-function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.hp = 20; p.alive = 1; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
+function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
 const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q => [q.id, q.name, q.team]) });
 
 function win(R) {
   if (R.st !== 'play') return;
   const live = [...R.ps.values()].filter(q => !q.out), teams = new Set(live.map(q => q.team));
-  if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => rooms.delete(R.code), 60000); }
+  if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 60000); }
 }
 function die(R, q) {
-  q.alive = 0; q.hp = 0; q.rt = 3;
+  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q);
   const k = q.src && R.t - q.st < 5 ? q.src : null; if (k) k.k++;
   msg(R, q.name + (k ? ' foi derrubado por ' + k.name : ' morreu'));
   if (!R.bed[q.team]) { q.out = 1; msg(R, q.name + ' foi eliminado!'); win(R); }
@@ -88,7 +85,7 @@ function killBed(R, t, src) {
 function boom(R, q) {
   const r = 3;
   for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) for (let c = -r; c <= r; c++)
-    if (a * a + b * b + c * c <= r * r) { const X = q.x + a, Y = q.y + b, Z = q.z + c; if (get(R, X, Y, Z) && R.pf[S.ix(X, Y, Z)]) setb(R, X, Y, Z, 0); }
+    if (a * a + b * b + c * c <= r * r) { const X = q.x + a, Y = q.y + b, Z = q.z + c; if (get(R, X, Y, Z) && R.pf[S.ix(X, Y, Z)] && ![7,16].includes(get(R,X,Y,Z))) setb(R, X, Y, Z, 0); }
   bc(R, { t: 'fx', x: q.x + .5, y: q.y + .5, z: q.z + .5, c: 0xff8a2a });
   R.ps.forEach(e => {
     if (!e.alive) return;
@@ -121,7 +118,7 @@ function fireballBoom(R, x, y, z, owner) {
   for (let a=-r;a<=r;a++) for (let b=-r;b<=r;b++) for (let c=-r;c<=r;c++) {
     if (a*a+b*b+c*c>r*r) continue;
     const X=Math.floor(x)+a,Y=Math.floor(y)+b,Z=Math.floor(z)+c;
-    if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]) setb(R,X,Y,Z,0);
+    if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]&&![7,16].includes(get(R,X,Y,Z))) setb(R,X,Y,Z,0);
   }
   bc(R,{t:'fx',x,y,z,c:0xff6a00});
   R.ps.forEach(q=>{
@@ -131,11 +128,38 @@ function fireballBoom(R, x, y, z, owner) {
   });
 }
 
+function breakTime(p, b) {
+  const m=S.BLOCKS[b]||{hard:.7,tool:null}, lv=m.tool?p.tools[m.tool]||0:0;
+  let mult=1;
+  if(m.tool==='shears'&&lv) mult=.28;
+  else if(m.tool==='pick'&&lv) mult=lv===1?.55:.32;
+  else if(m.tool==='axe'&&lv) mult=lv===1?.55:.32;
+  return Math.max(.18,m.hard*mult);
+}
+function addDrop(R,k,n,x,y,z,max=64){
+  let d=R.drops.find(e=>e.k===k&&Math.hypot(e.x-x,e.z-z)<1.2&&e.n<max);
+  if(d){d.n=Math.min(max,d.n+n);} else {d={id:++R.dropSeq,k,n:Math.min(max,n),x,y,z};R.drops.push(d);}
+  bc(R,{t:'drops',l:R.drops});
+}
+function pickupDrops(R, players){
+  let changed=false;
+  for(let i=R.drops.length-1;i>=0;i--){
+    const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.25&&Math.abs(q.y-d.y)<2.5);
+    if(!p) continue;
+    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;R.drops.splice(i,1);changed=true;
+  }
+  if(changed)bc(R,{t:'drops',l:R.drops});
+}
+function nearOwnBase(p){return Math.hypot(p.x-(S.IS[p.team][0]+.5),p.z-(S.IS[p.team][1]+.5))<5.5&&Math.abs(p.y-11)<4;}
+function enemyInBase(R,p){return [...R.ps.values()].find(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-(S.IS[p.team][0]+.5),q.z-(S.IS[p.team][1]+.5))<5.5);}
+
+
 wss.on('connection', ws => {
   let R, p;
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', raw => {
+    if(raw.length>4096){try{ws.close(1009,'mensagem muito grande')}catch(e){}return}
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
@@ -144,7 +168,7 @@ wss.on('connection', ws => {
       if (!free.length) return tx({ ws }, { t: 'err', s: 'Sala cheia (4 jogadores).' });
       p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), free[0]); p.id = ++uid; spawn(p);
       R.ps.set(p.id, p); if (!R.host) R.host = p.id;
-      tx(p, { t: 'init', id: p.id, team: p.team, ed: [...R.ed.values()] }); lobby(R); return;
+      tx(p, { t: 'init', id: p.id, team: p.team, ed: [...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
@@ -165,6 +189,7 @@ wss.on('connection', ws => {
         p.dy = (m.y - p.y) / dt; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'hit': {
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !allow(p, 'hit', 90) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const q = R.ps.get(m.id);
         if (!q || q === p || !q.alive || q.team === p.team) break;
@@ -177,23 +202,28 @@ wss.on('connection', ws => {
         break;
       }
       case 'place': {
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!allow(p, 'place', 45)) break;
-        const k = { wool: p.team + 1, planks: 5, stone: 12, tnt: 13 }[m.k], { x, y, z } = m;
+        const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16, tnt: 13 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
         if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
         if ([...R.ps.values()].some(q => q.alive && Math.abs(q.x - x - .5) < .8 && Math.abs(q.z - z - .5) < .8 && q.y < y + 1 && q.y + 1.8 > y)) break;
         setb(R, x, y, z, k, 1); p.inv[m.k]--; if (k === 13) R.tnt.push({ x, y, z, t: 3.2, o: p }); pinv(p); break;
       }
-      case 'break': {
-        if (!allow(p, 'break', 70)) break;
-        const { x, y, z } = m;
-        if (!play || ![x, y, z].every(Number.isInteger) || Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
-        const b = get(R, x, y, z);
-        if (b >= 8 && b <= 11) { if (b - 8 === p.team) tx(p, { t: 'm', s: 'Essa é a sua cama!' }); else killBed(R, b - 8, p); }
-        else if (b && R.pf[S.ix(x, y, z)]) setb(R, x, y, z, 0);
-        break;
+      case 'breakStart': {
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
+        const {x,y,z}=m;
+        if(!play||![x,y,z].every(Number.isInteger)||Math.hypot(x+.5-p.x,y+.5-p.y-1.6,z+.5-p.z)>7)break;
+        const b=get(R,x,y,z); if(!b)break;
+        if(b>=8&&b<=11){
+          if(b-8===p.team){tx(p,{t:'m',s:'Essa é a sua cama!'});break;}
+          p.breaking={x,y,z,b,need:.9,at:R.t};tx(p,{t:'breakp',x,y,z,d:.9});break;
+        }
+        if(!R.pf[S.ix(x,y,z)])break;
+        const need=breakTime(p,b);p.breaking={x,y,z,b,need,at:R.t};tx(p,{t:'breakp',x,y,z,d:need});break;
       }
+      case 'breakStop': p.breaking=null; break;
       case 'buy': {
         const s = S.SH[m.i]; if (!play || !allow(p, 'buy', 120) || !nearBase(p) || !s || p.inv[s[1]] < s[2]) break;
         let ok = 1;
@@ -201,12 +231,14 @@ wss.on('connection', ws => {
         else if (s[3] === 'inv') p.inv[s[4]] += s[5];
         else if (s[3] === 'sw' && p.sw < s[5]) p.sw = s[5];
         else if (s[3] === 'ar' && p.ar < s[5]) p.ar = s[5];
+        else if (s[3] === 'tool' && (p.tools[s[4]]||0) < s[5]) p.tools[s[4]] = s[5];
         else if (s[3] === 'up' && p.up[s[4]] === s[5] - 1) p.up[s[4]] = s[5];
         else ok = 0;
         if (ok) { p.inv[s[1]] -= s[2]; pinv(p); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
         break;
       }
       case 'shoot': {
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const kind = m.k;
         const gap = kind === 'bow' ? 500 : kind === 'fireball' ? 900 : kind === 'snowball' ? 300 : 999999;
@@ -235,6 +267,18 @@ wss.on('connection', ws => {
         }
         break;
       }
+      case 'use': {
+        if(!play||!allow(p,'use',300))break;
+        const k=m.k;
+        if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){
+          p.inv.pearl--;const r=aimRay(R,p,m.yaw,m.pitch,30);
+          bc(R,{t:'proj',k:'pearl',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
+          p.x=r.x-r.dx*.7;p.y=Math.max(1,r.y);p.z=r.z-r.dz*.7;p.hp=Math.max(1,p.hp-2);tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});pinv(p);
+        } else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p);}
+        else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p);}
+        else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p);}
+        break;
+      }
       case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
     }
   });
@@ -255,39 +299,46 @@ setInterval(() => {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih = Math.max(0, p.ih - dt);
-        if (p.alive) { p.hp = Math.min(20, p.hp + .4 * dt); if (p.y < -8) die(R, p); }
-        else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
+        p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);
+        if (p.alive) {
+          p.hp = Math.min(20, p.hp + .4 * dt);
+          if(p.up.regen&&nearOwnBase(p))p.hp=Math.min(20,p.hp+.8*dt);
+          if(p.up.trap&&enemyInBase(R,p)){p.up.trap=0;tx(p,{t:'m',s:'ARMADILHA! Inimigo na sua base!'});pinv(p);}
+          if(p.breaking){
+            const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
+            const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
+            if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
+            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)])setb(R,br.x,br.y,br.z,0);p.breaking=null;}
+          }
+          if (p.y < -8) die(R, p);
+        } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
       R.g.base.forEach((g, i) => {
         const gx = S.IS[i][0] + .5, gz = S.IS[i][1] + .5;
         const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
         g.iron += dt; g.gold += dt;
-        if (g.iron > 1.2 / fm) { g.iron = 0; near.forEach(q => { q.inv.iron++; q.dirty = 1; }); }
-        if (g.gold > 5 / fm) { g.gold = 0; near.forEach(q => { q.inv.gold++; q.dirty = 1; }); }
+        if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,11.25,gz,48); }
+        if (g.gold > 5 / fm) { g.gold = 0; addDrop(R,'gold',1,gx+1,11.25,gz,12); }
       });
       R.g.dia.forEach((g, i) => {
         g.t += dt;
         if (g.t <= 12) return;
         g.t = 0;
-        const [gx,gz] = S.DI[i];
-        players.forEach(q => {
-          if (q.alive && Math.hypot(q.x-(gx+.5), q.z-(gz+.5)) < 3 && Math.abs(q.y-11) < 4) { q.inv.dia++; q.dirty=1; }
-        });
+        const [gx,gz] = S.DI[i];addDrop(R,'dia',1,gx+.5,11.35,gz+.5,4);
       });
       R.g.em.t += dt;
       if (R.g.em.t > 22) {
         R.g.em.t = 0;
         const [gx,gz] = S.EM;
-        players.forEach(q => {
-          if (q.alive && Math.hypot(q.x-(gx+.5), q.z-(gz+.5)) < 4 && Math.abs(q.y-12) < 5) { q.inv.em++; q.dirty=1; }
-        });
+        addDrop(R,'em',1,gx+.5,12.35,gz+.5,2);
       }
+      R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
       for (let i = R.tnt.length; i--;) { const q = R.tnt[i]; if ((q.t -= dt) <= 0) { R.tnt.splice(i, 1); boom(R, q); } }
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') bc(R, { t: 's', p: [...R.ps.values()].map(p => [p.id, +p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +p.yaw.toFixed(2), +p.pitch.toFixed(2), Math.ceil(p.hp), p.alive, p.team]) });
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0])});}}
   });
 }, 50);
 

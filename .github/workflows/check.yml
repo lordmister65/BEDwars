@@ -1,0 +1,23 @@
+name: Check Bedwars
+on:
+  pull_request:
+  push:
+    branches: [ main, feature/full-gameplay-v4 ]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.js
+          node --check public/shared.js
+          node --check public/game.js
+      - name: Check referenced client assets
+        run: |
+          grep -q '/style.css' public/index.html
+          grep -q '/game.js' public/index.html
