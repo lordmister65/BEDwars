@@ -72,12 +72,26 @@ let AC,masterGain,lastStep=0,lastPickup=0;
 const audioInit=()=>{try{if(!AC){AC=new AudioContext();masterGain=AC.createGain();masterGain.gain.value=.55;masterGain.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}catch(e){}};
 const tone=(f,d=.1,ty='square',v=.05,slide=0)=>{try{audioInit();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=ty;o.frequency.setValueAtTime(Math.max(20,f),t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(masterGain);o.start();o.stop(t+d)}catch(e){}};
 const noise=(d=.08,v=.035,cut=1200)=>{try{audioInit();const n=Math.max(1,Math.floor(AC.sampleRate*d)),buf=AC.createBuffer(1,n,AC.sampleRate),a=buf.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const src=AC.createBufferSource(),g=AC.createGain(),lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=cut;g.gain.value=v;src.buffer=buf;src.connect(lp);lp.connect(g);g.connect(masterGain);src.start()}catch(e){}};
+const positionalGain=(x,y,z,r=7)=>{
+  const d=Math.hypot(pl.x-x,(pl.y+1)-y,pl.z-z);
+  if(d>=r)return 0;
+  const t=1-d/r;
+  return Math.max(0,Math.min(1,t*t));
+};
 const sfx=k=>{
   if(k==='place'){noise(.045,.025,900);tone(165,.045,'square',.022,-35)}
   else if(k==='break'){noise(.09,.04,1450);tone(110,.06,'triangle',.025,-45)}
   else if(k==='blocked'){tone(95,.06,'square',.035,-15)}
   else if(k==='buy'){tone(660,.055,'square',.035,220);setTimeout(()=>tone(880,.065,'square',.025,120),45)}
   else if(k==='pickup'){const n=performance.now();if(n-lastPickup<65)return;lastPickup=n;tone(780,.04,'sine',.025,180)}
+  else if(k==='resource_iron'){tone(390,.035,'triangle',.018,70)}
+  else if(k==='resource_gold'){tone(620,.045,'sine',.024,160)}
+  else if(k==='resource_dia'){tone(820,.05,'sine',.027,220)}
+  else if(k==='resource_em'){tone(520,.045,'triangle',.025,280)}
+  else if(k==='pickup_iron'){tone(520,.035,'sine',.023,120)}
+  else if(k==='pickup_gold'){tone(760,.04,'sine',.028,180)}
+  else if(k==='pickup_dia'){tone(940,.045,'sine',.03,240)}
+  else if(k==='pickup_em'){tone(660,.045,'triangle',.03,320)}
   else if(k==='hurt'){noise(.05,.03,700);tone(130,.08,'sawtooth',.045,-55)}
   else if(k==='death'){tone(180,.12,'sawtooth',.05,-100);setTimeout(()=>tone(90,.22,'sawtooth',.04,-40),80)}
   else if(k==='hit'){tone(310,.045,'square',.035,-70)}
@@ -144,7 +158,10 @@ case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').st
 case'proj':projectile(m);sfx(m.k==='fireball'?'fireball':m.k==='arrow'?'arrow':m.k==='pearl'?'pearl':'snowball');break;
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();break;
 case'bed':bed=m.bed;sfx('bed');hud();break;
-case'm':msg(m.s);break;case'sfx':sfx(m.k);break;case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');break;
+case'm':msg(m.s);break;
+case'sfx':sfx(m.k);break;
+case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0){const old=masterGain?masterGain.gain.value:.55;if(masterGain)masterGain.gain.value=.55*g;sfx(m.k);if(masterGain)masterGain.gain.value=old}break}
+case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');break;
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':over=1;sfx('victory');document.exitPointerLock();$('et').textContent='Fim de jogo — venceu: '+m.w;scr('end');break}}
 // entrada
