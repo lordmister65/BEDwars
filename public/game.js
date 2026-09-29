@@ -84,14 +84,6 @@ const sfx=k=>{
   else if(k==='blocked'){tone(95,.06,'square',.035,-15)}
   else if(k==='buy'){tone(660,.055,'square',.035,220);setTimeout(()=>tone(880,.065,'square',.025,120),45)}
   else if(k==='pickup'){const n=performance.now();if(n-lastPickup<65)return;lastPickup=n;tone(780,.04,'sine',.025,180)}
-  else if(k==='resource_iron'){tone(390,.035,'triangle',.018,70)}
-  else if(k==='resource_gold'){tone(620,.045,'sine',.024,160)}
-  else if(k==='resource_dia'){tone(820,.05,'sine',.027,220)}
-  else if(k==='resource_em'){tone(520,.045,'triangle',.025,280)}
-  else if(k==='pickup_iron'){tone(520,.035,'sine',.023,120)}
-  else if(k==='pickup_gold'){tone(760,.04,'sine',.028,180)}
-  else if(k==='pickup_dia'){tone(940,.045,'sine',.03,240)}
-  else if(k==='pickup_em'){tone(660,.045,'triangle',.03,320)}
   else if(k==='hurt'){noise(.05,.03,700);tone(130,.08,'sawtooth',.045,-55)}
   else if(k==='death'){tone(180,.12,'sawtooth',.05,-100);setTimeout(()=>tone(90,.22,'sawtooth',.04,-40),80)}
   else if(k==='hit'){tone(310,.045,'square',.035,-70)}
@@ -104,6 +96,18 @@ const sfx=k=>{
   else if(k==='victory'){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,.16,'square',.035,40),i*90))}
   else if(k==='step'){noise(.035,.014,650)}
   else if(k==='jump'){tone(190,.05,'triangle',.018,60)}
+};
+const resourceSfx=(k,g=1)=>{
+  if(g<=0)return;
+  const T=(f,d,ty,v,slide=0)=>tone(f,d,ty,v*g,slide);
+  if(k==='resource_iron')T(390,.035,'triangle',.018,70);
+  else if(k==='resource_gold')T(620,.045,'sine',.024,160);
+  else if(k==='resource_dia')T(820,.05,'sine',.027,220);
+  else if(k==='resource_em')T(520,.045,'triangle',.025,280);
+  else if(k==='pickup_iron')T(520,.035,'sine',.023,120);
+  else if(k==='pickup_gold')T(760,.04,'sine',.028,180);
+  else if(k==='pickup_dia')T(940,.045,'sine',.03,240);
+  else if(k==='pickup_em')T(660,.045,'triangle',.03,320);
 };
 const snd=(f,d=.1,ty='square',v=.05)=>tone(f,d,ty,v,0);
 let mt;const msg=t=>{$('msg').textContent=t;clearTimeout(mt);mt=setTimeout(()=>$('msg').textContent='',2600)};
@@ -160,7 +164,7 @@ case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud
 case'bed':bed=m.bed;sfx('bed');hud();break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
-case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0){const old=masterGain?masterGain.gain.value:.55;if(masterGain)masterGain.gain.value=.55*g;sfx(m.k);if(masterGain)masterGain.gain.value=old}break}
+case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0)resourceSfx(m.k,g);break}
 case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');break;
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':over=1;sfx('victory');document.exitPointerLock();$('et').textContent='Fim de jogo — venceu: '+m.w;scr('end');break}}
