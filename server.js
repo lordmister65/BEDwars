@@ -7,16 +7,13 @@ const MAX_SOCKET_BUFFER = 256 * 1024;
 let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
-const STATIC = {
-  'index.html': fs.readFileSync(path.join(__dirname, 'public', 'index.html')),
-  'shared.js': fs.readFileSync(path.join(__dirname, 'public', 'shared.js'))
-};
+const STATIC = {};
+for (const f of ['index.html','shared.js','game.js','style.css']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
 const srv = http.createServer((q, r) => {
-  const f = q.url.startsWith('/shared.js') ? 'shared.js' : 'index.html';
-  r.writeHead(200, {
-    'Content-Type': f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8',
-    'Cache-Control': f === 'index.html' ? 'no-cache' : 'public, max-age=300'
-  });
+  const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
+  if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
+  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
+  r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
   r.end(STATIC[f]);
 });
 const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
