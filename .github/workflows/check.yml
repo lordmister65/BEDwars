@@ -2,7 +2,7 @@ name: Check Bedwars
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [ main, feature/full-gameplay-v4 ]
 jobs:
   syntax:
     runs-on: ubuntu-latest
