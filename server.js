@@ -108,7 +108,11 @@ function aimRay(R, p, yaw, pitch, range) {
   let bx = p.x + dx * range, by = p.y + 1.62 + dy * range, bz = p.z + dz * range;
   for (let t = .25; t <= range; t += .2) {
     const x = p.x + dx * t, y = p.y + 1.62 + dy * t, z = p.z + dz * t;
-    if (get(R, Math.floor(x), Math.floor(y), Math.floor(z))) { bx = x; by = y; bz = z; bd = Math.min(bd, t); break; }
+    if (get(R, Math.floor(x), Math.floor(y), Math.floor(z))) {
+      bx = x; by = y; bz = z;
+      if (t < bd) { bd = t; best = null; }
+      break;
+    }
   }
   return { dx, dy, dz, best, dist: bd, x: p.x + dx * bd, y: p.y + 1.62 + dy * bd, z: p.z + dz * bd, bx, by, bz };
 }
@@ -193,7 +197,8 @@ wss.on('connection', ws => {
       case 'buy': {
         const s = S.SH[m.i]; if (!play || !allow(p, 'buy', 120) || !nearBase(p) || !s || p.inv[s[1]] < s[2]) break;
         let ok = 1;
-        if (s[3] === 'inv') p.inv[s[4]] += s[5];
+        if (s[3] === 'inv' && s[4] === 'bow') { if (p.inv.bow > 0) ok = 0; else p.inv.bow = 1; }
+        else if (s[3] === 'inv') p.inv[s[4]] += s[5];
         else if (s[3] === 'sw' && p.sw < s[5]) p.sw = s[5];
         else if (s[3] === 'ar' && p.ar < s[5]) p.ar = s[5];
         else if (s[3] === 'up' && p.up[s[4]] === s[5] - 1) p.up[s[4]] = s[5];
