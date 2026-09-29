@@ -53,6 +53,12 @@ const allow = (p, key, gap) => {
 const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
 const sfx = (p,k) => tx(p,{t:'sfx',k});
+const sfxAt = (R,k,x,y,z,r=7) => {
+  R.ps.forEach(p => {
+    if (!p.alive) return;
+    if (Math.hypot(p.x-x,p.y-y,p.z-z) <= r) tx(p,{t:'sfx3d',k,x,y,z,r});
+  });
+};
 function playerHitsBlock(q,x,y,z){
   if(!q.alive)return false;
   const samples=[[q.x,q.y,q.z],[q.px??q.x,q.py??q.y,q.pz??q.z]];
@@ -157,6 +163,7 @@ function breakTime(p, b) {
 function addDrop(R,k,n,x,y,z,max=64){
   let d=R.drops.find(e=>e.k===k&&Math.hypot(e.x-x,e.z-z)<1.2&&e.n<max);
   if(d){d.n=Math.min(max,d.n+n);} else {d={id:++R.dropSeq,k,n:Math.min(max,n),x,y,z};R.drops.push(d);}
+  if(['iron','gold','dia','em'].includes(k)) sfxAt(R,'resource_'+k,x,y,z,k==='iron'?4.5:6);
   bc(R,{t:'drops',l:R.drops});
 }
 function pickupDrops(R, players){
@@ -164,7 +171,10 @@ function pickupDrops(R, players){
   for(let i=R.drops.length-1;i>=0;i--){
     const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.25&&Math.abs(q.y-d.y)<2.5);
     if(!p) continue;
-    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;sfx(p,'pickup');R.drops.splice(i,1);changed=true;
+    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;
+    if(['iron','gold','dia','em'].includes(d.k)) sfxAt(R,'pickup_'+d.k,d.x,d.y,d.z,6);
+    else sfx(p,'pickup');
+    R.drops.splice(i,1);changed=true;
   }
   if(changed)bc(R,{t:'drops',l:R.drops});
 }
