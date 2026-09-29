@@ -112,13 +112,26 @@ const resourceSfx=(k,g=1)=>{
 const snd=(f,d=.1,ty='square',v=.05)=>tone(f,d,ty,v,0);
 let mt;const msg=t=>{$('msg').textContent=t;clearTimeout(mt);mt=setTimeout(()=>$('msg').textContent='',2600)};
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
-function hud(){html('bar',SL.map((s,i)=>{let q=i?inv[KY[i]]:'';if(i===8)q=inv.bow?('F'+inv.arrow):0;return `<div class="s${i===cur?' on':''}" title="${s}" onclick="pick(${i})"><i style="background:${SC[i]}"></i><em>${i<9?i+1:''}</em><b>${q}</b></div>`}).join(''));
-html('res',`<img class="ri" src="${RI.iron}">Ferro ${inv.iron}<br><img class="ri" src="${RI.gold}">Ouro ${inv.gold}<br><img class="ri" src="${RI.dia}">Diamante ${inv.dia}<br><img class="ri" src="${RI.em}">Esmeralda ${inv.em}`);
-swordMat.color.setHex([0xc9c9c9,0x8f8f8f,0xd9d9d9,0x56e6ef][sw]||0xc9c9c9);html('hp',`Vida ${me.hp}/20<br>Espada: ${SN[sw]} · Armadura: ${AN[ar]}<br>Pic. ${tools.pick} · Machado ${tools.axe} · Tesoura ${tools.shears?'sim':'não'}<br>Afiação ${up.sharp} · Prot. ${up.prot} · Forja ${up.forge}${up.regen?' · Regen':''}${up.trap?' · Armadilha':''}<br>${fxs.speed>0?'⚡Veloc. ':''}${fxs.jump>0?'↥Salto ':''}${fxs.invis>0?'◌Invis. ':''}<br>CPS ${clk.filter(t=>performance.now()-t<1000).length}`);
-html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t);return `<span style="color:#${hex(TC[t])}">■</span> ${o?o.n:'vazio'}: ${!o?'—':bed[t]?'cama':'sem cama'}`}).join('<br>'))}
+function hud(){
+html('bar',SL.map((name,i)=>{let q=i?inv[KY[i]]:'';if(i===8)q=inv.bow?('F'+inv.arrow):0;return `<div class="s${i===cur?' on':''}" title="${name}" onclick="pick(${i})"><i style="background:${SC[i]}"></i><em>${i<9?i+1:''}</em><b>${q}</b></div>`}).join(''));
+html('res',[
+  ['iron','Ferro',inv.iron],['gold','Ouro',inv.gold],['dia','Diamante',inv.dia],['em','Esmeralda',inv.em]
+].map(([k,n,v])=>`<div class="resource-row"><img class="ri" src="${RI[k]}"><span>${n}</span><strong>${v}</strong></div>`).join(''));
+const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10},(_,i)=>`<span class="heart${hp<=i*2?' empty':''}">♥</span>`).join('');
+swordMat.color.setHex([0xc9c9c9,0x8f8f8f,0xd9d9d9,0x56e6ef][sw]||0xc9c9c9);
+html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
+html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
+}
 const pick=n=>{cur=(n+SL.length)%SL.length;hud()};
 let shopCat='Blocos';const cats=[...new Set(SH.map(s=>s[6]||'Outros'))];
-function drawShop(){html('shopTabs',cats.map(c=>`<button onclick="shopCat='${c}';drawShop()">${c}</button>`).join(''));html('sl',SH.map((s,i)=>({s,i})).filter(o=>(o.s[6]||'Outros')===shopCat).map(o=>`<button onclick="send({t:'buy',i:${o.i}})"><img class="shopri" src="${RI[o.s[1]]||RI.iron}">${o.s[0]} — ${o.s[2]} ${CN[o.s[1]]}</button>`).join(''))}drawShop();
+function drawShop(){
+  html('shopTabs',cats.map(c=>`<button class="${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop()">${c}</button>`).join(''));
+  html('sl',SH.map((s,i)=>({s,i})).filter(o=>(o.s[6]||'Outros')===shopCat).map(o=>{
+    const s=o.s,cant=(inv[s[1]]||0)<s[2],icon=RI[s[1]]||RI.iron;
+    return `<button class="shop-card${cant?' cant':''}" onclick="send({t:'buy',i:${o.i}})"><img class="shopri" src="${icon}"><span class="item-name">${s[0]}</span><span class="item-cost">${s[2]} ${CN[s[1]]||s[1]}</span></button>`
+  }).join(''));
+  html('shopWallet',`<span><img src="${RI.iron}"> ${inv.iron}</span><span><img src="${RI.gold}"> ${inv.gold}</span><span><img src="${RI.dia}"> ${inv.dia}</span><span><img src="${RI.em}"> ${inv.em}</span>`);
+}drawShop();
 const scr=n=>['menu','lobby','ov','shop','end'].forEach(k=>$(k).style.display=k===n?'flex':'none'),cv=R.domElement;
 function closeShop(){shopOpen=0;if(!touchMode)cv.requestPointerLock();else scr(null)}
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(shopOpen?'shop':'ov')});
@@ -160,7 +173,7 @@ case'tp':pl.x=m.x;pl.y=m.y;pl.z=m.z;pl.vy=0;pl.kx=pl.kz=0;break;
 case'kb':pl.kx+=m.kx;pl.kz+=m.kz;pl.vy=Math.max(pl.vy,m.vy);sfx('hurt');break;
 case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').style.transform='',70);sfx(m.cr?'crit':'hit');msg((m.cr?'CRÍTICO · ':'')+'Vida inimiga: '+m.hp);break;
 case'proj':projectile(m);sfx(m.k==='fireball'?'fireball':m.k==='arrow'?'arrow':m.k==='pearl'?'pearl':'snowball');break;
-case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();break;
+case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();break;
 case'bed':bed=m.bed;sfx('bed');hud();break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
