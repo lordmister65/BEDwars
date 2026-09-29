@@ -151,7 +151,6 @@ html('res',[
   ['iron','Ferro',inv.iron],['gold','Ouro',inv.gold],['dia','Diamante',inv.dia],['em','Esmeralda',inv.em]
 ].map(([k,n,v])=>`<div class="resource-row"><img class="ri" src="${RI[k]}"><span>${n}</span><strong>${v}</strong></div>`).join(''));
 const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10},(_,i)=>`<span class="heart${hp<=i*2?' empty':''}">♥</span>`).join('');
-swordMat.color.setHex([0xc9c9c9,0x8f8f8f,0xd9d9d9,0x56e6ef][sw]||0xc9c9c9);
 html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
