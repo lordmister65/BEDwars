@@ -1,0 +1,28 @@
+name: Check Bedwars
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Check server/shared syntax
+        run: |
+          node --check server.js
+          node --check public/shared.js
+      - name: Check inline client JavaScript
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const h=fs.readFileSync('public/index.html','utf8');
+          const scripts=[...h.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).filter(Boolean);
+          if(!scripts.length) throw new Error('No inline script found');
+          fs.writeFileSync('/tmp/client.js',scripts[scripts.length-1]);
+          NODE
+          node --check /tmp/client.js
