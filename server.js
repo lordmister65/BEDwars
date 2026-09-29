@@ -61,10 +61,10 @@ const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q
 function win(R) {
   if (R.st !== 'play') return;
   const live = [...R.ps.values()].filter(q => !q.out), teams = new Set(live.map(q => q.team));
-  if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => rooms.delete(R.code), 60000); }
+  if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 60000); }
 }
 function die(R, q) {
-  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1);
+  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q);
   const k = q.src && R.t - q.st < 5 ? q.src : null; if (k) k.k++;
   msg(R, q.name + (k ? ' foi derrubado por ' + k.name : ' morreu'));
   if (!R.bed[q.team]) { q.out = 1; msg(R, q.name + ' foi eliminado!'); win(R); }
@@ -162,6 +162,7 @@ wss.on('connection', ws => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', raw => {
+    if(raw.length>4096){try{ws.close(1009,'mensagem muito grande')}catch(e){}return}
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
@@ -191,7 +192,7 @@ wss.on('connection', ws => {
         p.dy = (m.y - p.y) / dt; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'hit': {
-        p.fx.invis=0;
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !allow(p, 'hit', 90) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const q = R.ps.get(m.id);
         if (!q || q === p || !q.alive || q.team === p.team) break;
@@ -204,7 +205,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'place': {
-        p.fx.invis=0;
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!allow(p, 'place', 45)) break;
         const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16, tnt: 13 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
@@ -214,7 +215,7 @@ wss.on('connection', ws => {
         setb(R, x, y, z, k, 1); p.inv[m.k]--; if (k === 13) R.tnt.push({ x, y, z, t: 3.2, o: p }); pinv(p); break;
       }
       case 'breakStart': {
-        p.fx.invis=0;
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         const {x,y,z}=m;
         if(!play||![x,y,z].every(Number.isInteger)||Math.hypot(x+.5-p.x,y+.5-p.y-1.6,z+.5-p.z)>7)break;
         const b=get(R,x,y,z); if(!b)break;
@@ -240,7 +241,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'shoot': {
-        p.fx.invis=0;
+        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const kind = m.k;
         const gap = kind === 'bow' ? 500 : kind === 'fireball' ? 900 : kind === 'snowball' ? 300 : 999999;
@@ -308,7 +309,8 @@ setInterval(() => {
           if(p.up.trap&&enemyInBase(R,p)){p.up.trap=0;tx(p,{t:'m',s:'ARMADILHA! Inimigo na sua base!'});pinv(p);}
           if(p.breaking){
             const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
-            if(!same||!near)p.breaking=null;
+            const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
+            if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
             else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)])setb(R,br.x,br.y,br.z,0);p.breaking=null;}
           }
           if (p.y < -8) die(R, p);
