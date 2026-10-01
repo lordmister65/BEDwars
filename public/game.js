@@ -1,4 +1,4 @@
-const $=id=>document.getElementById(id),{W,H,D,TC,TN,IS,DI,EM,ix,SH,BLOCKS}=BW,gn=BW.gen(),B=gn.B,pf=new Uint8Array(B.length),CS=16,hex=c=>c.toString(16).padStart(6,'0');
+const $=id=>document.getElementById(id),{W,H,D,TC,TN,IS,DI,EM,LOBBY,MAPS,ix,SH,BLOCKS}=BW,gn=BW.gen('classic',true),B=gn.B,pf=new Uint8Array(B.length),CS=16,hex=c=>c.toString(16).padStart(6,'0');let currentMap='classic';
 const RI={
   iron:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAAxElEQVR4nO3ZsRWCMBSG0afHiVzB2kFkIByEmhVYSVsL0Sr54/HekoZHvtAkVQAAAAAAAAAAAAAAAAAAAAD8ikN6gFe3aXok33+f5+7rEQmwt9Dny7X3KFVVta3L2+c9gpxav+Cb1KJ/mmEvSAuxACMs/AiO6QFG1HNzCBAmQJgAYQKECRAmQJgAYQKECRAmQJgAYQKExQJs69L12HdU8fuA0fTeFPEAex/c4kh4xD/uL++EE3e/AAAAAAAAAAAAAADQ0BPsQyBuy/khFgAAAABJRU5ErkJggg==',
   gold:'data:image/png;base64,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',
@@ -64,12 +64,18 @@ function genIcon(k,x,y,z,scale=1.25){
 IS.forEach(([x,z])=>{genIcon('iron',x-.45,12.15,z+.5,.9);genIcon('gold',x+1.35,12.15,z+.5,.9)});
 DI.forEach(([x,z])=>genIcon('dia',x+.5,12.2,z+.5,1.1));
 genIcon('em',EM[0]+.5,13.2,EM[1]+.5,1.25);
-const cvT=document.createElement('canvas');cvT.width=128;cvT.height=16;const c2=cvT.getContext('2d');let sd=3;const rn=()=>(sd=(sd*16807)%2147483647)/2147483647;
-for(let t=0;t<5;t++)for(let x=0;x<16;x++)for(let y=0;y<16;y++){let v=.84+rn()*.16;
-if(t===0)v=(x+y)%4<2?v:v-.09;if(t===1)v=y%5===0?.62:(x+(y/5|0)*7)%16===0?.7:v;if(t===2)v=rn()<.16?.66:v;if(t===3)v=y<3?.72:v;if(t===4)v=(y>5&&y<11)?.97:v;
-c2.fillStyle=`rgb(${v*255|0},${v*255|0},${v*255|0})`;c2.fillRect(t*16+x,y,1,1)}
-const tex=new THREE.CanvasTexture(cvT);tex.magFilter=tex.minFilter=THREE.NearestFilter;
-const tl=b=>b<5?0:b===5?1:b===13?4:b>=8&&b<=11?3:2,mat=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,side:THREE.FrontSide}),M={},dirty=new Set();
+const cvT=document.createElement('canvas');cvT.width=128;cvT.height=16;const c2=cvT.getContext('2d');c2.imageSmoothingEnabled=false;
+function tile(t,base,fn){for(let x=0;x<16;x++)for(let y=0;y<16;y++){let c=base;if(fn)c=fn(x,y,c);c2.fillStyle=c;c2.fillRect(t*16+x,y,1,1)}}
+tile(0,'#d8d8d8',(x,y)=>((x*3+y*5)%7===0?'#bdbdbd':(x+y)%5===0?'#ededed':'#d8d8d8'));
+tile(1,'#a77945',(x,y)=>(y%4===0?'#76502f':(x+(y>>2)*5)%13===0?'#c99a63':'#a77945'));
+tile(2,'#e5dca9',(x,y)=>((x*5+y*3)%11<2?'#c8bf91':(x+y)%9===0?'#f5edc0':'#e5dca9'));
+tile(3,'#eeeeee',(x,y)=>(y<3?'#fafafa':y>10?'#7b4e31':'#d8d4ca'));
+tile(4,'#d52b2b',(x,y)=>(y>5&&y<10?'#eee6d6':(x+y)%5===0?'#ff4d42':'#d52b2b'));
+tile(5,'#251d31',(x,y)=>((x*7+y*11)%9<2?'#49335c':'#251d31'));
+tile(6,'#cdefff',(x,y)=>(x===0||y===0||x===15||y===15?'#ffffff':((x+y)%6===0?'#9ed6eb':'#cdefff')));
+tile(7,'#aaaaaa',(x,y)=>((x+y)%4===0?'#7c7c7c':'#aaaaaa'));
+const tex=new THREE.CanvasTexture(cvT);tex.magFilter=tex.minFilter=THREE.NearestFilter;tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+const tl=b=>b<5?0:b===5?1:(b===12||b===6)?2:b>=8&&b<=11?3:b===13?4:b===16?5:b===7?6:(b===14||b===15)?7:2,mat=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,side:THREE.FrontSide,transparent:true,alphaTest:.08}),M={},dirty=new Set();
 function build(cx,cz){const p=[],c=[],i=[],u=[],col=new THREE.Color();let n=0;
 for(let x=cx*CS;x<cx*CS+CS;x++)for(let z=cz*CS;z<cz*CS+CS;z++)for(let y=0;y<H;y++){const b=B[ix(x,y,z)];if(!b)continue;
 const v=.94+((x*73856093^y*19349663^z*83492791)>>>0)%100/1600,pp=P[b];
@@ -82,6 +88,8 @@ M[k]=new THREE.Mesh(g,mat);sc.add(M[k])}
 function sb(x,y,z,v,f){if(x<0||z<0||y<0||x>=W||z>=D||y>=H)return;B[ix(x,y,z)]=v;pf[ix(x,y,z)]=f;const a=Math.floor(x/CS),b=Math.floor(z/CS);dirty.add(a+','+b);
 if(x%CS==0)dirty.add((a-1)+','+b);if(x%CS==CS-1)dirty.add((a+1)+','+b);if(z%CS==0)dirty.add(a+','+(b-1));if(z%CS==CS-1)dirty.add(a+','+(b+1))}
 function flush(max=2){let n=0;for(const q of [...dirty]){if(n++>=max)break;dirty.delete(q);const[u,w]=q.split(',').map(Number);if(u>=0&&w>=0&&u<W/CS&&w<D/CS)build(u,w)}}
+function loadMap(mapId,lobby=false){currentMap=MAPS[mapId]?mapId:'classic';const g=BW.gen(currentMap,lobby);B.set(g.B);pf.fill(0);dirty.clear();for(let a=0;a<W/CS;a++)for(let b=0;b<D/CS;b++)dirty.add(a+','+b);flush(999)}
+function updateChunkLOD(){const max=lowEnd?42:72;for(const [k,m] of Object.entries(M)){const [cx,cz]=k.split(',').map(Number),x=cx*CS+CS/2,z=cz*CS+CS/2;m.visible=Math.hypot(pl.x-x,pl.z-z)<max}}
 for(let a=0;a<W/CS;a++)for(let b=0;b<D/CS;b++)build(a,b);
 const sel=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01,1.01,1.01)),new THREE.LineBasicMaterial({color:0}));sel.visible=false;sc.add(sel);
 // jogador local
