@@ -108,20 +108,20 @@ function die(R, q, cause='combat') {
   if(killer){
     if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
-    const verb=cause==='void'?'derrubou':'eliminou';
+    const verb=cause==='void'?'derrubou':cause==='explosion'?'explodiu':'eliminou';
     feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
   } else {
-    feed(R,`${q.name} morreu${cause==='void'?' no vazio':''}`,-1,q.team,'death');
+    feed(R,`${q.name} morreu${cause==='void'?' no vazio':cause==='explosion'?' em uma explosão':''}`,-1,q.team,'death');
   }
   if (final) { q.out = 1; win(R); }
 }
-function hurt(R, q, d, kx, kz, src, cr) {
+function hurt(R, q, d, kx, kz, src, cr, cause='combat') {
   if (!q.alive || q.ih > 0) return;
   q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; q.hp -= d;
   if (src) { q.src = src; q.st = R.t; }
   tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
   bc(R, { t: 'fx', x: q.x, y: q.y + 1, z: q.z, c: cr ? 0xffd23d : 0xd23c3c });
-  if (q.hp <= 0) die(R, q);
+  if (q.hp <= 0) die(R, q, cause);
 }
 function killBed(R, t, src) {
   if (!R.bed[t]) return;
@@ -140,7 +140,7 @@ function boom(R, q) {
   R.ps.forEach(e => {
     if (!e.alive) return;
     const dx = e.x - q.x - .5, dy = e.y + .9 - q.y - .5, dz = e.z - q.z - .5, L = Math.hypot(dx, dy, dz);
-    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o);
+    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o, false, 'explosion');
   });
 }
 
@@ -174,7 +174,7 @@ function fireballBoom(R, x, y, z, owner) {
   R.ps.forEach(q=>{
     if(!q.alive)return;
     const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
-    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner);
+    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner,false,'explosion');
   });
 }
 
