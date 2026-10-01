@@ -265,7 +265,7 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
@@ -309,7 +309,7 @@ wss.on('connection', ws => {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
-        R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t: 'start', bed: R.bed }); break;
+        R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId }); break;
       case 'mv': {
         if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
@@ -331,7 +331,7 @@ wss.on('connection', ws => {
         if (L > 3.8 || L < .01 || (dx * d[0] + dy * d[1] + dz * d[2]) / L < .9) break;
         const cr = p.dy < -1;
         hurt(R, q, (DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1), d[0], d[2], p, cr);
-        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });
+        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });bc(R,{t:'anim',id:p.id,k:'attack'});
         break;
       }
       case 'place': {
@@ -354,7 +354,7 @@ wss.on('connection', ws => {
           p.breaking={x,y,z,b,need:.9,at:R.t};tx(p,{t:'breakp',x,y,z,d:.9});break;
         }
         if(!R.pf[S.ix(x,y,z)])break;
-        const need=breakTime(p,b);p.breaking={x,y,z,b,need,at:R.t};tx(p,{t:'breakp',x,y,z,d:need});break;
+        const need=breakTime(p,b);p.breaking={x,y,z,b,need,at:R.t};tx(p,{t:'breakp',x,y,z,d:need});bc(R,{t:'anim',id:p.id,k:'mine'});break;
       }
       case 'breakStop': p.breaking=null; break;
       case 'buy': {
@@ -376,6 +376,7 @@ wss.on('connection', ws => {
         const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
         const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:999999;
         if(!allow(p,'shoot_'+kind,gap))break;
+        bc(R,{t:'anim',id:p.id,k:'attack'});
         if(kind==='bow'){
           if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,14+16*charge,charge);pinv(p);
         }else if(kind==='fireball'){
