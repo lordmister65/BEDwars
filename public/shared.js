@@ -2,7 +2,7 @@
 // O servidor e o cliente usam exatamente as mesmas coordenadas e estruturas.
 (function (E) {
   const MIN_X=-200, MAX_X=200, MIN_Z=-200, MAX_Z=200;
-  const W=MAX_X-MIN_X+1, D=MAX_Z-MIN_Z+1, H=96, BASE_Y=34;
+  const W=MAX_X-MIN_X+1, D=MAX_Z-MIN_Z+1, H=64, BASE_Y=34;
 
   const TEAM_COLORS=[0x3d6fe0,0xd23c3c,0x3fae4a,0xe6c53a];
   const TEAM_NAMES=['Azul','Vermelho','Verde','Amarelo'];
@@ -221,6 +221,9 @@
       for(const [dx,dz] of [[-7,-7],[7,-7],[-7,7],[7,7]])tower(set,LOBBY[0]+dx,LOBBY[2]+dz,LOBBY[1],12,6);
     }
 
-    return {B,BD,SHOP,GEN,mapId:cfg.id,activeChunks:[...active]};
+    const DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);
+    const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;
+    const EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5];
+    return {B,BD,SHOP,GEN,DIGEN,EMGEN,mapId:cfg.id,activeChunks:[...active]};
   };
 })(typeof module!=='undefined'?module.exports:(window.BW={}));
