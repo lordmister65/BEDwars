@@ -32,8 +32,8 @@ function setb(R, x, y, z, v, f = 0) {
 function room(code) {
   let R = rooms.get(code);
   if (!R) {
-    const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
+    const g = S.gen('classic',true);
+    R = { code, mapId:'classic', B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -85,7 +85,8 @@ function playerHitsBlock(q,x,y,z){
   });
 }
 function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
-const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q => [q.id, q.name, q.team]) });
+function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=2.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
+const lobby = R => bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) });
 
 function win(R) {
   if (R.st !== 'play') return;
@@ -107,27 +108,27 @@ function die(R, q, cause='combat') {
   if(killer){
     if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
-    const verb=cause==='void'?'derrubou':'eliminou';
+    const verb=cause==='void'?'derrubou':cause==='explosion'?'explodiu':'eliminou';
     feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
   } else {
-    feed(R,`${q.name} morreu${cause==='void'?' no vazio':''}`,-1,q.team,'death');
+    feed(R,`${q.name} morreu${cause==='void'?' no vazio':cause==='explosion'?' em uma explosão':''}`,-1,q.team,'death');
   }
   if (final) { q.out = 1; win(R); }
 }
-function hurt(R, q, d, kx, kz, src, cr) {
+function hurt(R, q, d, kx, kz, src, cr, cause='combat') {
   if (!q.alive || q.ih > 0) return;
   q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; q.hp -= d;
   if (src) { q.src = src; q.st = R.t; }
   tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
   bc(R, { t: 'fx', x: q.x, y: q.y + 1, z: q.z, c: cr ? 0xffd23d : 0xd23c3c });
-  if (q.hp <= 0) die(R, q);
+  if (q.hp <= 0) die(R, q, cause);
 }
 function killBed(R, t, src) {
   if (!R.bed[t]) return;
   const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); R.bed[t] = 0;
   if(src){src.stats.bedsDestroyed++;feed(R,`${src.name} destruiu a cama do Time ${S.TN[t]}!`,src.team,t,'bed');}
   else feed(R,`A cama do Time ${S.TN[t]} foi destruída!`,-1,t,'bed');
-  bc(R, { t: 'bed', bed: R.bed });
+  bc(R, { t:'bed', bed:R.bed, team:t, pos:R.BD[t] });
   R.ps.forEach(q => { if (q.team === t && !q.alive && !q.out) { q.out = 1; msg(R, q.name + ' foi eliminado!'); } });
   win(R);
 }
@@ -139,7 +140,7 @@ function boom(R, q) {
   R.ps.forEach(e => {
     if (!e.alive) return;
     const dx = e.x - q.x - .5, dy = e.y + .9 - q.y - .5, dz = e.z - q.z - .5, L = Math.hypot(dx, dy, dz);
-    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o);
+    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o, false, 'explosion');
   });
 }
 
@@ -173,7 +174,7 @@ function fireballBoom(R, x, y, z, owner) {
   R.ps.forEach(q=>{
     if(!q.alive)return;
     const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
-    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner);
+    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner,false,'explosion');
   });
 }
 
@@ -264,30 +265,51 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
-      const free = [0, 1, 2, 3].filter(t => ![...R.ps.values()].some(q => q.team === t));
-      if (!free.length) return tx({ ws }, { t: 'err', s: 'Sala cheia (4 jogadores).' });
-      p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), free[0]); p.id = ++uid; spawn(p);
-      R.ps.set(p.id, p); if (!R.host) R.host = p.id;
-      tx(p, { t: 'init', id: p.id, team: p.team, token:p.token, room:R.code, ed: [...R.ed.values()], drops:R.drops }); lobby(R); return;
+      if (R.ps.size>=8) return tx({ws},{t:'err',s:'Sala cheia (8 jogadores).'});
+      const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
+      let team=counts.indexOf(Math.min(...counts)); if(counts[team]>=2)return tx({ws},{t:'err',s:'Todos os times estão cheios.'});
+      p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), team); p.id = ++uid;
+      R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
+      case 'team': {
+        if(R.st!=='lobby'||!Number.isInteger(m.team)||m.team<0||m.team>3)break;
+        const count=[...R.ps.values()].filter(q=>q!==p&&q.team===m.team).length;
+        if(count>=2){tx(p,{t:'m',s:'Esse time já está cheio.'});break}
+        p.team=m.team;spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
+      }
+      case 'map': {
+        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
+        R.mapId=m.map;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        bc(R,{t:'map',mapId:R.mapId});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
+      }
+      case 'chat': {
+        if(!allow(p,'chat',650))break;
+        const text=String(m.text||'').replace(/[<>]/g,'').trim().slice(0,120);if(!text)break;
+        const scope=m.scope==='team'?'team':'global',payload={t:'chat',scope,id:p.id,name:p.name,team:p.team,text};
+        if(scope==='team'){const data=JSON.stringify(payload);R.ps.forEach(q=>{if(q.team===p.team&&canSend(q.ws))q.ws.send(data)})}else bc(R,payload);
+        break;
+      }
       case 'start':
         if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
+        if(new Set([...R.ps.values()].map(q=>q.team)).size<2){tx(p,{t:'m',s:'É necessário ter jogadores em pelo menos 2 times.'});break}
+        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
-        R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t: 'start', bed: R.bed }); break;
+        R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId }); break;
       case 'mv': {
         if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
@@ -309,7 +331,7 @@ wss.on('connection', ws => {
         if (L > 3.8 || L < .01 || (dx * d[0] + dy * d[1] + dz * d[2]) / L < .9) break;
         const cr = p.dy < -1;
         hurt(R, q, (DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1), d[0], d[2], p, cr);
-        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });
+        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });bc(R,{t:'anim',id:p.id,k:'attack'});
         break;
       }
       case 'place': {
@@ -332,7 +354,7 @@ wss.on('connection', ws => {
           p.breaking={x,y,z,b,need:.9,at:R.t};tx(p,{t:'breakp',x,y,z,d:.9});break;
         }
         if(!R.pf[S.ix(x,y,z)])break;
-        const need=breakTime(p,b);p.breaking={x,y,z,b,need,at:R.t};tx(p,{t:'breakp',x,y,z,d:need});break;
+        const need=breakTime(p,b);p.breaking={x,y,z,b,need,at:R.t};tx(p,{t:'breakp',x,y,z,d:need});bc(R,{t:'anim',id:p.id,k:'mine'});break;
       }
       case 'breakStop': p.breaking=null; break;
       case 'buy': {
@@ -354,6 +376,7 @@ wss.on('connection', ws => {
         const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
         const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:999999;
         if(!allow(p,'shoot_'+kind,gap))break;
+        bc(R,{t:'anim',id:p.id,k:'attack'});
         if(kind==='bow'){
           if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,14+16*charge,charge);pinv(p);
         }else if(kind==='fireball'){
