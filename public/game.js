@@ -173,7 +173,12 @@ function vendorTarget(){
  cam.getWorldDirection(vendorDir);vendorRay.set(cam.position,vendorDir);vendorRay.far=5.2;
  const hits=vendorRay.intersectObjects(VENDORS.map(v=>v.root),true);
  if(!hits.length)return null;
- const team=hits[0].object.userData.vendorTeam;
+ const hit=hits[0],step=.18;
+ for(let d=.18;d<hit.distance-.12;d+=step){
+   const x=Math.floor(cam.position.x+vendorDir.x*d),y=Math.floor(cam.position.y+vendorDir.y*d),z=Math.floor(cam.position.z+vendorDir.z*d);
+   if(get(x,y,z))return null;
+ }
+ const team=hit.object.userData.vendorTeam;
  return VENDORS.find(v=>v.team===team)||null;
 }
 function loadMap(mapId,lobby=false,serverChunks=null){
