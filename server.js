@@ -33,7 +33,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null,
+    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -93,7 +93,8 @@ function win(R) {
   if (teams.size <= 1) {
     const winnerTeam=live[0]?.team ?? -1;
     R.st = 'ended';
-    bc(R,{t:'end',winnerTeam,stats:statsPayload(R),time:+R.t.toFixed(1)});
+    R.final={t:'end',winnerTeam,stats:statsPayload(R),time:+R.t.toFixed(1)};
+    bc(R,R.final);
     setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 90000);
   }
 }
@@ -104,9 +105,8 @@ function die(R, q, cause='combat') {
   const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
   const final = !R.bed[q.team];
   if(killer){
-    killer.stats.kills++;
+    if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
-    if(final) killer.stats.finalKills++;
     const verb=cause==='void'?'derrubou':'eliminou';
     feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
   } else {
@@ -264,7 +264,8 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team])});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'join' && !p) {
@@ -399,6 +400,7 @@ setInterval(() => {
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           p.disconnected=false;p.reconnectDeadline=0;
+          for(const k of ['iron','gold','dia','em']){const n=p.inv[k]||0;if(n>0){addDrop(R,k,n,p.x,p.y+.25,p.z,k==='iron'?48:k==='gold'?12:8);p.inv[k]=0;}}
           if(p.alive)die(R,p,'disconnect');
           p.out=1;feed(R,`${p.name} não reconectou a tempo e foi eliminado.`,-1,p.team,'disconnect');win(R);return;
         }
