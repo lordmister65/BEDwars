@@ -32,8 +32,8 @@ function setb(R, x, y, z, v, f = 0) {
 function room(code) {
   let R = rooms.get(code);
   if (!R) {
-    const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
+    const g = S.gen('classic');
+    R = { code, mapId:'classic', B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -85,7 +85,8 @@ function playerHitsBlock(q,x,y,z){
   });
 }
 function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
-const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q => [q.id, q.name, q.team]) });
+function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=2.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
+const lobby = R => bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) });
 
 function win(R) {
   if (R.st !== 'play') return;
@@ -127,7 +128,7 @@ function killBed(R, t, src) {
   const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); R.bed[t] = 0;
   if(src){src.stats.bedsDestroyed++;feed(R,`${src.name} destruiu a cama do Time ${S.TN[t]}!`,src.team,t,'bed');}
   else feed(R,`A cama do Time ${S.TN[t]} foi destruída!`,-1,t,'bed');
-  bc(R, { t: 'bed', bed: R.bed });
+  bc(R, { t:'bed', bed:R.bed, team:t, pos:R.BD[t] });
   R.ps.forEach(q => { if (q.team === t && !q.alive && !q.out) { q.out = 1; msg(R, q.name + ' foi eliminado!'); } });
   win(R);
 }
@@ -271,17 +272,38 @@ wss.on('connection', ws => {
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
-      const free = [0, 1, 2, 3].filter(t => ![...R.ps.values()].some(q => q.team === t));
-      if (!free.length) return tx({ ws }, { t: 'err', s: 'Sala cheia (4 jogadores).' });
-      p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), free[0]); p.id = ++uid; spawn(p);
-      R.ps.set(p.id, p); if (!R.host) R.host = p.id;
-      tx(p, { t: 'init', id: p.id, team: p.team, token:p.token, room:R.code, ed: [...R.ed.values()], drops:R.drops }); lobby(R); return;
+      if (R.ps.size>=8) return tx({ws},{t:'err',s:'Sala cheia (8 jogadores).'});
+      const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
+      let team=counts.indexOf(Math.min(...counts)); if(counts[team]>=2)return tx({ws},{t:'err',s:'Todos os times estão cheios.'});
+      p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), team); p.id = ++uid;
+      R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
+      case 'team': {
+        if(R.st!=='lobby'||!Number.isInteger(m.team)||m.team<0||m.team>3)break;
+        const count=[...R.ps.values()].filter(q=>q!==p&&q.team===m.team).length;
+        if(count>=2){tx(p,{t:'m',s:'Esse time já está cheio.'});break}
+        p.team=m.team;spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
+      }
+      case 'map': {
+        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
+        R.mapId=m.map;const g=S.gen(R.mapId);R.B=g.B;R.BD=g.BD;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        bc(R,{t:'map',mapId:R.mapId});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
+      }
+      case 'chat': {
+        if(!allow(p,'chat',650))break;
+        const text=String(m.text||'').replace(/[<>]/g,'').trim().slice(0,120);if(!text)break;
+        const scope=m.scope==='team'?'team':'global',payload={t:'chat',scope,id:p.id,name:p.name,team:p.team,text};
+        if(scope==='team'){const data=JSON.stringify(payload);R.ps.forEach(q=>{if(q.team===p.team&&canSend(q.ws))q.ws.send(data)})}else bc(R,payload);
+        break;
+      }
       case 'start':
         if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
+        if(new Set([...R.ps.values()].map(q=>q.team)).size<2){tx(p,{t:'m',s:'É necessário ter jogadores em pelo menos 2 times.'});break}
+        const gg=S.gen(R.mapId);R.B=gg.B;R.BD=gg.BD;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
