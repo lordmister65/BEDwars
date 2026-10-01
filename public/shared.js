@@ -64,7 +64,7 @@
     ['Regeneração na base','dia',4,'up','regen',1,'Melhorias'],
     ['Armadilha','dia',2,'up','trap',1,'Melhorias']
   ]
-  E.gen = (mapId='classic') => {
+  E.gen = (mapId='classic', includeLobby=false) => {
     const cfg=E.MAPS[mapId]||E.MAPS.classic, B = new Uint8Array(W * H * D), BD = [];
     const set = (x, y, z, v) => { if (x >= 0 && z >= 0 && x < W && z < D && y >= 0 && y < H) B[E.ix(x, y, z)] = v; };
     const disk=(cx,cy,cz,r,v)=>{
@@ -98,9 +98,10 @@
     if(cfg.theme==='volcano'){
       disk(E.EM[0],11,E.EM[1],4,6);disk(E.EM[0],12,E.EM[1],3,6);disk(E.EM[0],13,E.EM[1],2,6);set(E.EM[0],14,E.EM[1],15);
     }
-    // Ilha de espera elevada, usada apenas no lobby. É removida visualmente do foco quando a partida começa.
-    disk(E.LOBBY[0],E.LOBBY[1]-1,E.LOBBY[2],4,6);
-    disk(E.LOBBY[0],E.LOBBY[1],E.LOBBY[2],3,12);
+    if(includeLobby){
+      disk(E.LOBBY[0],E.LOBBY[1]-1,E.LOBBY[2],4,6);
+      disk(E.LOBBY[0],E.LOBBY[1],E.LOBBY[2],3,12);
+    }
     return { B, BD, mapId:cfg.id };
   };
 })(typeof module !== 'undefined' ? module.exports : (window.BW = {}));
