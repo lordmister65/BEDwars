@@ -24,16 +24,16 @@ const bc = (R, o) => {
   R.ps.forEach(p => { if (canSend(p.ws)) p.ws.send(data); });
 };
 const msg = (R, s) => bc(R, { t: 'm', s });
-const get = (R, x, y, z) => (y < 0 || x < 0 || z < 0 || x >= S.W || z >= S.D || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
+const get = (R, x, y, z) => (y < 0 || !S.inXZ(x,z) || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
 function setb(R, x, y, z, v, f = 0) {
-  if (x < 0 || z < 0 || y < 0 || x >= S.W || z >= S.D || y >= S.H) return;
+  if (!S.inXZ(x,z) || y < 0 || y >= S.H) return;
   const i = S.ix(x, y, z); R.B[i] = v; R.pf[i] = f; R.ed.set(i, [x, y, z, v, f]); R.q.push([x, y, z, v, f]);
 }
 function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -52,7 +52,10 @@ const allow = (p, key, gap) => {
   if (n - last < gap) return false;
   p.rl[key] = n; return true;
 };
-const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
+const nearBase = p => {
+  const q=p.roomShop||null, x=q?q[0]:S.IS[p.team][0]+.5, y=q?q[1]:S.BASE_Y+2, z=q?q[2]:S.IS[p.team][1]+.5;
+  return Math.hypot(p.x-x,p.z-z)<=8&&Math.abs(p.y-y)<5;
+};
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
 const sfx = (p,k) => tx(p,{t:'sfx',k});
 const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
@@ -84,8 +87,8 @@ function playerHitsBlock(q,x,y,z){
     return horizontal&&vertical;
   });
 }
-function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = 11.02; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
-function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=2.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
+function spawn(p) { p.x = S.IS[p.team][0] + .5; p.z = S.IS[p.team][1] + .5; p.y = S.BASE_Y + 2.02; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) });
 
 function win(R) {
@@ -204,8 +207,8 @@ function pickupDrops(R, players){
   }
   if(changed)bc(R,{t:'drops',l:R.drops});
 }
-function nearOwnBase(p){return Math.hypot(p.x-(S.IS[p.team][0]+.5),p.z-(S.IS[p.team][1]+.5))<5.5&&Math.abs(p.y-11)<4;}
-function enemyInBase(R,p){return [...R.ps.values()].find(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-(S.IS[p.team][0]+.5),q.z-(S.IS[p.team][1]+.5))<5.5);}
+function nearOwnBase(p){return Math.hypot(p.x-(S.IS[p.team][0]+.5),p.z-(S.IS[p.team][1]+.5))<18&&Math.abs(p.y-(S.BASE_Y+2))<8;}
+function enemyInBase(R,p){return [...R.ps.values()].find(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-(S.IS[p.team][0]+.5),q.z-(S.IS[p.team][1]+.5))<19);}
 function projectileDir(yaw,pitch){const c=Math.cos(pitch);return{x:-Math.sin(yaw)*c,y:Math.sin(pitch),z:-Math.cos(yaw)*c};}
 function spawnProjectile(R,p,k,yaw,pitch,speed,charge=1){
   const d=projectileDir(yaw,pitch), id=++R.projSeq;
@@ -247,7 +250,7 @@ function tickProjectiles(R,dt){
       const db=Math.hypot(block.x-pr.x,block.y-pr.y,block.z-pr.z),dtar=Math.hypot(target.x-pr.x,target.y+.9-pr.y,target.z-pr.z);
       if(db<dtar)target=null;
     }
-    if(target||block||pr.age>6||ny<-10){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
+    if(target||block||pr.age>8||ny<=-20){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
     pr.x=nx;pr.y=ny;pr.z=nz;
   }
 }
@@ -265,7 +268,7 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
@@ -276,8 +279,8 @@ wss.on('connection', ws => {
       const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
       let team=counts.indexOf(Math.min(...counts)); if(counts[team]>=2)return tx({ws},{t:'err',s:'Todos os times estão cheios.'});
       p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), team); p.id = ++uid;
-      R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
+      p.roomShop=R.SHOP[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
@@ -286,12 +289,12 @@ wss.on('connection', ws => {
         if(R.st!=='lobby'||!Number.isInteger(m.team)||m.team<0||m.team>3)break;
         const count=[...R.ps.values()].filter(q=>q!==p&&q.team===m.team).length;
         if(count>=2){tx(p,{t:'m',s:'Esse time já está cheio.'});break}
-        p.team=m.team;spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
+        p.team=m.team;p.roomShop=R.SHOP[p.team];spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
       }
       case 'map': {
         if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
-        R.mapId=m.map;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
-        bc(R,{t:'map',mapId:R.mapId});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
+        R.mapId=m.map;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'chat': {
         if(!allow(p,'chat',650))break;
@@ -303,18 +306,18 @@ wss.on('connection', ws => {
       case 'start':
         if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
         if(new Set([...R.ps.values()].map(q=>q.team)).size<2){tx(p,{t:'m',s:'É necessário ter jogadores em pelo menos 2 times.'});break}
-        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
-        R.ps.forEach(spawn); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId }); break;
+        R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, activeChunks:R.activeChunks }); break;
       case 'mv': {
         if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
         const d = Math.hypot(m.x - p.x, m.z - p.z);
-        if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > dt * 12 + 1.5 || m.y - p.y > dt * 11 + 1.2 || m.x < -5 || m.x > S.W + 5 || m.z < -5 || m.z > S.D + 5 || m.y > 45) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
+        if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > dt * 12 + 1.5 || m.y - p.y > dt * 11 + 1.2 || m.x < S.MIN_X-5 || m.x > S.MAX_X+5 || m.z < S.MIN_Z-5 || m.z > S.MAX_Z+5 || m.y > S.H+10) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
         p.dy = (m.y - p.y) / dt; p.px=p.x;p.py=p.y;p.pz=p.z; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
       }
       case 'held': {
@@ -338,7 +341,7 @@ wss.on('connection', ws => {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!allow(p, 'place', 45)) break;
         const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16, tnt: 13 }[m.k], { x, y, z } = m;
-        if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y > 27 || get(R, x, y, z)) break;
+        if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y >= S.H-2 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 7) break;
         if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
         if ([...R.ps.values()].some(q => playerHitsBlock(q,x,y,z))) { sfx(p,'blocked'); break; }
@@ -437,28 +440,28 @@ setInterval(() => {
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
             else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
           }
-          if (p.y < -8) die(R, p, 'void');
+          if (p.y <= -20) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
       R.g.base.forEach((g, i) => {
-        const gx = S.IS[i][0] + .5, gz = S.IS[i][1] + .5;
-        const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 3.2 && Math.abs(q.y - 11) < 3);
+        const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
+        const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 4.2 && Math.abs(q.y - gy) < 4);
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
         g.iron += dt; g.gold += dt;
-        if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,11.25,gz,48); }
-        if (g.gold > 5 / fm) { g.gold = 0; addDrop(R,'gold',1,gx+1,11.25,gz,12); }
+        if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
+        if (g.gold > 5 / fm) { g.gold = 0; addDrop(R,'gold',1,gx+1,gy+.2,gz,12); }
       });
       R.g.dia.forEach((g, i) => {
         g.t += dt;
         if (g.t <= 12) return;
         g.t = 0;
-        const [gx,gz] = S.DI[i];addDrop(R,'dia',1,gx+.5,11.35,gz+.5,4);
+        const [gx,gy,gz]=R.DIGEN[i];addDrop(R,'dia',1,gx,gy,gz,4);
       });
       R.g.em.t += dt;
       if (R.g.em.t > 22) {
         R.g.em.t = 0;
-        const [gx,gz] = S.EM;
-        addDrop(R,'em',1,gx+.5,12.35,gz+.5,2);
+        const [gx,gy,gz]=R.EMGEN;
+        addDrop(R,'em',1,gx,gy,gz,2);
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
