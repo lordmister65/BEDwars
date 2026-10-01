@@ -241,7 +241,11 @@ function tickProjectiles(R,dt){
     const grav=pr.k==='fireball'?0:pr.k==='arrow'?13:10;
     pr.vy-=grav*dt;
     const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
-    const target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
+    let target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
+    if(block&&target){
+      const db=Math.hypot(block.x-pr.x,block.y-pr.y,block.z-pr.z),dtar=Math.hypot(target.x-pr.x,target.y+.9-pr.y,target.z-pr.z);
+      if(db<dtar)target=null;
+    }
     if(target||block||pr.age>6||ny<-10){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
     pr.x=nx;pr.y=ny;pr.z=nz;
   }
@@ -260,7 +264,7 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team])});
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'join' && !p) {
