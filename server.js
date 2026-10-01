@@ -52,10 +52,13 @@ const allow = (p, key, gap) => {
   if (n - last < gap) return false;
   p.rl[key] = n; return true;
 };
+const SHOP_RADIUS=10;
 const nearBase = p => {
   const q=p.roomShop||null, x=q?q[0]:S.IS[p.team][0]+.5, y=q?q[1]:S.BASE_Y+2, z=q?q[2]:S.IS[p.team][1]+.5;
-  return Math.hypot(p.x-x,p.z-z)<=8&&Math.abs(p.y-y)<5;
+  return Math.hypot(p.x-x,p.z-z)<=SHOP_RADIUS&&Math.abs(p.y-y)<6;
 };
+const buyFail=(p,code,text)=>tx(p,{t:'buyResult',ok:0,code,text});
+const buyOk=p=>tx(p,{t:'buyResult',ok:1});
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
 const sfx = (p,k) => tx(p,{t:'sfx',k});
 const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
@@ -365,16 +368,24 @@ wss.on('connection', ws => {
       }
       case 'breakStop': p.breaking=null; break;
       case 'buy': {
-        const s = S.SH[m.i]; if (!play || !allow(p, 'buy', 120) || !nearBase(p) || !s || p.inv[s[1]] < s[2]) break;
-        let ok = 1;
-        if (s[3] === 'inv' && s[4] === 'bow') { if (p.inv.bow > 0) ok = 0; else p.inv.bow = 1; }
-        else if (s[3] === 'inv') p.inv[s[4]] += s[5];
-        else if (s[3] === 'sw' && p.sw < s[5]) p.sw = s[5];
-        else if (s[3] === 'ar' && p.ar < s[5]) p.ar = s[5];
-        else if (s[3] === 'tool' && (p.tools[s[4]]||0) < s[5]) p.tools[s[4]] = s[5];
-        else if (s[3] === 'up' && p.up[s[4]] === s[5] - 1) p.up[s[4]] = s[5];
-        else ok = 0;
-        if (ok) { p.inv[s[1]] -= s[2]; pinv(p); sfx(p,'buy'); } else tx(p, { t: 'm', s: 'Você já tem algo melhor' });
+        if(!play){buyFail(p,'not_playing','A loja só funciona durante a partida.');break}
+        if(!allow(p,'buy',120)){buyFail(p,'cooldown','Aguarde um instante para comprar novamente.');break}
+        const item=S.SH[m.i];
+        if(!item){buyFail(p,'invalid_item','Item inválido.');break}
+        if(!nearBase(p)){buyFail(p,'too_far','Chegue mais perto da loja do seu time.');break}
+        const [name,currency,price,type,key,value]=item;
+        if((p.inv[currency]||0)<price){buyFail(p,'no_resource',`Recursos insuficientes para ${name}.`);break}
+        let ok=1;
+        if(type==='inv'&&key==='bow'){if(p.inv.bow>0)ok=0;else p.inv.bow=1}
+        else if(type==='inv')p.inv[key]=(p.inv[key]||0)+value;
+        else if(type==='sw'&&p.sw<value)p.sw=value;
+        else if(type==='ar'&&p.ar<value)p.ar=value;
+        else if(type==='tool'&&(p.tools[key]||0)<value)p.tools[key]=value;
+        else if(type==='up'&&p.up[key]===value-1)p.up[key]=value;
+        else ok=0;
+        if(!ok){buyFail(p,'already_owned','Você já possui esse item ou uma versão melhor.');break}
+        p.inv[currency]-=price;
+        pinv(p);buyOk(p);sfx(p,'buy');
         break;
       }
       case 'shoot': {
@@ -449,7 +460,6 @@ setInterval(() => {
       });
       R.g.base.forEach((g, i) => {
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
-        const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 4.2 && Math.abs(q.y - gy) < 4);
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
         g.iron += dt; g.gold += dt;
         if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
