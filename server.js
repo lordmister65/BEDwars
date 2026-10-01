@@ -32,7 +32,7 @@ function setb(R, x, y, z, v, f = 0) {
 function room(code) {
   let R = rooms.get(code);
   if (!R) {
-    const g = S.gen('classic');
+    const g = S.gen('classic',true);
     R = { code, mapId:'classic', B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
@@ -290,7 +290,7 @@ wss.on('connection', ws => {
       }
       case 'map': {
         if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
-        R.mapId=m.map;const g=S.gen(R.mapId);R.B=g.B;R.BD=g.BD;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        R.mapId=m.map;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         bc(R,{t:'map',mapId:R.mapId});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'chat': {
@@ -303,7 +303,7 @@ wss.on('connection', ws => {
       case 'start':
         if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
         if(new Set([...R.ps.values()].map(q=>q.team)).size<2){tx(p,{t:'m',s:'É necessário ter jogadores em pelo menos 2 times.'});break}
-        const gg=S.gen(R.mapId);R.B=gg.B;R.BD=gg.BD;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
