@@ -460,7 +460,6 @@ setInterval(() => {
       });
       R.g.base.forEach((g, i) => {
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
-        const near = players.filter(q => q.alive && q.team === i && Math.hypot(q.x - gx, q.z - gz) < 4.2 && Math.abs(q.y - gy) < 4);
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
         g.iron += dt; g.gold += dt;
         if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
