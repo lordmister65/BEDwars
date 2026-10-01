@@ -8,11 +8,11 @@ let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
 const STATIC = {};
-for (const f of ['index.html','shared.js','game.js','style.css']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
+for (const f of ['index.html','shared.js','game.js','style.css','assets/blockbench-models.zip']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
 const srv = http.createServer((q, r) => {
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
   if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
-  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
+  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.zip')?'application/zip':'text/html; charset=utf-8';
   r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
   r.end(STATIC[f]);
 });
@@ -483,7 +483,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.disconnected?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2)])});}}
   });
 }, 50);
 

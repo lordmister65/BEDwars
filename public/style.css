@@ -147,7 +147,7 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   text-align:center!important;padding:0!important;background:rgba(70,70,70,.78)!important;
   pointer-events:auto!important;touch-action:none
 }
-#jumpBtn{right:18px;bottom:88px}#actBtn{right:98px;bottom:28px}#useBtn{right:18px;bottom:28px}#shopBtn{right:178px;bottom:28px}
+#jumpBtn{right:18px;bottom:88px}#actBtn{right:98px;bottom:28px}#useBtn{right:18px;bottom:28px}
 
 @media (pointer:coarse),(max-width:800px){
   #mobile{display:block}
@@ -249,7 +249,6 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
 #chatForm button{width:78px;margin:0;text-align:center;padding:5px}
 
 #placeBtn{right:178px;bottom:88px}
-#shopBtn{right:178px;bottom:28px}
 
 @media (pointer:coarse),(max-width:800px){
   .lobby-grid{grid-template-columns:1fr}
@@ -257,5 +256,4 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   #chatForm{left:5px;bottom:72px;width:94vw}
   #chatForm select{width:72px}
   #placeBtn{right:98px;bottom:88px}
-  #shopBtn{right:178px;bottom:28px}
 }
