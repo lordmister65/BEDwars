@@ -218,3 +218,44 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   #bowCharge{top:auto;bottom:112px;width:130px}
   .end-table{font-size:7px}.end-table th,.end-table td{padding:5px 3px}
 }
+
+
+/* Lobby interativo, chat e refinamentos mobile */
+#lobby{background:rgba(5,10,18,.42)}
+#lobby .lobby-panel{width:min(820px,94vw);background:rgba(198,198,198,.94)}
+.lobby-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:12px}
+.lobby-grid section{background:#a9a9a9;padding:8px;border:2px inset #ddd}
+.lobby-grid h2{font-size:10px;margin:0 0 7px;color:#222}
+.team-pick{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.team-btn{margin:0!important;text-align:center!important}
+.team-btn.active{outline:3px solid #fff;box-shadow:0 0 0 2px #222}
+.map-card{margin:4px 0!important;padding:7px!important}
+.map-card.active{background:#5b5b5b!important;color:#ffff55}
+.map-card small{display:block;font-size:7px;color:#eee;margin-top:2px}
+
+#chatLog{
+  position:fixed;left:14px;bottom:150px;z-index:13;width:min(420px,46vw);max-height:150px;
+  overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;pointer-events:none
+}
+.chat-line{font-size:9px;color:#fff;text-shadow:1px 1px #000;background:rgba(0,0,0,.22);padding:2px 4px}
+.chat-line.team{color:#9fffb1}
+#chatForm{
+  display:none;position:fixed;left:14px;bottom:112px;z-index:22;width:min(470px,70vw);
+  gap:4px;background:rgba(0,0,0,.72);padding:5px
+}
+#chatForm.open{display:flex}
+#chatForm select{width:84px;background:#333;color:#fff;border:1px solid #777;font:inherit;font-size:8px}
+#chatForm input{min-width:0;flex:1;padding:6px}
+#chatForm button{width:78px;margin:0;text-align:center;padding:5px}
+
+#placeBtn{right:178px;bottom:88px}
+#shopBtn{right:178px;bottom:28px}
+
+@media (pointer:coarse),(max-width:800px){
+  .lobby-grid{grid-template-columns:1fr}
+  #chatLog{left:6px;bottom:125px;width:58vw;max-height:105px}
+  #chatForm{left:5px;bottom:72px;width:94vw}
+  #chatForm select{width:72px}
+  #placeBtn{right:98px;bottom:88px}
+  #shopBtn{right:178px;bottom:28px}
+}
