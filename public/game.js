@@ -197,10 +197,11 @@ html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.spee
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
 const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}cur=(n+SL.length)%SL.length;lastHeldSig='';refreshHeld();hud()};
-let shopCat='Blocos',lastBuyAt=0;const cats=[...new Set(SH.map(s=>s[6]||'Outros'))];
+let shopCat='Blocos',lastBuyAt=0,lastShopSig='';const cats=[...new Set(SH.map(s=>s[6]||'Outros'))];
 function buyItem(i){const now=performance.now();if(now-lastBuyAt<130)return;lastBuyAt=now;send({t:'buy',i})}
-function drawShop(){
-  html('shopTabs',cats.map(c=>`<button class="${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop()">${c}</button>`).join(''));
+function shopSig(){return [shopCat,inv.iron,inv.gold,inv.dia,inv.em,inv.bow,sw,ar,tools.pick,tools.axe,tools.shears,up.sharp,up.prot,up.forge,up.regen,up.trap].join('|')}
+function drawShop(force=false){const sig=shopSig();if(!force&&sig===lastShopSig)return;lastShopSig=sig;
+  html('shopTabs',cats.map(c=>`<button class="${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop(true)">${c}</button>`).join(''));
   html('sl',SH.map((s,i)=>({s,i})).filter(o=>(o.s[6]||'Outros')===shopCat).map(o=>{
     const s=o.s,cant=(inv[s[1]]||0)<s[2],icon=RI[s[1]]||RI.iron;
     return `<button class="shop-card${cant?' cant':''}" onclick="buyItem(${o.i})"><img class="shopri" src="${icon}"><span class="item-name">${s[0]}</span><span class="item-cost">${s[2]} ${CN[s[1]]||s[1]}</span></button>`
@@ -214,7 +215,7 @@ function canUseShop(){const [x,y,z]=shopPosition();return Math.hypot(pl.x-x,pl.z
 function openShop(){
  if(!started||over)return;
  if(!canUseShop()){msg('Chegue mais perto da loja do seu time.');sfx('blocked');return}
- shopOpen=1;drawShop();try{document.exitPointerLock()}catch(e){};scr('shop')
+ shopOpen=1;drawShop(true);try{document.exitPointerLock()}catch(e){};scr('shop')
 }
 function closeShop(){shopOpen=0;if(!touchMode)cv.requestPointerLock();else scr(null)}
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(shopOpen?'shop':'ov')});
@@ -305,7 +306,7 @@ case'feed':addFeed(m);break;
 case'chat':addChat(m);break;
 case'anim':{const r=PL.get(m.id);if(r)r.action=performance.now()+(m.k==='mine'?500:320);break}
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();break;
-case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}else if(shopOpen)drawShop();break;
+case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}break;
 case'bed':bed=m.bed;sfx('bed');bedBurst(m.team,m.pos);hud();break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
