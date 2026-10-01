@@ -8,13 +8,19 @@
 <div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div></div>
 <div id="reconnectBanner"></div>
-<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="shopBtn">LOJA</button></div>
+<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button><button class="mb" id="shopBtn">LOJA</button></div>
 <div class="hud" id="tm"></div><div class="hud" id="res"></div><div class="hud" id="hp"></div>
+<div id="chatLog"></div>
+<form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
 <div class="ov" id="menu" style="display:flex"><div><h1>Bed Wars Online</h1>
 <p>Seu nome</p><input id="nm" maxlength="14" value="Jogador">
 <p>Código da sala (todos digitam o mesmo)</p><input id="rm" maxlength="12" value="sala1">
 <button id="go" style="text-align:center;margin-top:12px">Entrar</button><p id="er"></p></div></div>
-<div class="ov" id="lobby"><div><h1>Sala <span id="rc"></span></h1><div id="pl"></div>
+<div class="ov" id="lobby"><div class="lobby-panel"><h1>Sala <span id="rc"></span></h1>
+<div class="lobby-grid">
+  <section><h2>Jogadores</h2><div id="pl"></div></section>
+  <section><h2>Escolha seu time</h2><div id="teamPick" class="team-pick"></div><h2>Mapa</h2><div id="mapPick"></div></section>
+</div>
 <button id="st" style="display:none;text-align:center;margin-top:10px">Iniciar partida</button><p id="wt"></p></div></div>
 <div class="ov" id="ov"><div><h1>Pronto?</h1>
 <p>WASD anda · Espaço pula · Shift agacha</p><p>Esquerdo bate ou quebra · direito usa o item</p>
