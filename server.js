@@ -1,5 +1,5 @@
 // Servidor autoritativo do Bed Wars: blocos, dano, camas, recursos e loja são decididos aqui.
-const http = require('http'), fs = require('fs'), path = require('path');
+const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [2, 4, 6, 8], rooms = new Map();
@@ -17,7 +17,7 @@ const srv = http.createServer((q, r) => {
   r.end(STATIC[f]);
 });
 const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
-const canSend = ws => ws.readyState === 1 && ws.bufferedAmount < MAX_SOCKET_BUFFER;
+const canSend = ws => !!ws && ws.readyState === 1 && ws.bufferedAmount < MAX_SOCKET_BUFFER;
 const tx = (p, o) => { if (canSend(p.ws)) p.ws.send(JSON.stringify(o)); };
 const bc = (R, o) => {
   const data = JSON.stringify(o);
@@ -33,7 +33,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen();
-    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null,
+    R = { code, B: g.B, BD: g.BD, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -44,6 +44,8 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1,
+  token: crypto.randomBytes(18).toString('hex'), disconnected:false, reconnectDeadline:0,
+  stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
@@ -53,6 +55,12 @@ const allow = (p, key, gap) => {
 const nearBase = p => Math.hypot(p.x - (S.IS[p.team][0] + .5), p.z - (S.IS[p.team][1] + .5)) <= 6 && Math.abs(p.y - 11) < 4;
 const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
 const sfx = (p,k) => tx(p,{t:'sfx',k});
+const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
+const statsPayload = R => [...R.ps.values()].map(p=>({
+  id:p.id,name:p.name,team:p.team,disconnected:!!p.disconnected,
+  kills:p.stats.kills,finalKills:p.stats.finalKills,bedsDestroyed:p.stats.bedsDestroyed,
+  deaths:p.stats.deaths,resourcesCollected:p.stats.resourcesCollected
+}));
 const sfxAt = (R,k,x,y,z,r=7) => {
   R.ps.forEach(p => {
     if (!p.alive) return;
@@ -82,13 +90,29 @@ const lobby = R => bc(R, { t: 'lobby', host: R.host, l: [...R.ps.values()].map(q
 function win(R) {
   if (R.st !== 'play') return;
   const live = [...R.ps.values()].filter(q => !q.out), teams = new Set(live.map(q => q.team));
-  if (teams.size <= 1) { R.st = 'over'; bc(R, { t: 'end', w: live[0] ? live[0].name : 'ninguém' }); setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 60000); }
+  if (teams.size <= 1) {
+    const winnerTeam=live[0]?.team ?? -1;
+    R.st = 'ended';
+    R.final={t:'end',winnerTeam,stats:statsPayload(R),time:+R.t.toFixed(1)};
+    bc(R,R.final);
+    setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 90000);
+  }
 }
-function die(R, q) {
+function die(R, q, cause='combat') {
+  if(!q.alive)return;
+  q.stats.deaths++;
   q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
-  const k = q.src && R.t - q.st < 5 ? q.src : null; if (k) k.k++;
-  msg(R, q.name + (k ? ' foi derrubado por ' + k.name : ' morreu'));
-  if (!R.bed[q.team]) { q.out = 1; msg(R, q.name + ' foi eliminado!'); win(R); }
+  const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
+  const final = !R.bed[q.team];
+  if(killer){
+    if(final) killer.stats.finalKills++; else killer.stats.kills++;
+    killer.k++;
+    const verb=cause==='void'?'derrubou':'eliminou';
+    feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
+  } else {
+    feed(R,`${q.name} morreu${cause==='void'?' no vazio':''}`,-1,q.team,'death');
+  }
+  if (final) { q.out = 1; win(R); }
 }
 function hurt(R, q, d, kx, kz, src, cr) {
   if (!q.alive || q.ih > 0) return;
@@ -101,7 +125,8 @@ function hurt(R, q, d, kx, kz, src, cr) {
 function killBed(R, t, src) {
   if (!R.bed[t]) return;
   const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); R.bed[t] = 0;
-  msg(R, 'A cama do time ' + S.TN[t] + ' foi destruída' + (src ? ' por ' + src.name : '') + '!');
+  if(src){src.stats.bedsDestroyed++;feed(R,`${src.name} destruiu a cama do Time ${S.TN[t]}!`,src.team,t,'bed');}
+  else feed(R,`A cama do Time ${S.TN[t]} foi destruída!`,-1,t,'bed');
   bc(R, { t: 'bed', bed: R.bed });
   R.ps.forEach(q => { if (q.team === t && !q.alive && !q.out) { q.out = 1; msg(R, q.name + ' foi eliminado!'); } });
   win(R);
@@ -171,7 +196,7 @@ function pickupDrops(R, players){
   for(let i=R.drops.length-1;i>=0;i--){
     const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.25&&Math.abs(q.y-d.y)<2.5);
     if(!p) continue;
-    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.dirty=1;
+    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.stats.resourcesCollected+=d.n;p.dirty=1;
     if(['iron','gold','dia','em'].includes(d.k)) sfxAt(R,'pickup_'+d.k,d.x,d.y,d.z,6);
     else sfx(p,'pickup');
     R.drops.splice(i,1);changed=true;
@@ -180,6 +205,51 @@ function pickupDrops(R, players){
 }
 function nearOwnBase(p){return Math.hypot(p.x-(S.IS[p.team][0]+.5),p.z-(S.IS[p.team][1]+.5))<5.5&&Math.abs(p.y-11)<4;}
 function enemyInBase(R,p){return [...R.ps.values()].find(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-(S.IS[p.team][0]+.5),q.z-(S.IS[p.team][1]+.5))<5.5);}
+function projectileDir(yaw,pitch){const c=Math.cos(pitch);return{x:-Math.sin(yaw)*c,y:Math.sin(pitch),z:-Math.cos(yaw)*c};}
+function spawnProjectile(R,p,k,yaw,pitch,speed,charge=1){
+  const d=projectileDir(yaw,pitch), id=++R.projSeq;
+  const pr={id,k,o:p.id,team:p.team,x:p.x,y:p.y+1.55,z:p.z,vx:d.x*speed,vy:d.y*speed,vz:d.z*speed,age:0,charge};
+  R.projectiles.push(pr);bc(R,{t:'projSpawn',p:pr});return pr;
+}
+function segmentHitPlayer(R,pr,nx,ny,nz){
+  let best=null,bd=Infinity;
+  for(const q of R.ps.values()){
+    if(!q.alive||q.team===pr.team||q.out)continue;
+    const sx=pr.x,sy=pr.y,sz=pr.z,dx=nx-sx,dy=ny-sy,dz=nz-sz,L2=dx*dx+dy*dy+dz*dz||1;
+    const t=Math.max(0,Math.min(1,((q.x-sx)*dx+(q.y+.9-sy)*dy+(q.z-sz)*dz)/L2));
+    const cx=sx+dx*t,cy=sy+dy*t,cz=sz+dz*t,dist=Math.hypot(q.x-cx,q.y+.9-cy,q.z-cz);
+    if(dist<.55&&t<bd){best=q;bd=t}
+  }
+  return best;
+}
+function segmentHitsBlock(R,x0,y0,z0,x1,y1,z1){
+  const L=Math.hypot(x1-x0,y1-y0,z1-z0),steps=Math.max(1,Math.ceil(L/.18));
+  for(let i=1;i<=steps;i++){const a=i/steps,x=x0+(x1-x0)*a,y=y0+(y1-y0)*a,z=z0+(z1-z0)*a;if(get(R,Math.floor(x),Math.floor(y),Math.floor(z)))return{x,y,z}}
+  return null;
+}
+function projectileImpact(R,pr,x,y,z,target){
+  const owner=R.ps.get(pr.o);
+  if(pr.k==='arrow'&&target)hurt(R,target,3+4*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1),pr.vz/(Math.hypot(pr.vx,pr.vz)||1),owner);
+  else if(pr.k==='snowball'&&target)hurt(R,target,1,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.15,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.15,owner);
+  else if(pr.k==='fireball')fireballBoom(R,x,y,z,owner);
+  else if(pr.k==='pearl'&&owner&&owner.alive){owner.x=x-pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.y=Math.max(1,y);owner.z=z-pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.hp=Math.max(1,owner.hp-2);tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z});}
+  bc(R,{t:'projHit',id:pr.id,k:pr.k,x,y,z});
+}
+function tickProjectiles(R,dt){
+  for(let i=R.projectiles.length-1;i>=0;i--){
+    const pr=R.projectiles[i];pr.age+=dt;
+    const grav=pr.k==='fireball'?0:pr.k==='arrow'?13:10;
+    pr.vy-=grav*dt;
+    const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
+    let target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
+    if(block&&target){
+      const db=Math.hypot(block.x-pr.x,block.y-pr.y,block.z-pr.z),dtar=Math.hypot(target.x-pr.x,target.y+.9-pr.y,target.z-pr.z);
+      if(db<dtar)target=null;
+    }
+    if(target||block||pr.age>6||ny<-10){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
+    pr.x=nx;pr.y=ny;pr.z=nz;
+  }
+}
 
 
 wss.on('connection', ws => {
@@ -189,6 +259,15 @@ wss.on('connection', ws => {
   ws.on('message', raw => {
     if(raw.length>4096){try{ws.close(1009,'mensagem muito grande')}catch(e){}return}
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
+    if (m.t === 'reconnect' && !p) {
+      const code=String(m.room||'').slice(0,12).toLowerCase(), rr=rooms.get(code);
+      const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
+      if(!found)return tx({ws},{t:'reconnectFail'});
+      R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      if(R.final)tx(p,R.final);
+      feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
+    }
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
@@ -196,7 +275,7 @@ wss.on('connection', ws => {
       if (!free.length) return tx({ ws }, { t: 'err', s: 'Sala cheia (4 jogadores).' });
       p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), free[0]); p.id = ++uid; spawn(p);
       R.ps.set(p.id, p); if (!R.host) R.host = p.id;
-      tx(p, { t: 'init', id: p.id, team: p.team, ed: [...R.ed.values()], drops:R.drops }); lobby(R); return;
+      tx(p, { t: 'init', id: p.id, team: p.team, token:p.token, room:R.code, ed: [...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
@@ -272,30 +351,15 @@ wss.on('connection', ws => {
       case 'shoot': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
-        const kind = m.k;
-        const gap = kind === 'bow' ? 500 : kind === 'fireball' ? 900 : kind === 'snowball' ? 300 : 999999;
-        if (!allow(p, 'shoot_' + kind, gap)) break;
-        if (kind === 'bow') {
-          if (p.inv.bow < 1 || p.inv.arrow < 1) break;
-          p.inv.arrow--;
-          const r = aimRay(R, p, m.yaw, m.pitch, 28);
-          bc(R,{t:'proj',k:'arrow',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
-          if (r.best) hurt(R, r.best, 5, r.dx, r.dz, p);
-          pinv(p);
-        } else if (kind === 'fireball') {
-          if (p.inv.fireball < 1) break;
-          p.inv.fireball--;
-          const r = aimRay(R, p, m.yaw, m.pitch, 24);
-          bc(R,{t:'proj',k:'fireball',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
-          fireballBoom(R, r.x, r.y, r.z, p);
-          pinv(p);
-        } else if (kind === 'snowball') {
-          if (p.inv.snowball < 1) break;
-          p.inv.snowball--;
-          const r = aimRay(R, p, m.yaw, m.pitch, 20);
-          bc(R,{t:'proj',k:'snowball',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
-          if (r.best) hurt(R, r.best, 1, r.dx * 1.15, r.dz * 1.15, p);
-          pinv(p);
+        const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
+        const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:999999;
+        if(!allow(p,'shoot_'+kind,gap))break;
+        if(kind==='bow'){
+          if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,14+16*charge,charge);pinv(p);
+        }else if(kind==='fireball'){
+          if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,10,1);pinv(p);
+        }else if(kind==='snowball'){
+          if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,18,1);pinv(p);
         }
         break;
       }
@@ -303,9 +367,7 @@ wss.on('connection', ws => {
         if(!play||!allow(p,'use',300))break;
         const k=m.k;
         if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){
-          p.inv.pearl--;const r=aimRay(R,p,m.yaw,m.pitch,30);
-          bc(R,{t:'proj',k:'pearl',x:p.x,y:p.y+1.55,z:p.z,tx:r.x,ty:r.y,tz:r.z});
-          p.x=r.x-r.dx*.7;p.y=Math.max(1,r.y);p.z=r.z-r.dz*.7;p.hp=Math.max(1,p.hp-2);tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});pinv(p);
+          p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,15,1);pinv(p);
         } else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p);}
         else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p);}
         else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p);}
@@ -316,10 +378,14 @@ wss.on('connection', ws => {
   });
   ws.on('close', () => {
     if (!p) return;
+    if(R.st==='play'){
+      p.ws=null;p.disconnected=true;p.reconnectDeadline=Date.now()+30000;
+      feed(R,`${p.name} desconectou. Aguardando reconexão...`,p.team,-1,'disconnect');
+      return;
+    }
     R.ps.delete(p.id); if (R.host === p.id) R.host = [...R.ps.keys()][0] || null;
     if (!R.ps.size) { rooms.delete(R.code); return; }
     if (R.st === 'lobby') lobby(R);
-    else { msg(R, p.name + ' saiu da partida'); if (R.bed[p.team]) killBed(R, p.team); win(R); }
   });
 });
 
@@ -332,6 +398,12 @@ setInterval(() => {
       R.ps.forEach(p => {
         p.ih = Math.max(0, p.ih - dt);
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);
+        if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
+          p.disconnected=false;p.reconnectDeadline=0;
+          for(const k of ['iron','gold','dia','em']){const n=p.inv[k]||0;if(n>0){addDrop(R,k,n,p.x,p.y+.25,p.z,k==='iron'?48:k==='gold'?12:8);p.inv[k]=0;}}
+          if(p.alive)die(R,p,'disconnect');
+          p.out=1;feed(R,`${p.name} não reconectou a tempo e foi eliminado.`,-1,p.team,'disconnect');win(R);return;
+        }
         if (p.alive) {
           p.hp = Math.min(20, p.hp + .4 * dt);
           if(p.up.regen&&nearOwnBase(p))p.hp=Math.min(20,p.hp+.8*dt);
@@ -342,7 +414,7 @@ setInterval(() => {
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
             else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
           }
-          if (p.y < -8) die(R, p);
+          if (p.y < -8) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
       R.g.base.forEach((g, i) => {
@@ -368,9 +440,10 @@ setInterval(() => {
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
       for (let i = R.tnt.length; i--;) { const q = R.tnt[i]; if ((q.t -= dt) <= 0) { R.tnt.splice(i, 1); boom(R, q); } }
+      tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.disconnected?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2)])});}}
   });
 }, 50);
 
