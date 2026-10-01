@@ -169,7 +169,7 @@ const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10}
 html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
-const pick=n=>{cur=(n+SL.length)%SL.length;lastHeldSig='';refreshHeld();hud()};
+const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}cur=(n+SL.length)%SL.length;lastHeldSig='';refreshHeld();hud()};
 let shopCat='Blocos';const cats=[...new Set(SH.map(s=>s[6]||'Outros'))];
 function drawShop(){
   html('shopTabs',cats.map(c=>`<button class="${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop()">${c}</button>`).join(''));
@@ -301,7 +301,7 @@ function primary(){if(!started||!me.alive)return;audioInit();swing=1;useAnim=1;c
 function stopBreak(){if(breaking){breaking=null;send({t:'breakStop'});$('breakBox').style.display='none'}miningTool=null;lastHeldSig='';refreshHeld()}
 function beginBow(){if(!started||!me.alive||!inv.bow||inv.arrow<1)return;bowCharging=true;bowChargeAt=performance.now();$('bowCharge').style.display='block';$('bowChargeFill').style.width='0%'}
 function releaseBow(){if(!bowCharging)return;bowCharging=false;const ratio=Math.max(.2,Math.min(1,(performance.now()-bowChargeAt)/1200));$('bowCharge').style.display='none';useAnim=1;send({t:'shoot',k:'bow',yaw:pl.yaw,pitch:pl.pitch,charge:ratio})}
-function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=KY[cur];if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball')send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
+function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=KY[cur];if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball')send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
 addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(KY[cur]==='bow')beginBow();else primary()}else if(e.button===2)secondary()});
 addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}});
 if(touchMode){
@@ -341,5 +341,5 @@ requestAnimationFrame(tick);
 
 try{
  const saved=JSON.parse(sessionStorage.getItem('bwReconnect')||'null');
- if(saved&&saved.room&&saved.token){roomCode=saved.room;reconnectToken=saved.token;if(saved.name)$('nm').value=saved.name;reconnecting=true;reconnectUntil=Date.now()+30000;setReconnectBanner('Tentando restaurar a partida...');connectSocket('reconnect')}
+ if(saved&&saved.room&&saved.token){roomCode=saved.room;reconnectToken=saved.token;if(saved.name)$('nm').value=saved.name;setReconnectBanner('Tentando restaurar a partida...');startReconnect()}
 }catch(e){}
