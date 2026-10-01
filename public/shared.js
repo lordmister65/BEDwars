@@ -11,7 +11,7 @@
   const BASES=[[0,148],[-148,0],[0,-148],[148,0]];
   const DIAMONDS=[[0,82],[-82,0],[0,-82],[82,0]];
   const EMERALD=[0,0];
-  const LOBBY=[0,62,0];
+  const LOBBY=[0,52,0];
 
   const MAPS={
     classic:{
@@ -171,6 +171,13 @@
     set(x,BASE_Y+1,z,14);
     if(cfg.theme==='castle'){
       for(const [dx,dz] of [[-6,-6],[6,-6],[-6,6],[6,6]])tower(set,x+dx,z+dz,BASE_Y,12,5);
+      // Ponte parcial apontando para o centro: ajuda leitura do layout sem eliminar a necessidade de construir.
+      const L=Math.hypot(x,z)||1,dx=-x/L,dz=-z/L;
+      for(let n=8;n<=18;n++)for(let w=-2;w<=2;w++){
+        const px=Math.round(x+dx*n-dz*w),pz=Math.round(z+dz*n+dx*w);
+        set(px,BASE_Y,pz,12);
+        if((n===8||n===18)&&Math.abs(w)===2)set(px,BASE_Y+1,pz,12);
+      }
     }
   }
 
