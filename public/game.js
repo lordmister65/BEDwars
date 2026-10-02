@@ -313,19 +313,20 @@ $('chatForm').onsubmit=e=>{e.preventDefault();const text=$('chatInput').value.tr
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
 function hud(){
 html('bar',SL.map((name,i)=>{
- let q=i?inv[KY[i]]:'';if(i===8)q=inv.bow?('F'+inv.arrow):0;
+ const key=i?slotKey(i):0;let q=i?(inv[key]||0):'';if(i===8)q=inv.bow?('F'+inv.arrow):0;
  const owned=i===0||(i===8?inv.bow>0:(q||0)>0),was=ownedState[i],reveal=owned&&was===false;
  ownedState[i]=owned;
- return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}" title="${owned?name:''}" onclick="pick(${i})"><i style="background:${SC[i]}"></i><em>${i<9?i+1:''}</em><b>${owned?q:''}</b></div>`
+ const label=slotName(i),clr=i===6?(activeTnt()[2]||0xd7352f):SC[i];
+ return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}" title="${owned?label:''}" onclick="pick(${i})"><i style="background:${typeof clr==='number'?'#'+hex(clr):clr}"></i><em>${i<9?i+1:''}</em><b>${owned?q:''}</b><span class="slot-label">${i===6&&owned?activeTnt()[1]:''}</span></div>`
 }).join(''));
 html('res',[
   ['iron','Ferro',inv.iron],['gold','Ouro',inv.gold],['dia','Diamante',inv.dia],['em','Esmeralda',inv.em]
 ].map(([k,n,v])=>`<div class="resource-row"><img class="ri" src="${RI[k]}"><span>${n}</span><strong>${v}</strong></div>`).join(''));
 const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10},(_,i)=>`<span class="heart${hp<=i*2?' empty':''}">♥</span>`).join('');
-html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
+html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
-const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}cur=(n+SL.length)%SL.length;lastHeldSig='';refreshHeld();hud()};
+const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}const next=(n+SL.length)%SL.length;if(next===6&&cur===6){cycleTnt();return}cur=next;lastHeldSig='';refreshHeld();hud()};
 let shopCat='Compra Rápida',lastBuyAt=0,lastShopSig='';
 const SHOP_CATS=['Compra Rápida','Blocos','Combate','Armadura','Ferramentas','Arcos','Poções','Utilidades','Melhorias'];
 const QUICK_KEYS=['wool','planks','endstone','sw1','ar1','pick1','bow','arrow','tnt','fireball','apple','pearl','speedPotion','jumpPotion'];
@@ -537,7 +538,7 @@ function beginBow(){if(!started||!me.alive||!inv.bow||inv.arrow<1)return;bowChar
 function releaseBow(){if(!bowCharging)return;bowCharging=false;const ratio=Math.max(.2,Math.min(1,(performance.now()-bowChargeAt)/1200));$('bowCharge').style.display='none';useAnim=1;send({t:'shoot',k:'bow',yaw:pl.yaw,pitch:pl.pitch,charge:ratio})}
 const PLACEABLE=new Set(['wool','planks','endstone','glass','obsidian']);
 function bridgeTarget(){
- const k=KY[cur];if(!PLACEABLE.has(k)||(inv[k]||0)<=0)return null;
+ const k=slotKey(cur);if(!PLACEABLE.has(k)||(inv[k]||0)<=0)return null;
  const speed=Math.hypot(pl.vx||0,pl.vz||0),fx=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw);
  const dx=speed>.2?(pl.vx/speed):fx,dz=speed>.2?(pl.vz/speed):fz;
  // Posição levemente à frente dos pés: ideal para speed bridge sem colocar dentro do jogador.
@@ -557,15 +558,15 @@ function autoBridge(now=performance.now()){
  sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);
  send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z});
 }
-function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=KY[cur];if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball')send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
-addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(KY[cur]==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(KY[cur]);secondary()}});
+function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
+addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()}});
 addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2)bridgeHeld=false});
 if(touchMode){
  const joy=$('joy'),kn=$('knob'),look=$('look');
  const jmove=e=>{const t=[...e.touches].find(t=>t.identifier===mJoy);if(!t)return;const r=joy.getBoundingClientRect(),dx=t.clientX-(r.left+r.width/2),dy=t.clientY-(r.top+r.height/2),L=Math.max(1,Math.hypot(dx,dy)),k=Math.min(1,50/L);mx=dx/50*k;my=-dy/50*k;kn.style.transform=`translate(${mx*36}px,${-my*36}px)`};
  joy.addEventListener('touchstart',e=>{mJoy=e.changedTouches[0].identifier;jmove(e)},{passive:false});joy.addEventListener('touchmove',e=>{e.preventDefault();jmove(e)},{passive:false});joy.addEventListener('touchend',()=>{mx=my=0;mJoy=null;kn.style.transform=''},{passive:false});
  look.addEventListener('touchstart',e=>{const t=e.changedTouches[0];mLook={id:t.identifier,x:t.clientX,y:t.clientY}},{passive:false});look.addEventListener('touchmove',e=>{e.preventDefault();const t=[...e.touches].find(t=>mLook&&t.identifier===mLook.id);if(!t)return;pl.yaw-=(t.clientX-mLook.x)*.006;pl.pitch=Math.max(-1.55,Math.min(1.55,pl.pitch-(t.clientY-mLook.y)*.006));mLook.x=t.clientX;mLook.y=t.clientY},{passive:false});
- $('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();KY[cur]==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(KY[cur]);secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false};
+ $('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();slotKey(cur)==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false};
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70;hud();
