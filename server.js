@@ -421,7 +421,7 @@ wss.on('connection', ws => {
         const item=S.SH[m.i];
         if(!item){buyFail(p,'invalid_item','Item inválido.');break}
         if(!nearBase(p)){buyFail(p,'too_far','Chegue mais perto da loja do seu time.');break}
-        const [name,currency,price,type,key,value]=item;
+        const [name,currency,basePrice,type,key,value]=item,modePrices=item[8]||null,price=modePrices&&modePrices[R.modeId]!=null?modePrices[R.modeId]:basePrice;
         if((p.inv[currency]||0)<price){buyFail(p,'no_resource',`Recursos insuficientes para ${name}.`);break}
         let ok=1;
         if(type==='inv'&&key==='bow'){if(p.inv.bow>0)ok=0;else p.inv.bow=1}
