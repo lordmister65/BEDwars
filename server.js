@@ -219,13 +219,21 @@ function spawnProjectile(R,p,k,yaw,pitch,speed,charge=1){
   R.projectiles.push(pr);bc(R,{t:'projSpawn',p:pr});return pr;
 }
 function segmentHitPlayer(R,pr,nx,ny,nz){
-  let best=null,bd=Infinity;
+  let best=null,bestT=Infinity;
+  const sx=pr.x,sy=pr.y,sz=pr.z,dx=nx-sx,dy=ny-sy,dz=nz-sz;
   for(const q of R.ps.values()){
     if(!q.alive||q.team===pr.team||q.out)continue;
-    const sx=pr.x,sy=pr.y,sz=pr.z,dx=nx-sx,dy=ny-sy,dz=nz-sz,L2=dx*dx+dy*dy+dz*dz||1;
-    const t=Math.max(0,Math.min(1,((q.x-sx)*dx+(q.y+.9-sy)*dy+(q.z-sz)*dz)/L2));
-    const cx=sx+dx*t,cy=sy+dy*t,cz=sz+dz*t,dist=Math.hypot(q.x-cx,q.y+.9-cy,q.z-cz);
-    if(dist<.55&&t<bd){best=q;bd=t}
+    // Caixa do corpo com pequena margem para compensar snapshot/interpolação.
+    const minX=q.x-.38,maxX=q.x+.38,minY=q.y-.08,maxY=q.y+1.82,minZ=q.z-.38,maxZ=q.z+.38;
+    let t0=0,t1=1,ok=true;
+    for(const [s,d,min,max] of [[sx,dx,minX,maxX],[sy,dy,minY,maxY],[sz,dz,minZ,maxZ]]){
+      if(Math.abs(d)<1e-8){if(s<min||s>max){ok=false;break}}
+      else{
+        let a=(min-s)/d,b=(max-s)/d;if(a>b){const tmp=a;a=b;b=tmp}
+        t0=Math.max(t0,a);t1=Math.min(t1,b);if(t0>t1){ok=false;break}
+      }
+    }
+    if(ok&&t0>=0&&t0<=1&&t0<bestT){best=q;bestT=t0}
   }
   return best;
 }
@@ -245,7 +253,7 @@ function projectileImpact(R,pr,x,y,z,target){
 function tickProjectiles(R,dt){
   for(let i=R.projectiles.length-1;i>=0;i--){
     const pr=R.projectiles[i];pr.age+=dt;
-    const grav=pr.k==='fireball'?0:pr.k==='arrow'?13:10;
+    const grav=pr.k==='fireball'?0:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:7.5;
     pr.vy-=grav*dt;
     const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
     let target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
@@ -254,7 +262,8 @@ function tickProjectiles(R,dt){
       if(db<dtar)target=null;
     }
     const outside=nx<S.MIN_X-8||nx>S.MAX_X+8||nz<S.MIN_Z-8||nz>S.MAX_Z+8;
-    if(ny<=-20||outside||pr.age>8){
+    const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='snowball'?9:8;
+    if(ny<=-20||outside||pr.age>maxAge){
       bc(R,{t:'projHit',id:pr.id,k:pr.k,x:nx,y:ny,z:nz});R.projectiles.splice(i,1);continue;
     }
     if(target||block){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
@@ -346,7 +355,7 @@ wss.on('connection', ws => {
       }
       case 'place': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!allow(p, 'place', 80)) break;
+        if (!allow(p, 'place', 70)) break;
         const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16, tnt: 13 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y >= S.H-2 || get(R, x, y, z)) break;
         if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 6.4) break;
@@ -396,11 +405,11 @@ wss.on('connection', ws => {
         if(!allow(p,'shoot_'+kind,gap))break;
         bc(R,{t:'anim',id:p.id,k:'attack'});
         if(kind==='bow'){
-          if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,14+16*charge,charge);pinv(p);
+          if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,22+22*charge,charge);pinv(p);
         }else if(kind==='fireball'){
-          if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,10,1);pinv(p);
+          if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,21,1);pinv(p);
         }else if(kind==='snowball'){
-          if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,18,1);pinv(p);
+          if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,26,1);pinv(p);
         }
         break;
       }
@@ -408,7 +417,7 @@ wss.on('connection', ws => {
         if(!play||!allow(p,'use',300))break;
         const k=m.k;
         if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){
-          p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,15,1);pinv(p);
+          p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,24,1);pinv(p);
         } else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p);}
         else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p);}
         else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p);}
