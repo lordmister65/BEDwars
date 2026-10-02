@@ -12,44 +12,60 @@ const lowEnd=(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||
 const R=new THREE.WebGLRenderer({antialias:!lowEnd,powerPreference:'high-performance'});R.setPixelRatio(Math.min(devicePixelRatio,lowEnd?1:1.5));document.body.prepend(R.domElement);
 const sky=0x8fc8ee,sc=new THREE.Scene();sc.background=new THREE.Color(sky);sc.fog=new THREE.Fog(sky,170,560);
 const cam=new THREE.PerspectiveCamera(72,1,.05,1200);cam.rotation.order='YXZ';sc.add(cam);
-const BB_PATH={
-  vendor:'testuras-modelos/vendedor.geo.gltf',
-  sword:'testuras-modelos/espada.geo.gltf',
-  helmet:'testuras-modelos/capacete.geo.gltf',
-  chest:'testuras-modelos/peitoral.geo.gltf',
-  leggings:'testuras-modelos/calça.geo.gltf',
-  boots:'testuras-modelos/bota.geo.gltf'
-};
-const BB_CACHE=new Map();let bbZipPromise=null;
-function prepareBB(root){
+const BB_CACHE=new Map(),BB_PENDING=new Map(),BB_LOADER=new THREE.GLTFLoader();
+function cloneMaterial(mat,tint=null){
+  const map=mat&&mat.map?mat.map:null;
+  if(map){map.magFilter=map.minFilter=THREE.NearestFilter;map.generateMipmaps=false;map.needsUpdate=true}
+  const m=new THREE.MeshBasicMaterial({
+    map,
+    color:tint==null?0xffffff:tint,
+    transparent:!!(mat&&mat.transparent),
+    opacity:mat&&Number.isFinite(mat.opacity)?mat.opacity:1,
+    alphaTest:mat&&Number.isFinite(mat.alphaTest)?mat.alphaTest:.05,
+    side:THREE.DoubleSide,
+    depthWrite:mat?mat.depthWrite!==false:true
+  });
+  return m;
+}
+function prepareBB(root,tint=null){
   root.traverse(o=>{if(o.isMesh&&o.material){
-    if(Array.isArray(o.material))o.material=o.material.map(m=>m.clone());else o.material=o.material.clone();
-    const mats=Array.isArray(o.material)?o.material:[o.material];
-    mats.forEach(m=>{if(m.map){m.map.magFilter=m.map.minFilter=THREE.NearestFilter;m.map.needsUpdate=true}});
-    o.castShadow=false;o.receiveShadow=false;
+    const src=Array.isArray(o.material)?o.material:[o.material];
+    const out=src.map(m=>cloneMaterial(m,tint));
+    o.material=Array.isArray(o.material)?out:out[0];
+    o.frustumCulled=true;o.castShadow=false;o.receiveShadow=false;
   }});
   return root;
 }
-function bbZip(){
-  if(!bbZipPromise)bbZipPromise=fetch('/assets/blockbench-models.zip')
-    .then(r=>{if(!r.ok)throw new Error('Falha ao carregar modelos Blockbench');return r.arrayBuffer()})
-    .then(b=>JSZip.loadAsync(b));
-  return bbZipPromise;
+function normalizeBB(root,targetHeight,centerXZ=true){
+  root.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(root),size=new THREE.Vector3();
+  box.getSize(size);
+  if(size.y>0&&targetHeight>0){const k=targetHeight/size.y;root.scale.multiplyScalar(k);root.updateMatrixWorld(true)}
+  const box2=new THREE.Box3().setFromObject(root),center=new THREE.Vector3();box2.getCenter(center);
+  if(centerXZ){root.position.x-=center.x;root.position.z-=center.z}
+  root.position.y-=box2.min.y;
+  root.updateMatrixWorld(true);
+  return root;
 }
-async function bbModel(key){
-  if(BB_CACHE.has(key))return BB_CACHE.get(key).clone(true);
-  const zip=await bbZip(),file=zip.file(BB_PATH[key]);
-  if(!file)throw new Error('Modelo ausente: '+key);
-  const json=await file.async('text'),loader=new THREE.GLTFLoader();
-  const gltf=await new Promise((ok,no)=>loader.parse(json,'',ok,no));
-  const root=prepareBB(gltf.scene);BB_CACHE.set(key,root);return root.clone(true);
+function parseBB(key){
+  if(BB_CACHE.has(key))return Promise.resolve(BB_CACHE.get(key).clone(true));
+  if(!window.BB_MODELS||!BB_MODELS[key])return Promise.reject(new Error('Modelo Blockbench ausente: '+key));
+  if(!BB_PENDING.has(key)){
+    BB_PENDING.set(key,new Promise((ok,no)=>{
+      BB_LOADER.parse(JSON.stringify(BB_MODELS[key]),'',gltf=>{
+        const root=prepareBB(gltf.scene);
+        BB_CACHE.set(key,root);
+        BB_PENDING.delete(key);
+        ok(root);
+      },err=>{BB_PENDING.delete(key);no(err)});
+    }));
+  }
+  return BB_PENDING.get(key).then(root=>root.clone(true));
 }
-function tintModel(root,color){
-  root.traverse(o=>{if(o.isMesh&&o.material){
-    const mats=Array.isArray(o.material)?o.material:[o.material];
-    mats.forEach(m=>{m=m.clone();m.color&&m.color.setHex(color);if(Array.isArray(o.material)){}});
-  }});return root;
+function bbModel(key,tint=null){
+  return parseBB(key).then(root=>prepareBB(root,tint));
 }
+['vendor','sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
 const hand=new THREE.Group(),handMat=new THREE.MeshBasicMaterial({color:0xe8b98a});
 const arm=new THREE.Mesh(new THREE.BoxGeometry(.18,.18,.55),handMat);arm.position.set(.48,-.44,-.72);arm.rotation.x=-.35;hand.add(arm);
 const heldRoot=new THREE.Group();heldRoot.position.set(.52,-.26,-.92);hand.add(heldRoot);cam.add(hand);let swing=0,useAnim=0,lastHeldSig='',miningTool=null;
@@ -60,19 +76,14 @@ function swordModel(level=sw){
  const g=new THREE.Group(),cols=[0xc7c7c7,0x898989,0xd9d9d9,0x57e8ee],b=box(.10,.62,.10,cols[level]||cols[0]),gr=box(.32,.07,.09,0x76513a),h=box(.09,.27,.09,0x5b3c2b);
  b.position.y=.22;gr.position.y=-.08;h.position.y=-.24;g.add(b,gr,h);g.rotation.z=-.35;return g
 }
-function blockbenchSword(target,sig,level=sw,scale=.62){
-  bbModel('sword').then(m=>{
-    if(lastHeldSig!==sig||!target.parent&&target!==heldRoot)return;
+function blockbenchSword(target,sig,level=sw){
+  const col=[0xffffff,0xb7b7b7,0xe6e6e6,0x8ff5ff][level]||0xffffff;
+  bbModel('sword',col).then(m=>{
+    if(lastHeldSig!==sig)return;
     while(target.children.length)target.remove(target.children[0]);
-    const cols=[0xc7c7c7,0x8b8b8b,0xd8d8d8,0x57e8ee],col=cols[level]||cols[0];
-    m.traverse(o=>{if(o.isMesh&&o.material){
-      const src=Array.isArray(o.material)?o.material:[o.material];
-      const next=src.map(mat=>{const c=mat.clone();if(c.color)c.color.setHex(col);return c});
-      o.material=Array.isArray(o.material)?next:next[0];
-    }});
-    m.scale.setScalar(scale);m.rotation.set(0,0,-.42);m.position.set(0,-.3,0);
+    normalizeBB(m,.78);m.rotation.set(0,0,-.42);m.position.add(new THREE.Vector3(0,-.24,0));
     target.add(m);
-  }).catch(()=>{});
+  }).catch(err=>console.warn('Falha ao carregar espada Blockbench',err));
 }
 function blockModel(c,o=1){const g=new THREE.Group(),b=new THREE.Mesh(new THREE.BoxGeometry(.42,.42,.42),hmat(c,o));g.add(b);g.rotation.set(.15,.45,.05);return g}
 function potionModel(c){const g=new THREE.Group(),body=box(.22,.28,.16,c),neck=box(.09,.10,.09,0xe9e9e9),cap=box(.12,.05,.12,0x7a5436);neck.position.y=.19;cap.position.y=.27;g.add(body,neck,cap);return g}
@@ -159,12 +170,16 @@ function updateVendors(g,lobby=false){
  clearVendors();if(lobby||!g||!g.SHOP)return;
  const gen=vendorGeneration;
  g.SHOP.forEach((pos,team)=>{
-   const fallback=fallbackVendor(team);fallback.position.set(pos[0],pos[1],pos[2]);fallback.rotation.y=vendorFacing(pos[0],pos[2]);markVendor(fallback,team);sc.add(fallback);VENDORS.push({root:fallback,team,pos});
+   const holder=new THREE.Group();holder.position.set(pos[0],pos[1],pos[2]);holder.rotation.y=vendorFacing(pos[0],pos[2]);markVendor(holder,team);sc.add(holder);
+   const entry={root:holder,team,pos};VENDORS.push(entry);
    bbModel('vendor').then(model=>{
      if(gen!==vendorGeneration)return;
-     const entry=VENDORS.find(v=>v.team===team);if(!entry)return;
-     sc.remove(entry.root);model.position.set(pos[0],pos[1],pos[2]);model.rotation.y=vendorFacing(pos[0],pos[2]);model.scale.setScalar(.92);markVendor(model,team);sc.add(model);entry.root=model;
-   }).catch(()=>{});
+     normalizeBB(model,2.05);model.position.y+=.02;markVendor(model,team);holder.add(model);
+   }).catch(err=>{
+     console.warn('Falha ao carregar vendedor Blockbench',err);
+     if(gen!==vendorGeneration)return;
+     const fallback=fallbackVendor(team);markVendor(fallback,team);holder.add(fallback);
+   });
  });
 }
 const vendorRay=new THREE.Raycaster(),vendorDir=new THREE.Vector3();
@@ -363,18 +378,26 @@ function remoteHeld(r,slot,team,swordLevel){
  const sig=slot+':'+team+':'+swordLevel;if(r.hs===sig)return;r.hs=sig;while(r.held.children.length)r.held.remove(r.held.children[0]);
  const model=heldModel(slot,team,swordLevel);model.scale.set(.65,.65,.65);r.held.add(model);
  if(slot===0){
-   bbModel('sword').then(m=>{if(r.hs!==sig)return;while(r.held.children.length)r.held.remove(r.held.children[0]);
-     const col=[0xc7c7c7,0x8b8b8b,0xd8d8d8,0x57e8ee][swordLevel]||0xc7c7c7;
-     m.traverse(o=>{if(o.isMesh&&o.material){const src=Array.isArray(o.material)?o.material:[o.material],nx=src.map(mat=>{const c=mat.clone();if(c.color)c.color.setHex(col);return c});o.material=Array.isArray(o.material)?nx:nx[0]}});
-     m.scale.setScalar(.42);m.rotation.set(0,0,-.42);m.position.set(0,-.2,0);r.held.add(m);
+   const col=[0xffffff,0xb7b7b7,0xe6e6e6,0x8ff5ff][swordLevel]||0xffffff;
+   bbModel('sword',col).then(m=>{if(r.hs!==sig)return;while(r.held.children.length)r.held.remove(r.held.children[0]);
+     normalizeBB(m,.62);m.rotation.set(0,0,-.42);m.position.add(new THREE.Vector3(0,-.18,0));r.held.add(m);
    }).catch(()=>{});
  }
 }
 function syncRemoteArmor(r,tier){
  if(r.armorTier===tier)return;r.armorTier=tier;while(r.armorRoot.children.length)r.armorRoot.remove(r.armorRoot.children[0]);if(!tier)return;
- const col=tier===2?0x71e6ef:0xc8c8c8;
- const add=(key,scale,pos)=>bbModel(key).then(m=>{if(r.armorTier!==tier)return;m.traverse(o=>{if(o.isMesh&&o.material){const src=Array.isArray(o.material)?o.material:[o.material],nx=src.map(mat=>{const c=mat.clone();if(c.color)c.color.setHex(col);return c});o.material=Array.isArray(o.material)?nx:nx[0]}});m.scale.setScalar(scale);m.position.set(...pos);r.armorRoot.add(m)}).catch(()=>{});
- add('helmet',.72,[0,1.24,0]);add('chest',.62,[0,.54,0]);add('leggings',.55,[0,.06,0]);add('boots',.55,[0,.02,0]);
+ const tint=tier===2?0x9fefff:0xe7e7e7;
+ const token=tier;
+ Promise.all([
+   bbModel('helmet',tint),bbModel('chest',tint),bbModel('leggings',tint),bbModel('boots',tint)
+ ]).then(([helmet,chest,leggings,boots])=>{
+   if(r.armorTier!==token)return;
+   normalizeBB(helmet,.52);helmet.position.set(0,1.28,0);
+   normalizeBB(chest,.72);chest.position.set(0,.62,0);
+   normalizeBB(leggings,.72);leggings.position.set(0,.24,0);
+   normalizeBB(boots,.38);boots.position.set(0,.04,0);
+   r.armorRoot.add(helmet,chest,leggings,boots);
+ }).catch(err=>console.warn('Falha ao carregar armadura Blockbench',err));
 }
 const DROP=new Map();
 function syncDrops(l){const seen=new Set();l.forEach(d=>{seen.add(d.id);let o=DROP.get(d.id);if(!o){const tex=iconTex[d.k]||iconTex.iron,m=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));m.scale.set(.55,.55,1);sc.add(m);o={m};DROP.set(d.id,o)}o.m.position.set(d.x,d.y,d.z)});DROP.forEach((o,id)=>{if(!seen.has(id)){sc.remove(o.m);DROP.delete(id)}})}
