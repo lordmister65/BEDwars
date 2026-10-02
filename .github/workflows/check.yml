@@ -18,6 +18,11 @@ jobs:
           node --check public/shared.js
           node --check public/blockbench-models.js
           node --check public/game.js
+      - name: Check runtime state declarations
+        run: |
+          grep -q "currentMode='2v2'" public/game.js
+          grep -q "drawShop();" public/game.js
+
       - name: Check referenced client assets
         run: |
           grep -q '/style.css' public/index.html
