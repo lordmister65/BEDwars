@@ -515,9 +515,13 @@ function bridgeTarget(){
  return{x,y,z,k};
 }
 function autoBridge(now=performance.now()){
- if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<88)return;
+ if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<72)return;
  const p=bridgeTarget();if(!p)return;
- lastBridgeAt=now;useAnim=1;send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z});
+ lastBridgeAt=now;useAnim=1;
+ // Predição visual local: mostra o bloco imediatamente; o servidor continua autoritativo.
+ const blockId=p.k==='wool'?me.team+1:p.k==='planks'?5:p.k==='endstone'?12:p.k==='glass'?7:16;
+ sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);
+ send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z});
 }
 function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=KY[cur];if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball')send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
 addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(KY[cur]==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(KY[cur]);secondary()}});
@@ -534,7 +538,7 @@ let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFo
 function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);
 if((started||lobbyExplore)&&!over&&(document.pointerLockElement||touchMode)&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
-const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15&&pl.g,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1);
+const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1);
 pl.vx=(fx_*mf+rx*mr)/l*sp;pl.vz=(fz*mf+rz*mr)/l*sp;
 if(sneak&&pl.g){const gr=(x,z)=>hit(x,pl.y-.15,z);if(!gr(pl.x+pl.vx*.12,pl.z))pl.vx=0;if(!gr(pl.x,pl.z+pl.vz*.12))pl.vz=0}
 if(K.Space&&pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}step(pl,dt);
