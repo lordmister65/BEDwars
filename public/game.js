@@ -106,17 +106,17 @@ function blockModel(c,o=1){const g=new THREE.Group(),b=new THREE.Mesh(new THREE.
 function potionModel(c){const g=new THREE.Group(),body=box(.22,.28,.16,c),neck=box(.09,.10,.09,0xe9e9e9),cap=box(.12,.05,.12,0x7a5436);neck.position.y=.19;cap.position.y=.27;g.add(body,neck,cap);return g}
 function bowModel(){const g=new THREE.Group();for(const y of [-.22,0,.22]){const b=box(.05,.25,.05,0x8a5a32);b.position.y=y;b.rotation.z=y?Math.sign(y)*.45:0;g.add(b)}const str=box(.018,.62,.018,0xe5e5e5);str.position.x=.10;g.add(str);g.rotation.z=-.25;return g}
 function appleModel(){const g=new THREE.Group(),a=sphere(.18,0xffc928),st=box(.05,.12,.05,0x6d4828);st.position.y=.19;g.add(a,st);return g}
-function tntModel(){const g=blockModel(0xd7352f),band=box(.44,.13,.44,0xe8e0d2);band.position.y=0;g.add(band);return g}
+function tntModel(color=0xd7352f){const g=blockModel(color),band=box(.44,.13,.44,0xe8e0d2);band.position.y=0;g.add(band);return g}
 function toolModel(k){const g=new THREE.Group(),h=box(.06,.48,.06,0x76513a);h.position.y=-.05;g.add(h);if(k==='pick'){const p=box(.42,.08,.08,0xbfc5c7);p.position.y=.22;g.add(p)}else if(k==='axe'){const p=box(.24,.26,.08,0xbfc5c7);p.position.set(.09,.18,0);g.add(p)}else{const a=box(.28,.05,.05,0xc7c7c7),b=a.clone();a.rotation.z=.5;b.rotation.z=-.5;a.position.y=b.position.y=.15;g.add(a,b)}g.rotation.z=-.45;return g}
 function heldModel(slot,team=me.team,swordLevel=sw){
- const k=KY[slot];
+ const k=slotKey(slot);
  if(slot===0)return swordModel(swordLevel);
  if(k==='wool')return blockModel(TC[team]||0x3d6fe0);
  if(k==='planks')return blockModel(0xb58a4e);
  if(k==='endstone')return blockModel(0xe8dfb0);
  if(k==='glass')return blockModel(0xbfe9ff,.55);
  if(k==='obsidian')return blockModel(0x2c2036);
- if(k==='tnt')return tntModel();
+ if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(k)){const t=TNT_TYPES.find(x=>x[0]===k);return tntModel(t?t[2]:0xd7352f)}
  if(k==='apple')return appleModel();
  if(k==='bow')return bowModel();
  if(k==='fireball')return sphere(.20,0xff6a00);
@@ -128,7 +128,7 @@ function heldModel(slot,team=me.team,swordLevel=sw){
  return new THREE.Group()
 }
 function refreshHeld(){
- const sig=miningTool?'tool:'+miningTool:'slot:'+cur+':'+sw+':'+me.team;
+ const sig=miningTool?'tool:'+miningTool:'slot:'+cur+':'+slotKey(cur)+':'+sw+':'+me.team;
  if(lastHeldSig===sig)return;lastHeldSig=sig;
  while(heldRoot.children.length)heldRoot.remove(heldRoot.children[0]);
  heldRoot.add(miningTool?toolModel(miningTool):heldModel(cur));
@@ -245,7 +245,14 @@ let n=e.x+vx*dt;if(!hit(n,e.y,e.z))e.x=n;n=e.z+vz*dt;if(!hit(e.x,e.y,n))e.z=n;
 e.vy-=28*dt;n=e.y+e.vy*dt;e.g=false;if(!hit(e.x,n,e.z))e.y=n;else{if(e.vy<0)e.g=true;e.vy=0}}
 // estado
 const K={},SL=['Espada','Lã','Tábuas','End Stone','Vidro','Obsidiana','TNT','Maçã','Arco','B. Fogo','B. Neve','Pérola','Veloc.','Salto','Invis.'],KY=[0,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion'],SC=['#ccc','#3d6fe0','#b58a4e','#e8dfb0','#ddecff','#2c2036','#d83030','#ffd23d','#8b5a2b','#ff7a20','#eef6ff','#7b3fc6','#55ddff','#aaff55','#bbbbff'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
-let inv={wool:0,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,tools={pick:0,axe:0,shears:0},fxs={speed:0,jump:0,invis:0},up={sharp:0,prot:0,forge:0,regen:0,trap:0},cur=1,started=0,over=0,shopOpen=0,bed=[1,1,1,1],INFO={},tg=null,ws;
+const TNT_TYPES=[['tnt','Explosiva',0xd7352f],['tntImpulse','Impulso',0xe8f4ff],['tntSlow','Lentidão',0x4f9dff],['tntDamage','Dano',0xff3154]];
+let tntSel=0;
+let inv={wool:0,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,tools={pick:0,axe:0,shears:0},fxs={speed:0,jump:0,invis:0,slow:0},up={sharp:0,prot:0,forge:0,regen:0,trap:0},cur=1,started=0,over=0,shopOpen=0,bed=[1,1,1,1],INFO={},tg=null,ws;
+function ownedTnts(){return TNT_TYPES.filter(t=>(inv[t[0]]||0)>0)}
+function activeTnt(){const owned=ownedTnts();if(!owned.length)return TNT_TYPES[tntSel%TNT_TYPES.length];const key=TNT_TYPES[tntSel%TNT_TYPES.length][0];return owned.find(t=>t[0]===key)||owned[0]}
+function slotKey(i){return i===6?activeTnt()[0]:KY[i]}
+function slotName(i){return i===6?'TNT '+activeTnt()[1]:SL[i]}
+function cycleTnt(){const owned=ownedTnts();if(owned.length<2)return;const key=activeTnt()[0],i=owned.findIndex(t=>t[0]===key),next=owned[(i+1)%owned.length];tntSel=TNT_TYPES.findIndex(t=>t[0]===next[0]);lastHeldSig='';refreshHeld();hud();msg('TNT: '+next[1])}
 let roomCode='',reconnectToken='',reconnectUntil=0,reconnectTimer=null,reconnecting=false,bowCharging=false,bowChargeAt=0,lobbyExplore=false;
 const clk=[],PL=new Map(),PT=[],ownedState={};
 let AC,masterGain,lastStep=0,lastPickup=0;
