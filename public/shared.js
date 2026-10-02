@@ -103,7 +103,10 @@
     ['Poção de Salto','em',1,'inv','jumpPotion',1,'Poções','🦘'],
     ['Poção de Invisibilidade','em',2,'inv','invisPotion',1,'Poções','👻'],
 
-    ['TNT','gold',4,'inv','tnt',1,'Utilidades','🧨',{'4v4':8}],
+    ['TNT Explosiva','gold',4,'inv','tnt',1,'Utilidades','🧨',{'4v4':8}],
+    ['TNT de Impulso','iron',64,'inv','tntImpulse',1,'Utilidades','💨'],
+    ['TNT de Lentidão','dia',10,'inv','tntSlow',1,'Utilidades','🧊'],
+    ['TNT de Dano','em',4,'inv','tntDamage',1,'Utilidades','💥'],
     ['Bola de Fogo','iron',40,'inv','fireball',1,'Utilidades','🔥'],
     ['Bola de Neve ×4','iron',12,'inv','snowball',4,'Utilidades','❄️'],
     ['Pérola do End','em',4,'inv','pearl',1,'Utilidades','🟣'],
