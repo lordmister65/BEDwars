@@ -8,11 +8,11 @@ let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
 const STATIC = {};
-for (const f of ['index.html','shared.js','game.js','style.css','assets/blockbench-models.zip']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
+for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
 const srv = http.createServer((q, r) => {
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
   if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
-  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.zip')?'application/zip':'text/html; charset=utf-8';
+  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
   r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
   r.end(STATIC[f]);
 });
