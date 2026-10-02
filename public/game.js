@@ -65,13 +65,30 @@ function parseBB(key){
 function bbModel(key,tint=null){
   return parseBB(key).then(root=>prepareBB(root,tint));
 }
-['vendor','sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
+['sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
 const hand=new THREE.Group(),handMat=new THREE.MeshBasicMaterial({color:0xe8b98a});
 const arm=new THREE.Mesh(new THREE.BoxGeometry(.18,.18,.55),handMat);arm.position.set(.48,-.44,-.72);arm.rotation.x=-.35;hand.add(arm);
 const heldRoot=new THREE.Group();heldRoot.position.set(.52,-.26,-.92);hand.add(heldRoot);cam.add(hand);let swing=0,useAnim=0,lastHeldSig='',miningTool=null;
 const HMAT=new Map();const hmat=(c,o=1)=>{const k=c+':'+o;if(!HMAT.has(k))HMAT.set(k,new THREE.MeshBasicMaterial({color:c,transparent:o<1,opacity:o}));return HMAT.get(k)};
 const box=(w,h,d,c)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),hmat(c));
 const sphere=(r,c,o=1)=>new THREE.Mesh(new THREE.SphereGeometry(r,7,6),hmat(c,o));
+const vendorAtlas=new THREE.TextureLoader().load('/assets/vendor_blue_atlas.png');
+vendorAtlas.magFilter=vendorAtlas.minFilter=THREE.NearestFilter;vendorAtlas.generateMipmaps=false;
+function vendorFace(row,col){
+  const t=vendorAtlas.clone();t.needsUpdate=true;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;
+  t.repeat.set(1/6,1/6);t.offset.set(col/6,1-(row+1)/6);
+  return new THREE.MeshBasicMaterial({map:t,side:THREE.FrontSide});
+}
+const VENDOR_MATERIAL_ROWS=new Map();
+function vendorMaterials(row){
+  if(VENDOR_MATERIAL_ROWS.has(row))return VENDOR_MATERIAL_ROWS.get(row);
+  // BoxGeometry: direita, esquerda, topo, base, frente, costas.
+  const m=[vendorFace(row,3),vendorFace(row,2),vendorFace(row,4),vendorFace(row,5),vendorFace(row,0),vendorFace(row,1)];
+  VENDOR_MATERIAL_ROWS.set(row,m);return m;
+}
+function vendorPart(w,h,d,row){
+  return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),vendorMaterials(row));
+}
 function swordModel(level=sw){
  const g=new THREE.Group(),cols=[0xc7c7c7,0x898989,0xd9d9d9,0x57e8ee],b=box(.10,.62,.10,cols[level]||cols[0]),gr=box(.32,.07,.09,0x76513a),h=box(.09,.27,.09,0x5b3c2b);
  b.position.y=.22;gr.position.y=-.08;h.position.y=-.24;g.add(b,gr,h);g.rotation.z=-.35;return g
@@ -161,25 +178,26 @@ function flush(max=2){let n=0;for(const q of [...dirty]){if(n++>=max)break;dirty
 const VENDORS=[];let vendorGeneration=0;
 function clearVendors(){vendorGeneration++;while(VENDORS.length){const v=VENDORS.pop();sc.remove(v.root)}}
 function fallbackVendor(team){
- const g=new THREE.Group(),body=box(.72,1.15,.42,0x6c4b32),head=box(.55,.55,.55,0xe0a879);
- body.position.y=.75;head.position.y=1.6;g.add(body,head);g.userData.vendorTeam=team;return g;
+ const g=new THREE.Group();
+ const head=vendorPart(.58,.58,.58,0),body=vendorPart(.72,.78,.36,1);
+ const armR=vendorPart(.24,.72,.28,2),armL=vendorPart(.24,.72,.28,3);
+ const legR=vendorPart(.28,.78,.30,4),legL=vendorPart(.28,.78,.30,5);
+ legR.position.set(-.17,.39,0);legL.position.set(.17,.39,0);
+ body.position.set(0,1.15,0);
+ armR.position.set(-.49,1.16,0);armL.position.set(.49,1.16,0);
+ head.position.set(0,1.83,0);
+ g.add(legR,legL,body,armR,armL,head);
+ const badge=box(.15,.15,.03,TC[team]||0xffffff);badge.position.set(0,1.19,.205);g.add(badge);
+ g.userData.vendorTeam=team;return g;
 }
 function markVendor(root,team){root.userData.vendorTeam=team;root.traverse(o=>o.userData.vendorTeam=team)}
 function vendorFacing(x,z){return Math.atan2(-x,-z)}
 function updateVendors(g,lobby=false){
  clearVendors();if(lobby||!g||!g.SHOP)return;
- const gen=vendorGeneration;
  g.SHOP.forEach((pos,team)=>{
-   const holder=new THREE.Group();holder.position.set(pos[0],pos[1],pos[2]);holder.rotation.y=vendorFacing(pos[0],pos[2]);markVendor(holder,team);sc.add(holder);
-   const entry={root:holder,team,pos};VENDORS.push(entry);
-   bbModel('vendor').then(model=>{
-     if(gen!==vendorGeneration)return;
-     normalizeBB(model,2.05);model.position.y+=.02;markVendor(model,team);holder.add(model);
-   }).catch(err=>{
-     console.warn('Falha ao carregar vendedor Blockbench',err);
-     if(gen!==vendorGeneration)return;
-     const fallback=fallbackVendor(team);markVendor(fallback,team);holder.add(fallback);
-   });
+   const holder=new THREE.Group();holder.position.set(pos[0],pos[1],pos[2]);holder.rotation.y=vendorFacing(pos[0],pos[2]);
+   const seller=fallbackVendor(team);markVendor(seller,team);holder.add(seller);markVendor(holder,team);
+   sc.add(holder);VENDORS.push({root:holder,team,pos});
  });
 }
 const vendorRay=new THREE.Raycaster(),vendorDir=new THREE.Vector3();
