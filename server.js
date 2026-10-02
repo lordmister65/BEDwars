@@ -2,7 +2,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
-const PORT = process.env.PORT || 3000, DMG = [2, 4, 6, 8], rooms = new Map();
+const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const MODES={
   '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
   '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
@@ -165,7 +165,7 @@ function boom(R, q) {
   R.ps.forEach(e => {
     if (!e.alive) return;
     const dx = e.x - q.x - .5, dy = e.y + .9 - q.y - .5, dz = e.z - q.z - .5, L = Math.hypot(dx, dy, dz);
-    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1), dz / (L || 1), q.o, false, 'explosion');
+    if (L < 5) hurt(R, e, 9 * (1 - L / 5), dx / (L || 1)*1.25, dz / (L || 1)*1.25, q.o, false, 'explosion');
   });
 }
 
@@ -199,16 +199,16 @@ function fireballBoom(R, x, y, z, owner) {
   R.ps.forEach(q=>{
     if(!q.alive)return;
     const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
-    if(L<4.5) hurt(R,q,7*(1-L/4.5),dx/(L||1),dz/(L||1),owner,false,'explosion');
+    if(L<4.5) hurt(R,q,9*(1-L/4.5),dx/(L||1)*1.35,dz/(L||1)*1.35,owner,false,'explosion');
   });
 }
 
 function throwableTntBoom(R,kind,x,y,z,owner){
   const cfg={
-    tnt:{radius:3.2,damage:7,knock:8,breakR:2.7,color:0xff4b32},
-    tntImpulse:{radius:5.0,damage:1.5,knock:14,breakR:1.2,color:0xddeeff},
-    tntSlow:{radius:4.4,damage:2.5,knock:4.5,breakR:.8,color:0x78bfff},
-    tntDamage:{radius:4.3,damage:13,knock:6.5,breakR:1.5,color:0xff2448}
+    tnt:{radius:3.4,damage:7.5,knock:11,breakR:2.7,color:0xff4b32},
+    tntImpulse:{radius:5.4,damage:1.5,knock:18,breakR:1.2,color:0xddeeff},
+    tntSlow:{radius:4.6,damage:2.5,knock:7,breakR:.8,color:0x78bfff},
+    tntDamage:{radius:4.5,damage:13,knock:9,breakR:1.5,color:0xff2448}
   }[kind]||null;
   if(!cfg)return;
   if(cfg.breakR>0){
@@ -227,7 +227,7 @@ function throwableTntBoom(R,kind,x,y,z,owner){
     if(L>=cfg.radius)return;
     const f=1-L/cfg.radius,nx=dx/(L||1),nz=dz/(L||1);
     if(kind==='tntImpulse'){
-      tx(q,{t:'kb',kx:nx*cfg.knock*f,kz:nz*cfg.knock*f,vy:Math.max(4.8,8.5*f)});
+      tx(q,{t:'kb',kx:nx*cfg.knock*f,kz:nz*cfg.knock*f,vy:Math.max(5.5,10.5*f)});
       if(q!==owner)hurt(R,q,cfg.damage*f,nx*.45,nz*.45,owner,false,'explosion');
     }else{
       hurt(R,q,cfg.damage*f,nx*(cfg.knock/7),nz*(cfg.knock/7),owner,false,'explosion');
@@ -298,8 +298,8 @@ function segmentHitsBlock(R,x0,y0,z0,x1,y1,z1){
 }
 function projectileImpact(R,pr,x,y,z,target){
   const owner=R.ps.get(pr.o);
-  if(pr.k==='arrow'&&target)hurt(R,target,3+4*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1),pr.vz/(Math.hypot(pr.vx,pr.vz)||1),owner);
-  else if(pr.k==='snowball'&&target)hurt(R,target,1,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.15,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.15,owner);
+  if(pr.k==='arrow'&&target)hurt(R,target,4+5*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.12,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.12,owner);
+  else if(pr.k==='snowball'&&target)hurt(R,target,2.5,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.45,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.45,owner);
   else if(pr.k==='fireball')fireballBoom(R,x,y,z,owner);
   else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(pr.k))throwableTntBoom(R,pr.k,x,y,z,owner);
   else if(pr.k==='pearl'&&owner&&owner.alive){owner.x=x-pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.y=Math.max(1,y);owner.z=z-pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.hp=Math.max(1,owner.hp-2);tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z});}
