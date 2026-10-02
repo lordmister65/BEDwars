@@ -418,8 +418,8 @@ const held=new THREE.Group();held.position.set(.48,1.06,-.18);held.rotation.set(
 const armorRoot=new THREE.Group();g.add(armorRoot);
 sc.add(g);return{m:g,held,armorRoot,armorTier:-1,limbs:{ll,rl,la,ra},hs:-1,tx:0,ty:0,tz:0,lx:0,lz:0,speed:0,yaw:0,al:1,init:0,action:0}}
 const FX_GEO=new THREE.BoxGeometry(.15,.15,.15),FX_MAT=new Map(),PROJ=new Map();
-const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereGeometry(.18,6,6),snowball:new THREE.SphereGeometry(.13,6,6),pearl:new THREE.SphereGeometry(.15,7,7)};
-const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff}),pearl:new THREE.MeshBasicMaterial({color:0x8b4bc7})};
+const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereGeometry(.18,6,6),snowball:new THREE.SphereGeometry(.13,6,6),pearl:new THREE.SphereGeometry(.15,7,7),tnt:new THREE.BoxGeometry(.32,.32,.32),tntImpulse:new THREE.BoxGeometry(.32,.32,.32),tntSlow:new THREE.BoxGeometry(.32,.32,.32),tntDamage:new THREE.BoxGeometry(.32,.32,.32)};
+const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff}),pearl:new THREE.MeshBasicMaterial({color:0x8b4bc7}),tnt:new THREE.MeshBasicMaterial({color:0xd7352f}),tntImpulse:new THREE.MeshBasicMaterial({color:0xe8f4ff}),tntSlow:new THREE.MeshBasicMaterial({color:0x4f9dff}),tntDamage:new THREE.MeshBasicMaterial({color:0xff3154})};
 function fx(x,y,z,c,n=8){let mm=FX_MAT.get(c);if(!mm){mm=new THREE.MeshBasicMaterial({color:c});FX_MAT.set(c,mm)}for(let i=0;i<n;i++){const m=new THREE.Mesh(FX_GEO,mm);m.position.set(x,y,z);sc.add(m);PT.push({m,vx:(Math.random()-.5)*8,vy:Math.random()*6,vz:(Math.random()-.5)*8,t:.6})}}
 const BEDFX=[];
 function bedBurst(team,pos){if(!pos)return;const c=TC[team]||0xffffff;fx(pos[0]+.5,pos[1]+.7,pos[2]+.5,c,26);const beam=new THREE.Mesh(new THREE.BoxGeometry(.16,18,.16),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.8}));beam.position.set(pos[0]+.5,pos[1]+9,pos[2]+.5);sc.add(beam);BEDFX.push({m:beam,t:1.35})}
@@ -481,7 +481,7 @@ case'drops':syncDrops(m.l);break;
 case'tp':pl.x=m.x;pl.y=m.y;pl.z=m.z;pl.vy=0;pl.kx=pl.kz=0;break;
 case'kb':pl.kx+=m.kx;pl.kz+=m.kz;pl.vy=Math.max(pl.vy,m.vy);sfx('hurt');break;
 case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').style.transform='',70);sfx(m.cr?'crit':'hit');msg((m.cr?'CRÍTICO · ':'')+'Vida inimiga: '+m.hp);break;
-case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);sfx(p.k==='fireball'?'fireball':p.k==='arrow'?'arrow':p.k==='pearl'?'pearl':'snowball');break}
+case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);sfx(p.k==='fireball'||String(p.k).startsWith('tnt')?'fireball':p.k==='arrow'?'arrow':p.k==='pearl'?'pearl':'snowball');break}
 case'projHit':{const p=PROJ.get(m.id);if(p){sc.remove(p.m);PROJ.delete(m.id)}break}
 case'feed':addFeed(m);break;
 case'chat':addChat(m);break;
@@ -570,10 +570,10 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70;hud();
-function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);
+function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
 if((started||lobbyExplore)&&!over&&(document.pointerLockElement||touchMode)&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
-const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1);
+const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1)*(fxs.slow>0?.55:1);
 pl.vx=(fx_*mf+rx*mr)/l*sp;pl.vz=(fz*mf+rz*mr)/l*sp;
 if(sneak&&pl.g){const gr=(x,z)=>hit(x,pl.y-.15,z);if(!gr(pl.x+pl.vx*.12,pl.z))pl.vx=0;if(!gr(pl.x,pl.z+pl.vz*.12))pl.vz=0}
 if(K.Space&&pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}step(pl,dt);
