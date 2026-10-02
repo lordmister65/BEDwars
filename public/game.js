@@ -149,23 +149,22 @@ function updateGeneratorIcons(g){
   if(g.EMGEN)genIcon('em',g.EMGEN[0],g.EMGEN[1]+1,g.EMGEN[2],1.25);
 }
 updateGeneratorIcons(gn);
-const cvT=document.createElement('canvas');cvT.width=128;cvT.height=16;const c2=cvT.getContext('2d');c2.imageSmoothingEnabled=false;
-function tile(t,base,fn){for(let x=0;x<16;x++)for(let y=0;y<16;y++){let c=base;if(fn)c=fn(x,y,c);c2.fillStyle=c;c2.fillRect(t*16+x,y,1,1)}}
-tile(0,'#d8d8d8',(x,y)=>((x*3+y*5)%7===0?'#bdbdbd':(x+y)%5===0?'#ededed':'#d8d8d8'));
-tile(1,'#a77945',(x,y)=>(y%4===0?'#76502f':(x+(y>>2)*5)%13===0?'#c99a63':'#a77945'));
-tile(2,'#e5dca9',(x,y)=>((x*5+y*3)%11<2?'#c8bf91':(x+y)%9===0?'#f5edc0':'#e5dca9'));
-tile(3,'#eeeeee',(x,y)=>(y<3?'#fafafa':y>10?'#7b4e31':'#d8d4ca'));
-tile(4,'#d52b2b',(x,y)=>(y>5&&y<10?'#eee6d6':(x+y)%5===0?'#ff4d42':'#d52b2b'));
-tile(5,'#251d31',(x,y)=>((x*7+y*11)%9<2?'#49335c':'#251d31'));
-tile(6,'#cdefff',(x,y)=>(x===0||y===0||x===15||y===15?'#ffffff':((x+y)%6===0?'#9ed6eb':'#cdefff')));
-tile(7,'#aaaaaa',(x,y)=>((x+y)%4===0?'#7c7c7c':'#aaaaaa'));
-const tex=new THREE.CanvasTexture(cvT);tex.magFilter=tex.minFilter=THREE.NearestFilter;tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
-const tl=b=>b<5?0:(b===5||b===30)?1:(b===12||b===6||b>=17&&b<=21||b===24||b===25||b===26||b===27||b===28||b===29||b===31)?2:b>=8&&b<=11?3:b===13?4:b===16?5:b===7?6:(b===14||b===15||b===22||b===23||b===32||b===33||b===34)?7:2,mat=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,side:THREE.FrontSide,transparent:true,alphaTest:.08}),M={},dirty=new Set();
+const tex=new THREE.TextureLoader().load('/assets/kai_hive_bedwars_atlas.png',()=>{dirty&&activeChunks&&activeChunks.forEach(k=>dirty.add(k))});
+tex.magFilter=tex.minFilter=THREE.NearestFilter;tex.generateMipmaps=false;tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+const PACK_NATIVE=new Set([5,6,7,12,13,15,16,23,24,26,27,28,30,31,32,33,34]);
+const tl=b=>b>=1&&b<=4?0:b===5?1:b===6?7:b===7?6:b>=8&&b<=11?0:b===12?2:b===13?4:b===14?15:b===15?13:b===16?5:b>=17&&b<=19?3:b===20?2:b===21?7:b===22||b===23?15:b===24||b===25?8:b===26?11:b===27?9:b===28?3:b===29?9:b===30?10:b===31?12:b===32?13:b===33?14:b===34?15:7;
+function blockTint(b,face){
+  if(PACK_NATIVE.has(b))return 0xffffff;
+  if(b===25)return 0xa58a72;
+  if(b===29)return 0x5a9f45;
+  const pp=P[b];return pp?(pp[face]??pp[0]):0xffffff;
+}
+const mat=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,side:THREE.FrontSide,transparent:true,alphaTest:.08}),M={},dirty=new Set();
 function build(cx,cz){const p=[],c=[],i=[],u=[],col=new THREE.Color();let n=0;
 for(let x=cx*CS;x<cx*CS+CS;x++)for(let z=cz*CS;z<cz*CS+CS;z++){if(!inXZ(x,z))continue;for(let y=0;y<H;y++){const b=B[ix(x,y,z)];if(!b)continue;
-const v=.94+((x*73856093^y*19349663^z*83492791)>>>0)%100/1600,pp=P[b];
-for(const f of F){const d=f[0];if(get(x+d[0],y+d[1],z+d[2]))continue;col.setHex(pp[f[6]]??pp[0]).multiplyScalar(f[5]*v);
-for(let k=1;k<5;k++){p.push(x+f[k][0],y+f[k][1],z+f[k][2]);c.push(col.r,col.g,col.b);u.push((tl(b)+.02+.96*[0,1,1,0][k-1])/8,.02+.96*[0,0,1,1][k-1])}
+const v=.96+((x*73856093^y*19349663^z*83492791)>>>0)%100/2200;
+for(const f of F){const d=f[0];if(get(x+d[0],y+d[1],z+d[2]))continue;col.setHex(blockTint(b,f[6])).multiplyScalar(f[5]*v);
+for(let k=1;k<5;k++){p.push(x+f[k][0],y+f[k][1],z+f[k][2]);c.push(col.r,col.g,col.b);u.push((tl(b)+.02+.96*[0,1,1,0][k-1])/16,.02+.96*[0,0,1,1][k-1])}
 i.push(n,n+1,n+2,n,n+2,n+3);n+=4}}}
 const k=cx+','+cz;if(M[k]){sc.remove(M[k]);M[k].geometry.dispose()}
 const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(u,2));g.setIndex(i);

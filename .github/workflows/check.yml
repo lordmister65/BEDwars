@@ -28,3 +28,5 @@ jobs:
           grep -q '/style.css' public/index.html
           grep -q '/blockbench-models.js' public/index.html
           grep -q '/game.js' public/index.html
+          test -f public/assets/kai_hive_bedwars_atlas.png
+          grep -q '/assets/kai_hive_bedwars_atlas.png' public/game.js

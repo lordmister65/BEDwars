@@ -27,7 +27,7 @@ let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
 const STATIC = {};
-for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
+for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
 const srv = http.createServer((q, r) => {
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
   if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
