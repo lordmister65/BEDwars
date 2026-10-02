@@ -2,7 +2,7 @@ name: Check Bedwars
 on:
   pull_request:
   push:
-    branches: [ main, feature/full-gameplay-v4 ]
+    branches: [ main ]
 jobs:
   syntax:
     runs-on: ubuntu-latest
@@ -16,8 +16,10 @@ jobs:
         run: |
           node --check server.js
           node --check public/shared.js
+          node --check public/blockbench-models.js
           node --check public/game.js
       - name: Check referenced client assets
         run: |
           grep -q '/style.css' public/index.html
+          grep -q '/blockbench-models.js' public/index.html
           grep -q '/game.js' public/index.html
