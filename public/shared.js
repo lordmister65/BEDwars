@@ -173,7 +173,7 @@
     const gx=cx+oz*7-ox*5, gz=cz-ox*7-oz*5;
     GEN[t]=[gx+.5,BASE_Y+2,gz+.5];
     for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++)if(dx*dx+dz*dz<=10)set(gx+dx,BASE_Y+1,gz+dz,12);
-    ring(set,gx,BASE_Y+2,gz,3,decor,1);set(gx,BASE_Y+2,gz,23);
+    ring(set,gx,BASE_Y+2,gz,3,decor,1);
 
     if(cfg.theme==='castle'){
       for(const [dx,dz] of [[-r+4,-r+4],[r-4,-r+4],[-r+4,r-4],[r-4,r-4]])tower(set,cx+dx,cz+dz,BASE_Y+2,decor,9);
@@ -194,7 +194,7 @@
   function diamondIsland(set,x,z,i,cfg){
     island(set,x,z,BASE_Y-1,cfg.theme==='castle'?11:10,12,cfg.theme==='volcano'?21:6,200+i);
     ring(set,x,BASE_Y,z,8,cfg.theme==='volcano'?21:12,1);
-    set(x,BASE_Y+1,z,14);
+    // Centro livre: a plataforma de laje do gerador é renderizada no cliente.
     if(cfg.theme==='castle'){
       for(const [dx,dz] of [[-6,-6],[6,-6],[-6,6],[6,6]])tower(set,x+dx,z+dz,BASE_Y,12,5);
       // Ponte parcial apontando para o centro: ajuda leitura do layout sem eliminar a necessidade de construir.
@@ -214,7 +214,7 @@
       island(set,cx,cz,BASE_Y+2,23,21,21,334);
       island(set,cx,cz,BASE_Y+6,13,21,21,335);
       island(set,cx,cz,BASE_Y+9,6,22,21,336);
-      set(cx,BASE_Y+10,cz,15);
+      // Centro livre para a plataforma de esmeralda.
       // Quatro pilares elementares.
       for(const [dx,dz] of [[-18,-18],[18,-18],[-18,18],[18,18]])tower(set,cx+dx,cz+dz,BASE_Y,21,10);
     }else if(cfg.theme==='castle'){
@@ -222,7 +222,7 @@
       island(set,cx,cz,BASE_Y+4,20,12,12,321);
       for(const [dx,dz] of [[-22,-22],[22,-22],[-22,22],[22,22]])tower(set,cx+dx,cz+dz,BASE_Y,12,13);
       ring(set,cx,BASE_Y+5,cz,18,12,3);
-      set(cx,BASE_Y+6,cz,15);
+      // Centro livre para a plataforma de esmeralda.
     }else{
       island(set,cx,cz,BASE_Y-1,31,12,6,310);
       island(set,cx,cz,BASE_Y+5,19,12,6,311);
@@ -230,7 +230,7 @@
       for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]])for(let n=0;n<9;n++){
         for(let w=-2;w<=2;w++)set(cx+dx*(11+n)+(dz?w:0),BASE_Y+1+Math.floor(n/2),cz+dz*(11+n)+(dx?w:0),12);
       }
-      set(cx,BASE_Y+6,cz,15);
+      // Centro livre para a plataforma de esmeralda.
     }
   }
 
@@ -290,7 +290,7 @@
     SHOP[t]=[shopX+.5,23,shopZ+.5];
     const genX=cx-oz*8+ox*5,genZ=cz+ox*8-oz*5;
     GEN[t]=[genX+.5,23,genZ+.5];
-    set(genX,22,genZ,34);
+    // Centro livre para a plataforma baixa do gerador.
     jungleTree(set,cx+oz*12-ox*5,22,cz-ox*12-oz*5,7);
     jungleTree(set,cx-oz*12-ox*4,22,cz+ox*12-oz*4,6);
   }
@@ -299,7 +299,7 @@
     for(let r=6;r>=2;r-=2)for(let a=0;a<8;a++){
       const A=a*Math.PI/4;set(Math.round(cx+Math.cos(A)*r),23+(6-r)/2,Math.round(cz+Math.sin(A)*r),28);
     }
-    set(cx,23,cz,32);set(cx,24,cz,34);
+    // Centro livre para a plataforma de diamante.
     junglePillar(set,cx-5,23,cz-5,5);junglePillar(set,cx+5,23,cz+5,5);
   }
   function jungleTemple(set){
@@ -321,7 +321,7 @@
     for(let y=43;y<=52;y++)for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)
       if(Math.abs(x)===5||Math.abs(z)===5)set(x,y,z,(y%3===0)?26:28);
     for(const [x,z] of [[-18,-18],[18,-18],[-18,18],[18,18]])jungleTree(set,x,22,z,10);
-    set(0,53,0,33);set(0,54,0,34);
+    // Topo livre para a plataforma central de esmeralda.
   }
   function buildJungle(set,BD,SHOP,GEN,SPAWN){
     J_BASES.forEach(([x,z],t)=>jungleActiveBase(set,BD,SHOP,GEN,SPAWN,t,x,z));
