@@ -28,6 +28,11 @@
       id:'volcano',name:'Vulcão',
       description:'Templo elemental de pedra negra, relevo dramático e vulcão central elevado.',
       theme:'volcano',baseRadius:21,centerRadius:34
+    },
+    jungle:{
+      id:'jungle',name:'Jungle Temple',
+      description:'Mapa inspirado no mundo Minecraft enviado: ruínas de selva, oito ilhas externas e templo central.',
+      theme:'jungle',baseRadius:18,centerRadius:34
     }
   };
 
@@ -53,7 +58,18 @@
       20:{name:'Arenito Dourado',kind:'decor',hard:3.4,tool:'pick'},
       21:{name:'Pedra Negra',kind:'decor',hard:4.5,tool:'pick'},
       22:{name:'Magma',kind:'decor',hard:4.5,tool:'pick'},
-      23:{name:'Luz',kind:'decor',hard:1.5,tool:null}
+      23:{name:'Luz',kind:'decor',hard:1.5,tool:null},
+      24:{name:'Terra',kind:'decor',hard:1.2,tool:null},
+      25:{name:'Terra Escura',kind:'decor',hard:1.5,tool:null},
+      26:{name:'Terracota Ciano',kind:'decor',hard:2.4,tool:'pick'},
+      27:{name:'Grama',kind:'decor',hard:.8,tool:null},
+      28:{name:'Tijolo de Pedra',kind:'decor',hard:3.2,tool:'pick'},
+      29:{name:'Folhagem',kind:'decor',hard:.5,tool:null},
+      30:{name:'Madeira de Selva',kind:'decor',hard:1.8,tool:'axe'},
+      31:{name:'Terracota Rosa',kind:'decor',hard:2.4,tool:'pick'},
+      32:{name:'Bloco de Diamante',kind:'decor',hard:4.5,tool:'pick'},
+      33:{name:'Bloco de Esmeralda',kind:'decor',hard:4.5,tool:'pick'},
+      34:{name:'Lanterna do Mar',kind:'decor',hard:1.6,tool:'pick'}
     }
   });
 
@@ -208,9 +224,109 @@
     }
   }
 
+
+  // Layout extraído do mapa Minecraft "Inca/Jungle Temple" enviado pelo usuário.
+  const J_BASES=[[-90,30],[-30,-90],[90,-30],[30,90]];
+  const J_EXTRA=[[-90,-30],[-30,90],[90,30],[30,-90]];
+  const J_DI=[[-58,59],[59,58],[-59,-58],[58,-59]];
+
+  function jungleCone(set,cx,cz,topY,r,seed=1){
+    const noise=(x,z)=>Math.sin((x*17.17+z*31.37+seed*11.3))*43758.5453%1;
+    for(let d=0;d<=Math.floor(r*.82);d++){
+      const rr=Math.max(2,r-d*.72),y=topY-d;
+      for(let x=Math.floor(cx-rr);x<=Math.ceil(cx+rr);x++)for(let z=Math.floor(cz-rr);z<=Math.ceil(cz+rr);z++){
+        const j=((noise(x,z)+1)%1-.5)*2.2;
+        if(Math.hypot(x-cx,z-cz)<=rr+j){
+          const edge=Math.hypot(x-cx,z-cz)>rr-2;
+          set(x,y,z,d===0?(edge?24:27):(d<4?24:(d%5===0?19:25)));
+        }
+      }
+    }
+  }
+  function jungleTree(set,x,y,z,h=7){
+    for(let i=0;i<h;i++)set(x,y+i,z,30);
+    for(let dy=h-3;dy<=h;dy++){
+      const r=dy===h?2:3;
+      for(let dx=-r;dx<=r;dx++)for(let dz=-r;dz<=r;dz++)
+        if(Math.abs(dx)+Math.abs(dz)<=r+1)set(x+dx,y+dy,z+dz,29);
+    }
+  }
+  function junglePillar(set,x,y,z,h=7){
+    for(let i=0;i<h;i++)set(x,y+i,z,i%3===0?19:28);
+    set(x,y+h,z,34);
+  }
+  function jungleRuin(set,cx,cz,rot=0,accent=26){
+    const sx=rot%2?1:0,sz=rot%2?0:1;
+    for(let w=-7;w<=7;w++){
+      for(let h=0;h<6;h++){
+        if((w+h)%5!==0){
+          set(cx+w*sz-7*sx,22+h,cz+w*sx-7*sz,h<2?19:28);
+          set(cx+w*sz+7*sx,22+h,cz+w*sx+7*sz,h<2?19:28);
+        }
+      }
+    }
+    for(const [dx,dz] of [[-6,-6],[6,-6],[-6,6],[6,6]])junglePillar(set,cx+dx,22,cz+dz,8);
+    for(let x=-4;x<=4;x++)for(let z=-4;z<=4;z++)if(Math.abs(x)+Math.abs(z)<7)set(cx+x,22,cz+z,accent);
+  }
+  function jungleActiveBase(set,BD,SHOP,GEN,SPAWN,t,cx,cz){
+    jungleCone(set,cx,cz,21,19,500+t);
+    jungleRuin(set,cx,cz,t,26);
+    const ox=Math.abs(cx)>Math.abs(cz)?Math.sign(cx):0,oz=ox?0:Math.sign(cz);
+    const bx=cx-ox*8,bz=cz-oz*8;BD[t]=[bx,22,bz];set(bx,22,bz,8+t);
+    set(bx-oz,22,bz-ox,t+1);
+    const sx=cx+oz*8-ox*4,sz=cz-ox*8-oz*4;
+    SPAWN[t]=[sx+.5,23.02,sz+.5];
+    const shopX=cx+oz*8+ox*5,shopZ=cz-ox*8+oz*5;
+    SHOP[t]=[shopX+.5,23,shopZ+.5];
+    const genX=cx-oz*8+ox*5,genZ=cz+ox*8-oz*5;
+    GEN[t]=[genX+.5,23,genZ+.5];
+    set(genX,22,genZ,34);
+    jungleTree(set,cx+oz*12-ox*5,22,cz-ox*12-oz*5,7);
+    jungleTree(set,cx-oz*12-ox*4,22,cz+ox*12-oz*4,6);
+  }
+  function jungleDiamond(set,cx,cz,i){
+    jungleCone(set,cx,cz,22,10,620+i);
+    for(let r=6;r>=2;r-=2)for(let a=0;a<8;a++){
+      const A=a*Math.PI/4;set(Math.round(cx+Math.cos(A)*r),23+(6-r)/2,Math.round(cz+Math.sin(A)*r),28);
+    }
+    set(cx,23,cz,32);set(cx,24,cz,34);
+    junglePillar(set,cx-5,23,cz-5,5);junglePillar(set,cx+5,23,cz+5,5);
+  }
+  function jungleTemple(set){
+    jungleCone(set,0,0,21,34,777);
+    // Pirâmide/templo central em níveis, inspirado na construção original.
+    const levels=[[28,22],[23,27],[18,32],[13,37],[8,42]];
+    for(const [r,y] of levels){
+      for(let x=-r;x<=r;x++)for(let z=-r;z<=r;z++){
+        if(Math.abs(x)===r||Math.abs(z)===r||Math.abs(x)+Math.abs(z)<r/2)
+          set(x,y,z,(x+z+y)%7===0?19:28);
+      }
+      for(const [dx,dz] of [[-r,-r],[r,-r],[-r,r],[r,r]])junglePillar(set,dx,y,dz,Math.min(8,48-y));
+    }
+    // Escadaria frontal e detalhes de terracota.
+    for(let n=0;n<18;n++)for(let w=-3;w<=3;w++){
+      set(w,22+Math.floor(n/4),28-n,28);
+      if(Math.abs(w)===3)set(w,23+Math.floor(n/4),28-n,26);
+    }
+    for(let y=43;y<=52;y++)for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)
+      if(Math.abs(x)===5||Math.abs(z)===5)set(x,y,z,(y%3===0)?26:28);
+    for(const [x,z] of [[-18,-18],[18,-18],[-18,18],[18,18]])jungleTree(set,x,22,z,10);
+    set(0,53,0,33);set(0,54,0,34);
+  }
+  function buildJungle(set,BD,SHOP,GEN,SPAWN){
+    J_BASES.forEach(([x,z],t)=>jungleActiveBase(set,BD,SHOP,GEN,SPAWN,t,x,z));
+    J_EXTRA.forEach(([x,z],i)=>{jungleCone(set,x,z,21,18,560+i);jungleRuin(set,x,z,i+1,i%2?31:26);});
+    J_DI.forEach(([x,z],i)=>jungleDiamond(set,x,z,i));
+    jungleTemple(set);
+    return {
+      DIGEN:J_DI.map(([x,z])=>[x+.5,25.2,z+.5]),
+      EMGEN:[.5,55.2,.5]
+    };
+  }
+
   E.gen=(mapId='classic',includeLobby=false)=>{
     const cfg=MAPS[mapId]||MAPS.classic;
-    const B=new Uint8Array(W*H*D),BD=[],SHOP=[],GEN=[],active=new Set();
+    const B=new Uint8Array(W*H*D),BD=[],SHOP=[],GEN=[],SPAWN=[],active=new Set();
     const set=(x,y,z,v)=>{
       x=Math.round(x);y=Math.round(y);z=Math.round(z);
       if(!inXZ(x,z)||y<0||y>=H)return;
@@ -218,9 +334,14 @@
       if(v)active.add(Math.floor(x/16)+','+Math.floor(z/16));
     };
 
-    BASES.forEach((_,t)=>teamBase(set,BD,SHOP,GEN,t,cfg));
-    DIAMONDS.forEach(([x,z],i)=>diamondIsland(set,x,z,i,cfg));
-    centerIsland(set,cfg);
+    let DIGEN,EMGEN;
+    if(cfg.theme==='jungle'&&!includeLobby){
+      const j=buildJungle(set,BD,SHOP,GEN,SPAWN);DIGEN=j.DIGEN;EMGEN=j.EMGEN;
+    }else{
+      BASES.forEach(([x,z],t)=>{teamBase(set,BD,SHOP,GEN,t,cfg);SPAWN[t]=[x+.5,BASE_Y+2.02,z+.5]});
+      DIAMONDS.forEach(([x,z],i)=>diamondIsland(set,x,z,i,cfg));
+      centerIsland(set,cfg);
+    }
 
     if(includeLobby){
       island(set,LOBBY[0],LOBBY[2],LOBBY[1]-1,13,12,6,900);
@@ -228,9 +349,8 @@
       for(const [dx,dz] of [[-7,-7],[7,-7],[-7,7],[7,7]])tower(set,LOBBY[0]+dx,LOBBY[2]+dz,LOBBY[1],12,6);
     }
 
-    const DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);
-    const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;
-    const EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5];
-    return {B,BD,SHOP,GEN,DIGEN,EMGEN,mapId:cfg.id,activeChunks:[...active]};
+    if(!DIGEN)DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);
+    if(!EMGEN){const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5]}
+    return {B,BD,SHOP,GEN,SPAWN,DIGEN,EMGEN,mapId:cfg.id,activeChunks:[...active]};
   };
 })(typeof module!=='undefined'?module.exports:(window.BW={}));
