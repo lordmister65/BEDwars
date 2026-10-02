@@ -73,41 +73,48 @@
     }
   });
 
-  // [nome, moeda, preço, tipo, chave, valor, categoria]
+  // [nome, moeda, preço-base, tipo, chave, valor, categoria, ícone, preços por modo]
+  // Item Shop segue o padrão Bed Wars: itens usam ferro/ouro/esmeralda; diamantes ficam nas melhorias.
   E.SH=[
-    ['Lã ×16','iron',4,'inv','wool',16,'Blocos'],
-    ['Tábuas ×16','gold',4,'inv','planks',16,'Blocos'],
-    ['End Stone ×12','iron',24,'inv','endstone',12,'Blocos'],
-    ['Vidro ×8','iron',12,'inv','glass',8,'Blocos'],
-    ['Obsidiana ×4','em',4,'inv','obsidian',4,'Blocos'],
-    ['Espada de pedra','iron',10,'sw',0,1,'Combate'],
-    ['Espada de ferro','gold',7,'sw',0,2,'Combate'],
-    ['Espada de diamante','dia',4,'sw',0,3,'Combate'],
-    ['Arco','gold',8,'inv','bow',1,'Combate'],
-    ['Flechas ×8','gold',2,'inv','arrow',8,'Combate'],
-    ['Maçã dourada','gold',3,'inv','apple',1,'Combate'],
-    ['Picareta I','iron',10,'tool','pick',1,'Ferramentas'],
-    ['Picareta II','gold',4,'tool','pick',2,'Ferramentas'],
-    ['Machado I','iron',10,'tool','axe',1,'Ferramentas'],
-    ['Machado II','gold',4,'tool','axe',2,'Ferramentas'],
-    ['Tesoura','iron',20,'tool','shears',1,'Ferramentas'],
-    ['Armadura de ferro','iron',12,'ar',0,1,'Armaduras'],
-    ['Armadura de diamante','dia',6,'ar',0,2,'Armaduras'],
-    ['TNT','gold',4,'inv','tnt',1,'Utilidades'],
-    ['TNT ×4','em',2,'inv','tnt',4,'Utilidades'],
-    ['Bola de fogo','iron',40,'inv','fireball',1,'Utilidades'],
-    ['Bola de neve ×4','iron',12,'inv','snowball',4,'Utilidades'],
-    ['Pérola','em',4,'inv','pearl',1,'Utilidades'],
-    ['Poção de Velocidade','em',1,'inv','speedPotion',1,'Utilidades'],
-    ['Poção de Salto','em',1,'inv','jumpPotion',1,'Utilidades'],
-    ['Poção de Invisibilidade','em',2,'inv','invisPotion',1,'Utilidades'],
-    ['Afiação (+2 de dano)','dia',4,'up','sharp',1,'Melhorias'],
-    ['Proteção I','dia',3,'up','prot',1,'Melhorias'],
-    ['Proteção II','dia',6,'up','prot',2,'Melhorias'],
-    ['Forja I (geradores +50%)','dia',2,'up','forge',1,'Melhorias'],
-    ['Forja II (geradores +100%)','dia',4,'up','forge',2,'Melhorias'],
-    ['Regeneração na base','dia',4,'up','regen',1,'Melhorias'],
-    ['Armadilha','dia',2,'up','trap',1,'Melhorias']
+    ['Lã ×16','iron',4,'inv','wool',16,'Blocos','🧶'],
+    ['Tábuas ×16','gold',4,'inv','planks',16,'Blocos','🪵'],
+    ['End Stone ×12','iron',24,'inv','endstone',12,'Blocos','🟨'],
+    ['Vidro ×4','iron',12,'inv','glass',4,'Blocos','⬜'],
+    ['Obsidiana ×4','em',4,'inv','obsidian',4,'Blocos','⬛'],
+
+    ['Espada de Pedra','iron',10,'sw',0,1,'Combate','🗡️'],
+    ['Espada de Ferro','gold',7,'sw',0,2,'Combate','⚔️'],
+    ['Espada de Diamante','em',4,'sw',0,3,'Combate','💎',{'4v4':3}],
+    ['Maçã Dourada','gold',3,'inv','apple',1,'Combate','🍎'],
+
+    ['Armadura de Ferro','gold',12,'ar',0,1,'Armadura','🛡️'],
+    ['Armadura de Diamante','em',6,'ar',0,2,'Armadura','💠'],
+
+    ['Picareta I','iron',10,'tool','pick',1,'Ferramentas','⛏️'],
+    ['Picareta II','gold',3,'tool','pick',2,'Ferramentas','⛏️'],
+    ['Machado I','iron',10,'tool','axe',1,'Ferramentas','🪓'],
+    ['Machado II','gold',3,'tool','axe',2,'Ferramentas','🪓'],
+    ['Tesoura Permanente','iron',20,'tool','shears',1,'Ferramentas','✂️'],
+
+    ['Arco','gold',12,'inv','bow',1,'Arcos','🏹'],
+    ['Flechas ×8','gold',2,'inv','arrow',8,'Arcos','➶'],
+
+    ['Poção de Velocidade','em',1,'inv','speedPotion',1,'Poções','⚡'],
+    ['Poção de Salto','em',1,'inv','jumpPotion',1,'Poções','🦘'],
+    ['Poção de Invisibilidade','em',2,'inv','invisPotion',1,'Poções','👻'],
+
+    ['TNT','gold',4,'inv','tnt',1,'Utilidades','🧨',{'4v4':8}],
+    ['Bola de Fogo','iron',40,'inv','fireball',1,'Utilidades','🔥'],
+    ['Bola de Neve ×4','iron',12,'inv','snowball',4,'Utilidades','❄️'],
+    ['Pérola do End','em',4,'inv','pearl',1,'Utilidades','🟣'],
+
+    ['Afiação','dia',4,'up','sharp',1,'Melhorias','⚔️'],
+    ['Proteção I','dia',3,'up','prot',1,'Melhorias','🛡️'],
+    ['Proteção II','dia',6,'up','prot',2,'Melhorias','🛡️'],
+    ['Forja I (+50%)','dia',2,'up','forge',1,'Melhorias','⚙️'],
+    ['Forja II (+100%)','dia',4,'up','forge',2,'Melhorias','⚙️'],
+    ['Regeneração na Base','dia',4,'up','regen',1,'Melhorias','❤'],
+    ['Armadilha','dia',2,'up','trap',1,'Melhorias','⚠️']
   ];
 
   // Gera uma ilha orgânica em cone/pirâmide invertida voxel.
