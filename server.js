@@ -3,6 +3,11 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [2, 4, 6, 8], rooms = new Map();
+const MODES={
+  '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
+  '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'}
+};
+const modeCfg=R=>MODES[R.modeId]||MODES['2v2'];
 const MAX_SOCKET_BUFFER = 256 * 1024;
 let uid = 0;
 
@@ -33,7 +38,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -92,7 +97,7 @@ function playerHitsBlock(q,x,y,z){
 }
 function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
-const lobby = R => bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) });
+const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
 
 function win(R) {
   if (R.st !== 'play') return;
@@ -286,28 +291,39 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'join' && !p) {
       const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
-      if (R.ps.size>=8) return tx({ws},{t:'err',s:'Sala cheia (8 jogadores).'});
+      const mc=modeCfg(R);
+      if (R.ps.size>=mc.maxPlayers) return tx({ws},{t:'err',s:`Sala cheia para o modo ${mc.name} (${mc.maxPlayers} jogadores).`});
       const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
-      let team=counts.indexOf(Math.min(...counts)); if(counts[team]>=2)return tx({ws},{t:'err',s:'Todos os times estão cheios.'});
+      let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
+      if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os dois times estão cheios.'});
       p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), team); p.id = ++uid;
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
       case 'team': {
-        if(R.st!=='lobby'||!Number.isInteger(m.team)||m.team<0||m.team>3)break;
+        const mc=modeCfg(R);
+        if(R.st!=='lobby'||!Number.isInteger(m.team)||!mc.activeTeams.includes(m.team))break;
         const count=[...R.ps.values()].filter(q=>q!==p&&q.team===m.team).length;
-        if(count>=2){tx(p,{t:'m',s:'Esse time já está cheio.'});break}
+        if(count>=mc.teamCap){tx(p,{t:'m',s:`Esse time já está cheio (${mc.teamCap}/${mc.teamCap}).`});break}
         p.team=m.team;p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
+      }
+      case 'mode': {
+        if(R.st!=='lobby'||p.id!==R.host||!MODES[m.mode])break;
+        const next=MODES[m.mode];
+        if(R.ps.size>next.maxPlayers){tx(p,{t:'m',s:`Não é possível mudar para ${next.name}: há ${R.ps.size} jogadores na sala.`});break}
+        const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
+        if(next.activeTeams.some(t=>counts[t]>next.teamCap)){tx(p,{t:'m',s:'Um dos times excede a capacidade desse modo.'});break}
+        R.modeId=next.id;lobby(R);break;
       }
       case 'map': {
         if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
@@ -323,14 +339,17 @@ wss.on('connection', ws => {
       }
       case 'start':
         if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
-        if(new Set([...R.ps.values()].map(q=>q.team)).size<2){tx(p,{t:'m',s:'É necessário ter jogadores em pelo menos 2 times.'});break}
+        { const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team));
+          if(teams.size<2){tx(p,{t:'m',s:'É necessário ter jogadores nos times Azul e Vermelho.'});break}
+          if(active.some(q=>[...R.ps.values()].filter(x=>x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
+        }
         const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
-        R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, activeChunks:R.activeChunks }); break;
+        R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks }); break;
       case 'mv': {
         if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
@@ -470,6 +489,7 @@ setInterval(() => {
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
       R.g.base.forEach((g, i) => {
+        if(!modeCfg(R).activeTeams.includes(i))return;
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
         g.iron += dt; g.gold += dt;
