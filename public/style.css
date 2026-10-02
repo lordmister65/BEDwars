@@ -45,18 +45,18 @@ body:after{content:"";position:fixed;inset:0;pointer-events:none;box-shadow:inse
 
 #bar{
   position:fixed;z-index:11;bottom:14px;left:50%;transform:translateX(-50%);
-  display:flex;gap:0;padding:3px;background:#8b8b8b;
-  border-top:3px solid #fff;border-left:3px solid #fff;border-right:3px solid #373737;border-bottom:3px solid #373737;
+  display:flex;gap:2px;padding:4px;background:rgba(20,20,20,.72);
+  border:2px solid rgba(255,255,255,.26);box-shadow:0 2px 0 #000,0 0 0 2px rgba(0,0,0,.55);
   max-width:94vw;overflow-x:auto;scrollbar-width:none
 }
 #bar::-webkit-scrollbar{display:none}
 .s{
-  flex:0 0 auto;width:48px;height:48px;position:relative;cursor:pointer;background:#8b8b8b;
-  border-top:2px solid #373737;border-left:2px solid #373737;border-right:2px solid #d8d8d8;border-bottom:2px solid #d8d8d8
+  flex:0 0 auto;width:46px;height:46px;position:relative;cursor:pointer;background:rgba(76,76,76,.72);
+  border:2px solid rgba(215,215,215,.38);box-shadow:inset 0 0 0 1px rgba(0,0,0,.42)
 }
 .s.on{
-  z-index:2;border:3px solid #fff;box-shadow:0 0 0 2px #222;
-  transform:translateY(-2px)
+  z-index:2;border:3px solid #fff;box-shadow:0 0 0 2px #111,0 0 8px rgba(255,255,255,.26);
+  transform:translateY(-3px) scale(1.04)
 }
 .s i{position:absolute;left:8px;right:8px;top:8px;bottom:8px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.22)}
 .s b{position:absolute;right:3px;bottom:1px;font-size:11px;color:#fff;text-shadow:2px 2px #333}
@@ -256,4 +256,14 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   #chatForm{left:5px;bottom:72px;width:94vw}
   #chatForm select{width:72px}
   #placeBtn{right:98px;bottom:88px}
+}
+
+/* Minecraft-feel v1 */
+#cross{mix-blend-mode:difference}
+.s i{image-rendering:pixelated}
+#breakBox{height:8px;background:rgba(0,0,0,.72);border:1px solid #000}
+#breakFill{background:#d7d7d7;box-shadow:inset 0 0 0 1px #fff}
+@media (pointer:coarse),(max-width:800px){
+  #bar{gap:1px;padding:3px}
+  .s{width:39px;height:39px}
 }
