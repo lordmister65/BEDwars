@@ -392,10 +392,10 @@ function syncRemoteArmor(r,tier){
    bbModel('helmet',tint),bbModel('chest',tint),bbModel('leggings',tint),bbModel('boots',tint)
  ]).then(([helmet,chest,leggings,boots])=>{
    if(r.armorTier!==token)return;
-   normalizeBB(helmet,.52);helmet.position.set(0,1.28,0);
-   normalizeBB(chest,.72);chest.position.set(0,.62,0);
-   normalizeBB(leggings,.72);leggings.position.set(0,.24,0);
-   normalizeBB(boots,.38);boots.position.set(0,.04,0);
+   normalizeBB(helmet,.52);helmet.position.add(new THREE.Vector3(0,1.28,0));
+   normalizeBB(chest,.72);chest.position.add(new THREE.Vector3(0,.62,0));
+   normalizeBB(leggings,.72);leggings.position.add(new THREE.Vector3(0,.24,0));
+   normalizeBB(boots,.38);boots.position.add(new THREE.Vector3(0,.04,0));
    r.armorRoot.add(helmet,chest,leggings,boots);
  }).catch(err=>console.warn('Falha ao carregar armadura Blockbench',err));
 }
