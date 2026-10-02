@@ -224,7 +224,9 @@ function segmentHitPlayer(R,pr,nx,ny,nz){
   for(const q of R.ps.values()){
     if(!q.alive||q.team===pr.team||q.out)continue;
     // Caixa do corpo com pequena margem para compensar snapshot/interpolação.
-    const minX=q.x-.38,maxX=q.x+.38,minY=q.y-.08,maxY=q.y+1.82,minZ=q.z-.38,maxZ=q.z+.38;
+    const minX=Math.min(q.x,q.px??q.x)-.40,maxX=Math.max(q.x,q.px??q.x)+.40,
+          minY=Math.min(q.y,q.py??q.y)-.08,maxY=Math.max(q.y,q.py??q.y)+1.84,
+          minZ=Math.min(q.z,q.pz??q.z)-.40,maxZ=Math.max(q.z,q.pz??q.z)+.40;
     let t0=0,t1=1,ok=true;
     for(const [s,d,min,max] of [[sx,dx,minX,maxX],[sy,dy,minY,maxY],[sz,dz,minZ,maxZ]]){
       if(Math.abs(d)<1e-8){if(s<min||s>max){ok=false;break}}
