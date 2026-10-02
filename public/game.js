@@ -65,7 +65,7 @@ function parseBB(key){
 function bbModel(key,tint=null){
   return parseBB(key).then(root=>prepareBB(root,tint));
 }
-['vendor','sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
+['sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
 const hand=new THREE.Group(),handMat=new THREE.MeshBasicMaterial({color:0xe8b98a});
 const arm=new THREE.Mesh(new THREE.BoxGeometry(.18,.18,.55),handMat);arm.position.set(.48,-.44,-.72);arm.rotation.x=-.35;hand.add(arm);
 const heldRoot=new THREE.Group();heldRoot.position.set(.52,-.26,-.92);hand.add(heldRoot);cam.add(hand);let swing=0,useAnim=0,lastHeldSig='',miningTool=null;
