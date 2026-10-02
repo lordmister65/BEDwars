@@ -137,16 +137,48 @@ function refreshHeld(){
 }
 const iconTex={};
 for(const k of Object.keys(RI)){const t=new THREE.TextureLoader().load(RI[k]);t.magFilter=t.minFilter=THREE.NearestFilter;iconTex[k]=t}
-const genSprites=[];
+const genSprites=[],genPlatforms=[];
 function genIcon(k,x,y,z,scale=1.25){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:iconTex[k],transparent:true,depthWrite:false}));
   sp.position.set(x,y,z);sp.scale.set(scale,scale,1);sc.add(sp);genSprites.push(sp);return sp;
 }
-function updateGeneratorIcons(g){
+function generatorPlatform(x,y,z,size=7,accent=0xffffff){
+  const g=new THREE.Group(),baseH=.10,trimH=.055;
+  const base=new THREE.Mesh(new THREE.BoxGeometry(size,baseH,size),new THREE.MeshBasicMaterial({color:0x7f858b}));
+  base.position.y=baseH/2;
+  g.add(base);
+  const inner=Math.max(1,size-1.15),pad=new THREE.Mesh(new THREE.BoxGeometry(inner,.035,inner),new THREE.MeshBasicMaterial({color:0x555b60}));
+  pad.position.y=baseH+.0175;g.add(pad);
+  const c=new THREE.Mesh(new THREE.BoxGeometry(Math.max(1.35,size*.28),.045,Math.max(1.35,size*.28)),new THREE.MeshBasicMaterial({color:accent}));
+  c.position.y=baseH+.04;g.add(c);
+  const t=.16,h=trimH;
+  const tm=new THREE.MeshBasicMaterial({color:0xb8bdc2});
+  for(const [w,d,px,pz] of [[size,t,0,(size-t)/2],[size,t,0,-(size-t)/2],[t,size,(size-t)/2,0],[t,size,-(size-t)/2,0]]){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),tm);m.position.set(px,baseH+h/2,pz);g.add(m);
+  }
+  g.position.set(x,y+.01,z);sc.add(g);genPlatforms.push(g);return g;
+}
+function clearGeneratorVisuals(){
   while(genSprites.length){const sp=genSprites.pop();sc.remove(sp);sp.material.dispose()}
-  (g.GEN||[]).forEach(([x,y,z])=>{genIcon('iron',x-.6,y+1,z,.9);genIcon('gold',x+.7,y+1,z,.9)});
-  (g.DIGEN||[]).forEach(([x,y,z])=>genIcon('dia',x,y+1,z,1.1));
-  if(g.EMGEN)genIcon('em',g.EMGEN[0],g.EMGEN[1]+1,g.EMGEN[2],1.25);
+  while(genPlatforms.length){
+    const g=genPlatforms.pop();sc.remove(g);
+    g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&!Array.isArray(o.material))o.material.dispose()});
+  }
+}
+function updateGeneratorIcons(g){
+  clearGeneratorVisuals();
+  (g.GEN||[]).forEach(([x,y,z])=>{
+    generatorPlatform(x,y-.03,z,7,0xe8d7a0);
+    genIcon('iron',x-.65,y+1,z,.9);genIcon('gold',x+.72,y+1,z,.9);
+  });
+  (g.DIGEN||[]).forEach(([x,y,z])=>{
+    generatorPlatform(x,y-.03,z,5,0x4de8e0);
+    genIcon('dia',x,y+1,z,1.1);
+  });
+  if(g.EMGEN){
+    generatorPlatform(g.EMGEN[0],g.EMGEN[1]-.03,g.EMGEN[2],7,0x43cf75);
+    genIcon('em',g.EMGEN[0],g.EMGEN[1]+1,g.EMGEN[2],1.25);
+  }
 }
 updateGeneratorIcons(gn);
 const tex=new THREE.TextureLoader().load('/assets/kai_hive_bedwars_atlas.png',()=>{dirty&&activeChunks&&activeChunks.forEach(k=>dirty.add(k))});
