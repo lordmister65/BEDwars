@@ -65,7 +65,7 @@ function room(code) {
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1,
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, reconnectDeadline:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
-  rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
+  rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, tntImpulse:0, tntSlow:0, tntDamage:0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
   if (n - last < gap) return false;
@@ -203,6 +203,39 @@ function fireballBoom(R, x, y, z, owner) {
   });
 }
 
+function throwableTntBoom(R,kind,x,y,z,owner){
+  const cfg={
+    tnt:{radius:3.2,damage:7,knock:8,breakR:2.7,color:0xff4b32},
+    tntImpulse:{radius:5.0,damage:1.5,knock:14,breakR:1.2,color:0xddeeff},
+    tntSlow:{radius:4.4,damage:2.5,knock:4.5,breakR:.8,color:0x78bfff},
+    tntDamage:{radius:4.3,damage:13,knock:6.5,breakR:1.5,color:0xff2448}
+  }[kind]||null;
+  if(!cfg)return;
+  if(cfg.breakR>0){
+    const r=Math.ceil(cfg.breakR);
+    for(let a=-r;a<=r;a++)for(let b=-r;b<=r;b++)for(let c=-r;c<=r;c++){
+      if(a*a+b*b+c*c>cfg.breakR*cfg.breakR)continue;
+      const X=Math.floor(x)+a,Y=Math.floor(y)+b,Z=Math.floor(z)+c;
+      if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]&&![7,16].includes(get(R,X,Y,Z)))setb(R,X,Y,Z,0);
+    }
+  }
+  bc(R,{t:'fx',x,y,z,c:cfg.color});
+  sfxAt(R,'fireball',x,y,z,8);
+  R.ps.forEach(q=>{
+    if(!q.alive)return;
+    const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
+    if(L>=cfg.radius)return;
+    const f=1-L/cfg.radius,nx=dx/(L||1),nz=dz/(L||1);
+    if(kind==='tntImpulse'){
+      tx(q,{t:'kb',kx:nx*cfg.knock*f,kz:nz*cfg.knock*f,vy:Math.max(4.8,8.5*f)});
+      if(q!==owner)hurt(R,q,cfg.damage*f,nx*.45,nz*.45,owner,false,'explosion');
+    }else{
+      hurt(R,q,cfg.damage*f,nx*(cfg.knock/7),nz*(cfg.knock/7),owner,false,'explosion');
+      if(kind==='tntSlow'&&q!==owner){q.fx.slow=Math.max(q.fx.slow||0,7);pinv(q)}
+    }
+  });
+}
+
 function breakTime(p, b) {
   const m=S.BLOCKS[b]||{hard:.7,tool:null}, lv=m.tool?p.tools[m.tool]||0:0;
   let mult=1;
@@ -268,13 +301,14 @@ function projectileImpact(R,pr,x,y,z,target){
   if(pr.k==='arrow'&&target)hurt(R,target,3+4*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1),pr.vz/(Math.hypot(pr.vx,pr.vz)||1),owner);
   else if(pr.k==='snowball'&&target)hurt(R,target,1,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.15,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.15,owner);
   else if(pr.k==='fireball')fireballBoom(R,x,y,z,owner);
+  else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(pr.k))throwableTntBoom(R,pr.k,x,y,z,owner);
   else if(pr.k==='pearl'&&owner&&owner.alive){owner.x=x-pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.y=Math.max(1,y);owner.z=z-pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.hp=Math.max(1,owner.hp-2);tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z});}
   bc(R,{t:'projHit',id:pr.id,k:pr.k,x,y,z});
 }
 function tickProjectiles(R,dt){
   for(let i=R.projectiles.length-1;i>=0;i--){
     const pr=R.projectiles[i];pr.age+=dt;
-    const grav=pr.k==='fireball'?0:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:7.5;
+    const grav=pr.k==='fireball'?0:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:pr.k.startsWith('tnt')?9.2:7.5;
     pr.vy-=grav*dt;
     const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
     let target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
@@ -283,7 +317,7 @@ function tickProjectiles(R,dt){
       if(db<dtar)target=null;
     }
     const outside=nx<S.MIN_X-8||nx>S.MAX_X+8||nz<S.MIN_Z-8||nz>S.MAX_Z+8;
-    const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='snowball'?9:8;
+    const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='snowball'?9:pr.k.startsWith('tnt')?1.35:8;
     if(ny<=-20||outside||pr.age>maxAge){
       bc(R,{t:'projHit',id:pr.id,k:pr.k,x:nx,y:ny,z:nz});R.projectiles.splice(i,1);continue;
     }
@@ -440,7 +474,7 @@ wss.on('connection', ws => {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
-        const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:999999;
+        const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:kind.startsWith('tnt')?650:999999;
         if(!allow(p,'shoot_'+kind,gap))break;
         bc(R,{t:'anim',id:p.id,k:'attack'});
         if(kind==='bow'){
@@ -449,6 +483,8 @@ wss.on('connection', ws => {
           if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,21,1);pinv(p);
         }else if(kind==='snowball'){
           if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,26,1);pinv(p);
+        }else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(kind)){
+          if((p.inv[kind]||0)<1)break;p.inv[kind]--;spawnProjectile(R,p,kind,m.yaw,m.pitch,13.5,1);pinv(p);
         }
         break;
       }
@@ -486,7 +522,7 @@ setInterval(() => {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih = Math.max(0, p.ih - dt);
-        p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);
+        p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           p.disconnected=false;p.reconnectDeadline=0;
           for(const k of ['iron','gold','dia','em']){const n=p.inv[k]||0;if(n>0){addDrop(R,k,n,p.x,p.y+.25,p.z,k==='iron'?48:k==='gold'?12:8);p.inv[k]=0;}}
