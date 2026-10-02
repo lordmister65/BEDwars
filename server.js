@@ -319,6 +319,7 @@ function tickProjectiles(R,dt){
     const outside=nx<S.MIN_X-8||nx>S.MAX_X+8||nz<S.MIN_Z-8||nz>S.MAX_Z+8;
     const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='snowball'?9:pr.k.startsWith('tnt')?1.35:8;
     if(ny<=-20||outside||pr.age>maxAge){
+      if(pr.k.startsWith('tnt'))throwableTntBoom(R,pr.k,nx,ny,nz,R.ps.get(pr.o));
       bc(R,{t:'projHit',id:pr.id,k:pr.k,x:nx,y:ny,z:nz});R.projectiles.splice(i,1);continue;
     }
     if(target||block){projectileImpact(R,pr,block?.x??nx,block?.y??ny,block?.z??nz,target);R.projectiles.splice(i,1);continue}
