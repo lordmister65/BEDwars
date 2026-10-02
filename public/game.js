@@ -319,17 +319,40 @@ html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.spee
 html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
 const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}cur=(n+SL.length)%SL.length;lastHeldSig='';refreshHeld();hud()};
-let shopCat='Blocos',lastBuyAt=0,lastShopSig='';const cats=[...new Set(SH.map(s=>s[6]||'Outros'))];
-function buyItem(i){const now=performance.now();if(now-lastBuyAt<130)return;lastBuyAt=now;send({t:'buy',i})}
-function shopSig(){return [shopCat,inv.iron,inv.gold,inv.dia,inv.em,inv.bow,sw,ar,tools.pick,tools.axe,tools.shears,up.sharp,up.prot,up.forge,up.regen,up.trap].join('|')}
-function drawShop(force=false){const sig=shopSig();if(!force&&sig===lastShopSig)return;lastShopSig=sig;
-  html('shopTabs',cats.map(c=>`<button class="${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop(true)">${c}</button>`).join(''));
-  html('sl',SH.map((s,i)=>({s,i})).filter(o=>(o.s[6]||'Outros')===shopCat).map(o=>{
-    const s=o.s,cant=(inv[s[1]]||0)<s[2],icon=RI[s[1]]||RI.iron;
-    return `<button class="shop-card${cant?' cant':''}" onclick="buyItem(${o.i})"><img class="shopri" src="${icon}"><span class="item-name">${s[0]}</span><span class="item-cost">${s[2]} ${CN[s[1]]||s[1]}</span></button>`
-  }).join(''));
-  html('shopWallet',`<span><img src="${RI.iron}"> ${inv.iron}</span><span><img src="${RI.gold}"> ${inv.gold}</span><span><img src="${RI.dia}"> ${inv.dia}</span><span><img src="${RI.em}"> ${inv.em}</span>`);
-}drawShop();
+let shopCat='Compra Rápida',lastBuyAt=0,lastShopSig='';
+const SHOP_CATS=['Compra Rápida','Blocos','Combate','Armadura','Ferramentas','Arcos','Poções','Utilidades','Melhorias'];
+const QUICK_KEYS=['wool','planks','endstone','sw1','ar1','pick1','bow','arrow','tnt','fireball','apple','pearl','speedPotion','jumpPotion'];
+const CK={Blocos:'🧱',Combate:'⚔️',Armadura:'🛡️',Ferramentas:'⛏️',Arcos:'🏹',Poções:'🧪',Utilidades:'💥',Melhorias:'💎'};
+function shopKey(s){if(s[3]==='sw')return 'sw'+s[5];if(s[3]==='ar')return 'ar'+s[5];if(s[3]==='tool')return s[4]+s[5];return String(s[4])}
+function shopPrice(s){const modes=s[8]||null;return modes&&modes[currentMode]!=null?modes[currentMode]:s[2]}
+function buyItem(i){const now=performance.now();if(now-lastBuyAt<120)return;lastBuyAt=now;send({t:'buy',i})}
+function shopOwned(s){
+ if(s[3]==='sw')return sw>=s[5];
+ if(s[3]==='ar')return ar>=s[5];
+ if(s[3]==='tool')return (tools[s[4]]||0)>=s[5];
+ if(s[3]==='up')return (up[s[4]]||0)>=s[5];
+ if(s[3]==='inv'&&s[4]==='bow')return (inv.bow||0)>0;
+ return false;
+}
+function shopSig(){return [shopCat,currentMode,inv.iron,inv.gold,inv.dia,inv.em,inv.bow,sw,ar,tools.pick,tools.axe,tools.shears,up.sharp,up.prot,up.forge,up.regen,up.trap].join('|')}
+function drawShop(force=false){
+ const sig=shopSig();if(!force&&sig===lastShopSig)return;lastShopSig=sig;
+ html('shopTabs',SHOP_CATS.map(c=>`<button class="shop-tab ${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop(true)"><span class="tab-icon">${c==='Compra Rápida'?'★':CK[c]||'•'}</span><span>${c}</span></button>`).join(''));
+ const list=SH.map((s,i)=>({s,i,key:shopKey(s)})).filter(o=>shopCat==='Compra Rápida'?QUICK_KEYS.includes(o.key):(o.s[6]||'Outros')===shopCat);
+ html('sl',list.map(o=>{
+   const s=o.s,price=shopPrice(s),currency=s[1],cant=(inv[currency]||0)<price,owned=shopOwned(s),icon=s[7]||'□';
+   const state=owned?'owned':cant?'cant':'';
+   const costText=owned?'COMPRADO':price+' '+(CN[currency]||currency);
+   return `<button class="shop-card ${state}" onclick="buyItem(${o.i})" ${owned?'disabled':''}>
+     <span class="slot-icon">${icon}</span>
+     <span class="item-name">${s[0]}</span>
+     <span class="item-cost cur-${currency}">${costText}</span>
+     ${cant&&!owned?'<span class="cant-mark">✕</span>':''}
+   </button>`
+ }).join(''));
+ html('shopWallet',`<span class="wallet iron"><img src="${RI.iron}"> ${inv.iron}</span><span class="wallet gold"><img src="${RI.gold}"> ${inv.gold}</span><span class="wallet dia"><img src="${RI.dia}"> ${inv.dia}</span><span class="wallet em"><img src="${RI.em}"> ${inv.em}</span>`);
+}
+drawShop();
 const scr=n=>['menu','lobby','ov','shop','end'].forEach(k=>$(k).style.display=k===n?'flex':'none'),cv=R.domElement;
 const SHOP_RADIUS=10;
 function shopPosition(){return worldMeta.SHOP&&worldMeta.SHOP[me.team]||[IS[me.team][0]+.5,BASE_Y+2,IS[me.team][1]+.5]}
