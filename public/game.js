@@ -432,12 +432,12 @@ case'lobby':{
  INFO={};m.l.forEach(([id,n,t,d])=>INFO[id]={n,t,d});const mine=m.l.find(q=>q[0]===me.id);if(mine)me.team=mine[2];
  currentMode=m.modeId||currentMode;
  if(m.mapId&&m.mapId!==currentMap)loadMap(m.mapId,true,m.activeChunks);
- const activeTeams=m.activeTeams||[0,1],teamCap=m.teamCap||2,counts=[0,0,0,0];m.l.forEach(q=>counts[q[2]]++);
+ const activeTeams=m.activeTeams||[0,1],teamCap=m.teamCap||2,soloMode=!!m.solo,counts=[0,0,0,0];m.l.forEach(q=>counts[q[2]]++);
  $('pl').innerHTML=m.l.map(([id,n,t,d])=>`<p style="color:#${hex(TC[t])}">■ ${n}${id===me.id?' (você)':''}${id===m.host?' ★ anfitrião':''}${d?' · desconectado':''}</p>`).join('');
  $('modePick').innerHTML=(m.modes||[]).map(md=>`<button class="map-card${md.id===currentMode?' active':''}" ${me.id===m.host?'':'disabled'} onclick="send({t:'mode',mode:'${md.id}'})"><b>${md.name}</b><small>${md.description||''}</small></button>`).join('');
- $('teamPick').innerHTML=activeTeams.map(t=>`<button class="team-btn${me.team===t?' active':''}" style="background:#${hex(TC[t])}" onclick="send({t:'team',team:${t}})">${TN[t]} (${counts[t]}/${teamCap})</button>`).join('');
+ $('teamPick').innerHTML=activeTeams.map(t=>`<button class="team-btn${me.team===t?' active':''}" style="background:#${hex(TC[t])}" onclick="send({t:'team',team:${t}})">${soloMode?'Base ':''}${TN[t]} (${counts[t]}/${teamCap})</button>`).join('');
  $('mapPick').innerHTML=(m.maps||Object.values(MAPS)).map(mp=>`<button class="map-card${mp.id===m.mapId?' active':''}" ${me.id===m.host?'':'disabled'} onclick="send({t:'map',map:'${mp.id}'})">${mp.name}<small>${mp.description||''}</small></button>`).join('');
- $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?`Modo ${currentMode.toUpperCase()} · organize Azul x Vermelho e escolha o mapa.`:'Aguardando o anfitrião iniciar.';scr('lobby');hud();break}
+ $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · escolha o mapa.`:`Modo ${currentMode.toUpperCase()} · organize Azul x Vermelho e escolha o mapa.`):'Aguardando o anfitrião iniciar.';scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
 case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;scr(touchMode||document.pointerLockElement?null:'ov');hud();break;
 case's':{syncProjectiles(m.pr||[]);const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
@@ -465,8 +465,8 @@ case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');b
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':{
  over=1;started=0;clearReconnect();try{document.exitPointerLock()}catch(e){}
- const win=m.winnerTeam===me.team;sfx(win?'victory':'death');$('et').textContent=win?'VITÓRIA!':'DERROTA!';$('et').className=win?'end-win':'end-loss';
- $('endSub').textContent=m.winnerTeam>=0?'Time vencedor: '+TN[m.winnerTeam]+' · Tempo: '+Math.floor((m.time||0)/60)+':'+String(Math.floor((m.time||0)%60)).padStart(2,'0'):'Partida encerrada';
+ const solo=m.modeId==='solo',win=solo?m.winnerId===me.id:m.winnerTeam===me.team;sfx(win?'victory':'death');$('et').textContent=win?'VITÓRIA!':'DERROTA!';$('et').className=win?'end-win':'end-loss';
+ $('endSub').textContent=solo?(m.winnerId>=0?'Vencedor: '+(m.winnerName||'Jogador')+' · Tempo: '+Math.floor((m.time||0)/60)+':'+String(Math.floor((m.time||0)%60)).padStart(2,'0'):'Partida encerrada'):(m.winnerTeam>=0?'Time vencedor: '+TN[m.winnerTeam]+' · Tempo: '+Math.floor((m.time||0)/60)+':'+String(Math.floor((m.time||0)%60)).padStart(2,'0'):'Partida encerrada');
  const rows=[...(m.stats||[])].sort((a,b)=>b.finalKills-a.finalKills||b.bedsDestroyed-a.bedsDestroyed||b.kills-a.kills);
  html('endStats','<table class="end-table"><thead><tr><th>Jogador</th><th>Time</th><th>Kills</th><th>Final</th><th>Camas</th><th>Mortes</th><th>Recursos</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${r.name}</td><td>${TN[r.team]}</td><td>${r.kills}</td><td>${r.finalKills}</td><td>${r.bedsDestroyed}</td><td>${r.deaths}</td><td>${r.resourcesCollected}</td></tr>`).join('')+'</tbody></table>');
  scr('end');break
