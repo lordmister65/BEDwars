@@ -251,19 +251,27 @@ function removeBedVisual(team){
 function clearBedVisuals(){for(let t=0;t<BED_VIS.length;t++)removeBedVisual(t)}
 function createBedVisual(team,pos,spawn){
  const g=new THREE.Group(),wood=0x75472c,darkWood=0x4d2f20,linen=0xf3f0e8,teamColor=TC[team]||0xffffff;
- // Estrado e pés.
- bedPart(g,.96,.16,1.62,wood,0,.24,0);
- for(const x of[-.39,.39])for(const z of[-.68,.68])bedPart(g,.14,.34,.14,darkWood,x,.17,z);
- // Colchão, cobertor e travesseiro.
- bedPart(g,.88,.22,1.48,linen,0,.42,0);
- bedPart(g,.90,.12,.88,teamColor,0,.59,-.27);
- bedPart(g,.62,.14,.32,0xffffff,0,.60,.52);
- // Cabeceira com travessa, deixando a silhueta claramente parecida com cama.
- for(const x of[-.42,.42])bedPart(g,.13,.82,.13,darkWood,x,.43,.79);
- bedPart(g,.98,.16,.13,wood,0,.70,.79);
- bedPart(g,.78,.11,.10,teamColor,0,.48,.79);
+ // Estrado baixo e comprido: silhueta de cama de verdade, não de bloco.
+ bedPart(g,1.02,.14,1.96,wood,0,.22,0);
+ for(const x of[-.42,.42])for(const z of[-.82,.82])bedPart(g,.14,.32,.14,darkWood,x,.16,z);
+ // Colchão e lençol.
+ bedPart(g,.94,.20,1.84,linen,0,.39,0);
+ // Cobertor na cor do time cobrindo a metade dos pés.
+ bedPart(g,.96,.12,1.04,teamColor,0,.55,-.36);
+ // Faixa decorativa no cobertor para quebrar o aspecto de cubo único.
+ bedPart(g,.98,.035,.14,0xffffff,0,.625,-.14);
+ // Travesseiro destacado na cabeceira.
+ bedPart(g,.66,.16,.36,0xffffff,0,.58,.66);
+ // Cabeceira em madeira com dois postes e duas travessas.
+ for(const x of[-.43,.43])bedPart(g,.13,.82,.13,darkWood,x,.42,.96);
+ bedPart(g,1.00,.15,.13,wood,0,.73,.96);
+ bedPart(g,.78,.10,.10,teamColor,0,.50,.955);
+ // Pequenas laterais do estrado deixam o perfil mais legível de lado.
+ for(const x of[-.49,.49])bedPart(g,.06,.19,1.82,darkWood,x,.28,0);
  const sx=spawn?.[0]??pos[0]+.5,sz=spawn?.[2]??pos[2]-.5,dx=pos[0]+.5-sx,dz=pos[2]+.5-sz;
- g.rotation.y=Math.atan2(dx,dz);g.position.set(pos[0]+.5,pos[1],pos[2]+.5);g.userData={bedTeam:team,bedPos:pos};
+ g.rotation.y=Math.atan2(dx,dz);
+ g.position.set(pos[0]+.5,pos[1]+.02,pos[2]+.5);
+ g.userData={bedTeam:team,bedPos:pos};
  sc.add(g);BED_VIS[team]=g
 }
 function syncBedVisuals(meta=worldMeta,state=null){
