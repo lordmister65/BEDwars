@@ -1,0 +1,29 @@
+name: Apply Bed V2 Main
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/scripts/apply-bed-v2-main.js'
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply bed v2
+        run: node .github/scripts/apply-bed-v2-main.js
+      - name: Validate JavaScript
+        run: node --check public/game.js
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/game.js public/index.html
+          git diff --cached --quiet || git commit -m "Fix bed visual model and bust client cache"
+          git push origin main
