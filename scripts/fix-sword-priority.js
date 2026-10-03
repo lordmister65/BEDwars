@@ -1,0 +1,11 @@
+const fs=require('fs');
+const p='public/game.js';
+let s=fs.readFileSync(p,'utf8');
+const local=" if(!miningTool&&cur===0)blockbenchSword(heldRoot,sig,sw,.62);\n";
+if(!s.includes(local))throw new Error('local blockbench sword override not found');
+s=s.replace(local,'');
+const remote=` if(slot===0){\n   const col=[0xffffff,0xb7b7b7,0xe6e6e6,0x8ff5ff][swordLevel]||0xffffff;\n   bbModel('sword',col).then(m=>{if(r.hs!==sig)return;while(r.held.children.length)r.held.remove(r.held.children[0]);\n     normalizeBB(m,.62);m.rotation.set(0,0,-.42);m.position.add(new THREE.Vector3(0,-.18,0));r.held.add(m);\n   }).catch(()=>{});\n }\n`;
+if(!s.includes(remote))throw new Error('remote blockbench sword override not found');
+s=s.replace(remote,'');
+fs.writeFileSync(p,s);
+console.log('removed blockbench sword overrides');
