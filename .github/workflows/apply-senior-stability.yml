@@ -1,0 +1,27 @@
+name: Apply senior stability optimization
+on:
+  push:
+    branches: [ fix/senior-stability-optimization ]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/senior-stability-optimization
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/senior-stability-opt.js
+      - run: node --check server.js
+      - run: node --check public/game.js
+      - name: Commit optimization
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/game.js public/index.html
+          git diff --cached --quiet || git commit -m "Harden multiplayer runtime and optimize rendering"
+          git push origin HEAD:fix/senior-stability-optimization
