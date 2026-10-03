@@ -162,7 +162,6 @@ function refreshHeld(){
  if(lastHeldSig===sig)return;lastHeldSig=sig;
  while(heldRoot.children.length)heldRoot.remove(heldRoot.children[0]);
  heldRoot.add(miningTool?toolModel(miningTool):heldModel(cur));
- if(!miningTool&&cur===0)blockbenchSword(heldRoot,sig,sw,.62);
  if(!miningTool)send({t:'held',s:cur});
 }
 const iconTex={};
@@ -491,12 +490,6 @@ function syncProjectiles(list){const seen=new Set();(list||[]).forEach(([id,k,x,
 function remoteHeld(r,slot,team,swordLevel){
  const sig=slot+':'+team+':'+swordLevel;if(r.hs===sig)return;r.hs=sig;while(r.held.children.length)r.held.remove(r.held.children[0]);
  const model=heldModel(slot,team,swordLevel);model.scale.set(.65,.65,.65);r.held.add(model);
- if(slot===0){
-   const col=[0xffffff,0xb7b7b7,0xe6e6e6,0x8ff5ff][swordLevel]||0xffffff;
-   bbModel('sword',col).then(m=>{if(r.hs!==sig)return;while(r.held.children.length)r.held.remove(r.held.children[0]);
-     normalizeBB(m,.62);m.rotation.set(0,0,-.42);m.position.add(new THREE.Vector3(0,-.18,0));r.held.add(m);
-   }).catch(()=>{});
- }
 }
 function syncRemoteArmor(r,tier){
  if(r.armorTier===tier)return;r.armorTier=tier;while(r.armorRoot.children.length)r.armorRoot.remove(r.armorRoot.children[0]);if(!tier)return;
