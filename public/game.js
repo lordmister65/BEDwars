@@ -335,6 +335,7 @@ function slotKey(i){return i===6?activeTnt()[0]:KY[i]}
 function slotName(i){return i===6?'TNT '+activeTnt()[1]:SL[i]}
 function cycleTnt(){const owned=ownedTnts();if(owned.length<2)return;const key=activeTnt()[0],i=owned.findIndex(t=>t[0]===key),next=owned[(i+1)%owned.length];tntSel=TNT_TYPES.findIndex(t=>t[0]===next[0]);lastHeldSig='';refreshHeld();hud();msg('TNT: '+next[1])}
 let roomCode='',reconnectToken='',reconnectUntil=0,reconnectTimer=null,reconnecting=false,bowCharging=false,bowChargeAt=0,lobbyExplore=false;
+let matchTime=0,respawnEnds=0,respawnFinal=false,lastScoreboardAt=0;const matchPlayers=new Map();let myMatchStats={kills:0,finalKills:0};
 const clk=[],PL=new Map(),PT=[],ownedState={};
 let AC,masterGain,lastStep=0,lastPickup=0;
 const audioInit=()=>{try{if(!AC){AC=new AudioContext();masterGain=AC.createGain();masterGain.gain.value=.55;masterGain.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}catch(e){}};
@@ -394,6 +395,22 @@ $('chatForm').onsubmit=e=>{e.preventDefault();const text=$('chatInput').value.tr
 function adminPanel(){let p=$('adminPanel');if(p)return p;p=document.createElement('div');p.id='adminPanel';p.innerHTML='<div class=admin-title>ADMIN / SPECTADOR</div><div class=admin-row><b>Modo</b><button id=adminBuild>CONSTRUÇÃO</button></div><div class=admin-row><b>Bloco</b><select id=adminBlock></select></div><div class=admin-row><b>Dar item</b><select id=adminPlayer></select><select id=adminItem></select><input id=adminQty type=number min=1 max=999 value=64><button id=adminGive>DAR</button></div><div class=admin-row><b>Equipar</b><button id=adminSword>Espada Diamante</button><button id=adminArmor>Armadura Diamante</button></div><div class=admin-hint>Voo: WASD · Espaço sobe · Shift desce · clique esquerdo quebra · clique direito coloca.</div>';document.body.appendChild(p);const names=['Lã Azul','Lã Vermelha','Lã Verde','Lã Amarela','Madeira','Pedra','Vidro','Cama Azul','Cama Vermelha','Cama Verde','Cama Amarela','End Stone','TNT','Ouro','Diamante','Obsidiana','Bloco Azul','Bloco Vermelho','Bloco Verde','Bloco Amarelo','Pedra Escura','Lava','Luz','Terra','Solo','Terracota Ciano','Grama','Pedra Cinza','Musgo','Madeira Selva','Terracota Rosa','Diamante Brilhante','Esmeralda','Glow'];$('adminBlock').innerHTML=names.map((n,i)=>'<option value='+(i+1)+'>'+n+'</option>').join('');const items=['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em'];$('adminItem').innerHTML=items.map(k=>'<option>'+k+'</option>').join('');$('adminBlock').onchange=()=>ADMIN.block=+$('adminBlock').value;$('adminBuild').onclick=()=>{ADMIN.build=!ADMIN.build;$('adminBuild').textContent=ADMIN.build?'CONSTRUÇÃO':'ITENS'};$('adminGive').onclick=()=>send({t:'adminGive',id:+$('adminPlayer').value,k:$('adminItem').value,n:+$('adminQty').value});$('adminSword').onclick=()=>send({t:'adminSetGear',sw:3,ar});$('adminArmor').onclick=()=>send({t:'adminSetGear',sw,ar:2});return p}
 function setAdminMode(on,players=[]){ADMIN.on=!!on;const p=adminPanel();p.classList.toggle('open',ADMIN.on);$('adminPlayer').innerHTML=(players||[]).map(q=>'<option value='+q[0]+'>'+q[1]+' · '+TN[q[2]]+'</option>').join('');if($('adminBuild'))$('adminBuild').textContent=ADMIN.build?'CONSTRUÇÃO':'ITENS';lastHeldSig='';hud()}
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
+function fmtTime(v){v=Math.max(0,Math.floor(v||0));return String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0')}
+function renderScoreboard(force=false){
+ if(!started){return}
+ const now=performance.now();if(!force&&now-lastScoreboardAt<220)return;lastScoreboardAt=now;
+ const cfg=MAPS[currentMap]||{},teams=TN.map((n,t)=>{const ps=[...matchPlayers.values()].filter(p=>p.team===t&&!p.admin),active=ps.filter(p=>!p.out).length;if(!ps.length&&!bed[t])return '';return '<div class="score-team"><span class="score-dot" style="background:#'+hex(TC[t])+'"></span><span class="score-name">'+n+'</span><span class="score-count">'+active+'/'+ps.length+'</span><span class="score-bed '+(bed[t]?'alive':'dead')+'">'+(bed[t]?'🛏':'✖')+'</span></div>'}).join('');
+ html('tm','<div class="score-head">BEDWARS</div><div class="score-meta">'+(cfg.name||currentMap)+' · '+currentMode.toUpperCase()+'</div><div class="score-time">⏱ '+fmtTime(matchTime)+'</div><div class="score-teams">'+teams+'</div><div class="score-stats">⚔ Kills '+(myMatchStats.kills||0)+' &nbsp; ★ Finais '+(myMatchStats.finalKills||0)+'</div>')
+}
+function setRespawn(final=false,seconds=0,text=''){
+ respawnFinal=!!final;respawnEnds=final?0:performance.now()+Math.max(0,seconds)*1000;
+ const el=$('respawnOverlay');el.classList.add('show',''+(final?'final':''));$('respawnTitle').textContent=final?'ELIMINADO':'VOCÊ MORREU';$('respawnText').textContent=final?(text||'Sua cama foi destruída.'):('Renascer em '+Math.max(1,Math.ceil(seconds))+'...')
+}
+function clearRespawn(){respawnFinal=false;respawnEnds=0;$('respawnOverlay').className='';}
+function updateRespawnUI(){if(respawnFinal||!respawnEnds)return;const n=Math.max(0,Math.ceil((respawnEnds-performance.now())/1000));$('respawnText').textContent=n>0?'Renascer em '+n+'...':'Renascendo...'}
+function screenHurt(cr=false){const el=$('damageFlash');el.className='show'+(cr?' crit':'');clearTimeout(el._t);el._t=setTimeout(()=>el.className='',150)}
+function floatingDamage(x,y,z,d,cr){const v=new THREE.Vector3(x,y,z).project(cam);if(v.z<-1||v.z>1)return;const el=document.createElement('div');el.className='damage-number'+(cr?' crit':'');el.textContent=(cr?'✦ ':'-')+Number(d).toFixed(d>=10?0:1);el.style.left=((v.x*.5+.5)*innerWidth)+'px';el.style.top=((-v.y*.5+.5)*innerHeight)+'px';$('hitNumbers').appendChild(el);setTimeout(()=>el.remove(),720)}
+function combatBurst(m){fx(m.x,m.y,m.z,m.cr?0xffe45c:0xff4545,m.cr?20:12);if(m.cr)fx(m.x,m.y+.08,m.z,0xffffff,8);floatingDamage(m.x,m.y+.45,m.z,m.d,m.cr);if(m.target===me.id)screenHurt(!!m.cr)};
 function hud(){
 html('bar',SL.map((name,i)=>{
  const key=i?slotKey(i):0;let q=i?(inv[key]||0):'';if(i===8)q=inv.bow?('F'+inv.arrow):0;
@@ -407,7 +424,7 @@ html('res',[
 ].map(([k,n,v])=>`<div class="resource-row"><img class="ri" src="${RI[k]}"><span>${n}</span><strong>${v}</strong></div>`).join(''));
 const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10},(_,i)=>`<span class="heart${hp<=i*2?' empty':''}">♥</span>`).join('');
 html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
-html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
+if(started)renderScoreboard(true);else html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
 const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}const next=(n+SL.length)%SL.length;if(next===6&&cur===6){cycleTnt();return}cur=next;lastHeldSig='';refreshHeld();hud()};
 let shopCat='Compra Rápida',lastBuyAt=0,lastShopSig='';
@@ -547,17 +564,22 @@ case'lobby':{
  $('mapPick').innerHTML=(m.maps||Object.values(MAPS)).map(mp=>`<button class="map-card${mp.id===m.mapId?' active':''}" ${me.id===m.host?'':'disabled'} onclick="send({t:'map',map:'${mp.id}'})">${mp.name}<small>${mp.description||''}</small></button>`).join('');
  $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · escolha o mapa.`:`Modo ${currentMode.toUpperCase()} · organize Azul x Vermelho e escolha o mapa.`):'Aguardando o anfitrião iniciar.';scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
-case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;scr(touchMode||document.pointerLockElement?null:'ov');hud();break;
-case's':{syncProjectiles(m.pr||[]);const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
+case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();scr(touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);break;
+case's':{syncProjectiles(m.pr||[]);if(m.time!=null)matchTime=m.time;if(m.bed)bed=m.bed;const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin,out,rt,kills,finalKills])=>{seen.add(id);matchPlayers.set(id,{id,team:tm,alive:!!al,out:!!out,admin:!!radmin,kills:kills||0,finalKills:finalKills||0,rt:rt||0});if(id===me.id){me.hp=hp;me.alive=al;me.out=!!out;myMatchStats={kills:kills||0,finalKills:finalKills||0};return}
 let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
-PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id)}});break}
+PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id);matchPlayers.delete(id)}});renderScoreboard();break}
 case'bb':m.l.forEach(a=>{sb(...a);BRIDGE_PRED.delete(a[0]+','+a[1]+','+a[2])});unstick();break;
 case'breakp':breakDur=m.d;breakAt=performance.now();$('breakBox').style.display='block';break;
 case'breakCancel':breaking=null;breakDur=0;miningTool=null;lastHeldSig='';$('breakBox').style.display='none';crackBox.visible=false;refreshHeld();break;
 case'drops':syncDrops(m.l);break;
 case'tp':pl.x=m.x;pl.y=m.y;pl.z=m.z;pl.vy=0;pl.kx=pl.kz=0;break;
 case'kb':pl.kx+=m.kx;pl.kz+=m.kz;pl.vy=Math.max(pl.vy,m.vy);sfx('hurt');break;
-case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').style.transform='',70);sfx(m.cr?'crit':'hit');msg((m.cr?'CRÍTICO · ':'')+'Vida inimiga: '+m.hp);break;
+case'hitok':$('cross').style.transform='scale(1.9)';setTimeout(()=>$('cross').style.transform='',70);sfx(m.cr?'crit':'hit');break;
+case'hitfx':combatBurst(m);break;
+case'hurtPulse':screenHurt(!!m.cr);break;
+case'deathState':setRespawn(!!m.final,m.respawn||0,m.final?'Você foi eliminado.':'');break;
+case'eliminated':setRespawn(true,0,m.reason||'Você foi eliminado.');break;
+case'respawn':clearRespawn();break;
 case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);sfx(p.k==='fireball'||String(p.k).startsWith('tnt')?'fireball':p.k==='arrow'?'arrow':p.k==='pearl'?'pearl':'snowball');break}
 case'projHit':{const p=PROJ.get(m.id);if(p){sc.remove(p.m);PROJ.delete(m.id)}break}
 case'feed':addFeed(m);break;
@@ -566,14 +588,14 @@ case'adminMode':setAdminMode(m.enabled,m.players||[]);break;
 case'anim':{const r=PL.get(m.id);if(r)r.action=performance.now()+(m.k==='mine'?500:320);break}
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();break;
 case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}break;
-case'bed':bed=m.bed;sfx('bed');bedBurst(m.team,m.pos);hud();break;
+case'bed':bed=m.bed;sfx('bed');bedBurst(m.team,m.pos);hud();renderScoreboard(true);break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
 case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0)resourceSfx(m.k,g);break}
 case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');break;
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':{
- over=1;started=0;clearReconnect();try{document.exitPointerLock()}catch(e){}
+ over=1;started=0;clearRespawn();clearReconnect();try{document.exitPointerLock()}catch(e){}
  const solo=m.modeId==='solo',win=solo?m.winnerId===me.id:m.winnerTeam===me.team;sfx(win?'victory':'death');$('et').textContent=win?'VITÓRIA!':'DERROTA!';$('et').className=win?'end-win':'end-loss';
  $('endSub').textContent=solo?(m.winnerId>=0?'Vencedor: '+(m.winnerName||'Jogador')+' · Tempo: '+Math.floor((m.time||0)/60)+':'+String(Math.floor((m.time||0)%60)).padStart(2,'0'):'Partida encerrada'):(m.winnerTeam>=0?'Time vencedor: '+TN[m.winnerTeam]+' · Tempo: '+Math.floor((m.time||0)/60)+':'+String(Math.floor((m.time||0)%60)).padStart(2,'0'):'Partida encerrada');
  const rows=[...(m.stats||[])].sort((a,b)=>b.finalKills-a.finalKills||b.bedsDestroyed-a.bedsDestroyed||b.kills-a.kills);
@@ -652,7 +674,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70;hud();
-function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
+function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;updateRespawnUI();acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
 if((started||lobbyExplore)&&!over&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
 let sneak=false,sprinting=false;
