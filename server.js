@@ -11,6 +11,39 @@ const MODES={
   '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
   'solo':{id:'solo',name:'Solo / FFA',teamCap:1,maxPlayers:4,activeTeams:[0,1,2,3],solo:true,description:'Todos contra todos · 2 a 4 jogadores · uma base por jogador'}
 };
+// Economia inspirada no ritmo do BedWars: base mais lenta no início e geradores
+// centrais acelerando por tiers ao longo da partida.
+const GEN_BALANCE={
+  iron:2.0,
+  gold:6.0,
+  diamond:[30,24,12],
+  diamondMarks:[360,1080],
+  emerald:{
+    solo:[65,50,35],
+    '2v2':[65,50,35],
+    '4v4':[56,40,28]
+  },
+  emeraldMarks:{
+    solo:[720,1440],
+    '2v2':[720,1440],
+    '4v4':[360,1080]
+  },
+  diamondCaps:[4,6,8],
+  emeraldCaps:[4,6,8]
+};
+const generatorTier=(time,marks)=>time>=marks[1]?2:time>=marks[0]?1:0;
+function generatorRates(R){
+  const diaTier=generatorTier(R.t,GEN_BALANCE.diamondMarks);
+  const emMarks=GEN_BALANCE.emeraldMarks[R.modeId]||GEN_BALANCE.emeraldMarks['2v2'];
+  const emTier=generatorTier(R.t,emMarks);
+  const emRates=GEN_BALANCE.emerald[R.modeId]||GEN_BALANCE.emerald['2v2'];
+  return {
+    iron:GEN_BALANCE.iron,gold:GEN_BALANCE.gold,
+    dia:GEN_BALANCE.diamond[diaTier],em:emRates[emTier],
+    diaCap:GEN_BALANCE.diamondCaps[diaTier],emCap:GEN_BALANCE.emeraldCaps[emTier],
+    diaTier,emTier
+  };
+}
 const modeCfg=R=>MODES[R.modeId]||MODES['2v2'];
 function rebalanceForMode(R,mc){
   const players=[...R.ps.values()];
@@ -257,10 +290,13 @@ function addDrop(R,k,n,x,y,z,max=64){
   bc(R,{t:'drops',l:R.drops});
 }
 function genSnapshot(R){
-  const players=[...R.ps.values()];
-  const base=R.g.base.map((g,i)=>{const o=players.find(q=>q.team===i),fm=1+.5*(o?o.up.forge:0);return [+(Math.max(0,1.2/fm-g.iron)).toFixed(2),+(Math.max(0,5/fm-g.gold)).toFixed(2)]});
-  const dia=R.g.dia.map(g=>+(Math.max(0,12-g.t)).toFixed(2));
-  return {base,dia,em:+Math.max(0,22-R.g.em.t).toFixed(2)};
+  const players=[...R.ps.values()],rates=generatorRates(R);
+  const base=R.g.base.map((g,i)=>{
+    const o=players.find(q=>q.team===i),fm=1+.5*(o?o.up.forge:0);
+    return [+(Math.max(0,rates.iron/fm-g.iron)).toFixed(2),+(Math.max(0,rates.gold/fm-g.gold)).toFixed(2)];
+  });
+  const dia=R.g.dia.map(g=>+(Math.max(0,rates.dia-g.t)).toFixed(2));
+  return {base,dia,em:+Math.max(0,rates.em-R.g.em.t).toFixed(2),diaTier:rates.diaTier+1,emTier:rates.emTier+1};
 }
 function pickupDrops(R, players){
   let changed=false;
@@ -589,25 +625,27 @@ setInterval(() => {
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
+      const rates=generatorRates(R);
       R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
         const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
+        const ironEvery=rates.iron/fm,goldEvery=rates.gold/fm;
         g.iron += dt; g.gold += dt;
-        if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
-        if (g.gold > 5 / fm) { g.gold = 0; addDrop(R,'gold',1,gx+1,gy+.2,gz,12); }
+        if (g.iron >= ironEvery) { g.iron -= ironEvery; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
+        if (g.gold >= goldEvery) { g.gold -= goldEvery; addDrop(R,'gold',1,gx+1,gy+.2,gz,12); }
       });
       R.g.dia.forEach((g, i) => {
         g.t += dt;
-        if (g.t <= 12) return;
-        g.t = 0;
-        const [gx,gy,gz]=R.DIGEN[i];addDrop(R,'dia',1,gx,gy,gz,4);
+        if (g.t < rates.dia) return;
+        g.t -= rates.dia;
+        const [gx,gy,gz]=R.DIGEN[i];addDrop(R,'dia',1,gx,gy,gz,rates.diaCap);
       });
       R.g.em.t += dt;
-      if (R.g.em.t > 22) {
-        R.g.em.t = 0;
+      if (R.g.em.t >= rates.em) {
+        R.g.em.t -= rates.em;
         const [gx,gy,gz]=R.EMGEN;
-        addDrop(R,'em',1,gx,gy,gz,2);
+        addDrop(R,'em',1,gx,gy,gz,rates.emCap);
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
