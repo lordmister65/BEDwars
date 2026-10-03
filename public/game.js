@@ -237,16 +237,49 @@ function blockTint(b,face){
   const pp=P[b];return pp?(pp[face]??pp[0]):0xffffff;
 }
 const mat=new THREE.MeshBasicMaterial({map:tex,vertexColors:true,side:THREE.FrontSide,transparent:true,alphaTest:.08}),M={},dirty=new Set();
+
+// Camas visuais: o bloco 8-11 continua existindo no voxel para colisão e destruição,
+// mas não é mais desenhado como cubo. O modelo abaixo é apenas visual.
+const BED_VIS=[];
+function bedPart(g,w,h,d,color,x,y,z){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshBasicMaterial({color}));
+ m.position.set(x,y,z);g.add(m);return m
+}
+function removeBedVisual(team){
+ const g=BED_VIS[team];if(!g)return;sc.remove(g);g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()});BED_VIS[team]=null
+}
+function clearBedVisuals(){for(let t=0;t<BED_VIS.length;t++)removeBedVisual(t)}
+function createBedVisual(team,pos,spawn){
+ const g=new THREE.Group(),wood=0x75472c,darkWood=0x4d2f20,linen=0xf3f0e8,teamColor=TC[team]||0xffffff;
+ // Estrado e pés.
+ bedPart(g,.96,.16,1.62,wood,0,.24,0);
+ for(const x of[-.39,.39])for(const z of[-.68,.68])bedPart(g,.14,.34,.14,darkWood,x,.17,z);
+ // Colchão, cobertor e travesseiro.
+ bedPart(g,.88,.22,1.48,linen,0,.42,0);
+ bedPart(g,.90,.12,.88,teamColor,0,.59,-.27);
+ bedPart(g,.62,.14,.32,0xffffff,0,.60,.52);
+ // Cabeceira com travessa, deixando a silhueta claramente parecida com cama.
+ for(const x of[-.42,.42])bedPart(g,.13,.82,.13,darkWood,x,.43,.79);
+ bedPart(g,.98,.16,.13,wood,0,.70,.79);
+ bedPart(g,.78,.11,.10,teamColor,0,.48,.79);
+ const sx=spawn?.[0]??pos[0]+.5,sz=spawn?.[2]??pos[2]-.5,dx=pos[0]+.5-sx,dz=pos[2]+.5-sz;
+ g.rotation.y=Math.atan2(dx,dz);g.position.set(pos[0]+.5,pos[1],pos[2]+.5);g.userData={bedTeam:team,bedPos:pos};
+ sc.add(g);BED_VIS[team]=g
+}
+function syncBedVisuals(meta=worldMeta,state=null){
+ clearBedVisuals();(meta?.BD||[]).forEach((pos,t)=>{if(!pos)return;if(state&&state[t]===0)return;if(B[ix(pos[0],pos[1],pos[2])]!==8+t)return;createBedVisual(t,pos,meta.SPAWN?.[t])})
+}
+
 function build(cx,cz){const p=[],c=[],i=[],u=[],col=new THREE.Color();let n=0;
-for(let x=cx*CS;x<cx*CS+CS;x++)for(let z=cz*CS;z<cz*CS+CS;z++){if(!inXZ(x,z))continue;for(let y=0;y<H;y++){const b=B[ix(x,y,z)];if(!b)continue;
+for(let x=cx*CS;x<cx*CS+CS;x++)for(let z=cz*CS;z<cz*CS+CS;z++){if(!inXZ(x,z))continue;for(let y=0;y<H;y++){const b=B[ix(x,y,z)];if(!b||b>=8&&b<=11)continue;
 const v=.96+((x*73856093^y*19349663^z*83492791)>>>0)%100/2200;
-for(const f of F){const d=f[0];if(get(x+d[0],y+d[1],z+d[2]))continue;col.setHex(blockTint(b,f[6])).multiplyScalar(f[5]*v);
+for(const f of F){const d=f[0],nb=get(x+d[0],y+d[1],z+d[2]);if(nb&&!(nb>=8&&nb<=11))continue;col.setHex(blockTint(b,f[6])).multiplyScalar(f[5]*v);
 for(let k=1;k<5;k++){p.push(x+f[k][0],y+f[k][1],z+f[k][2]);c.push(col.r,col.g,col.b);u.push((tl(b)+.02+.96*[0,1,1,0][k-1])/16,.02+.96*[0,0,1,1][k-1])}
 i.push(n,n+1,n+2,n,n+2,n+3);n+=4}}}
 const k=cx+','+cz;if(M[k]){sc.remove(M[k]);M[k].geometry.dispose()}
 const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(u,2));g.setIndex(i);
 M[k]=new THREE.Mesh(g,mat);sc.add(M[k])}
-function sb(x,y,z,v,f){if(!inXZ(x,z)||y<0||y>=H)return;B[ix(x,y,z)]=v;pf[ix(x,y,z)]=f;const a=Math.floor(x/CS),b=Math.floor(z/CS),mx=((x%CS)+CS)%CS,mz=((z%CS)+CS)%CS;dirty.add(a+','+b);activeChunks.add(a+','+b);
+function sb(x,y,z,v,f){if(!inXZ(x,z)||y<0||y>=H)return;const bi=ix(x,y,z),old=B[bi];B[bi]=v;pf[bi]=f;if(old>=8&&old<=11&&old!==v)removeBedVisual(old-8);const a=Math.floor(x/CS),b=Math.floor(z/CS),mx=((x%CS)+CS)%CS,mz=((z%CS)+CS)%CS;dirty.add(a+','+b);activeChunks.add(a+','+b);
 if(mx===0)dirty.add((a-1)+','+b);if(mx===CS-1)dirty.add((a+1)+','+b);if(mz===0)dirty.add(a+','+(b-1));if(mz===CS-1)dirty.add(a+','+(b+1))}
 const CMIN_X=Math.floor(MIN_X/CS),CMAX_X=Math.floor(MAX_X/CS),CMIN_Z=Math.floor(MIN_Z/CS),CMAX_Z=Math.floor(MAX_Z/CS);
 function validChunk(cx,cz){return cx>=CMIN_X&&cx<=CMAX_X&&cz>=CMIN_Z&&cz<=CMAX_Z}
@@ -294,7 +327,7 @@ function loadMap(mapId,lobby=false,serverChunks=null){
  currentMap=MAPS[mapId]?mapId:'classic';const g=BW.gen(currentMap,lobby);worldMeta=g;B.set(g.B);pf.fill(0);
  activeChunks=new Set(serverChunks||g.activeChunks||[]);dirty.clear();
  Object.keys(M).forEach(k=>{if(!activeChunks.has(k)){sc.remove(M[k]);M[k].geometry.dispose();delete M[k]}});
- activeChunks.forEach(k=>dirty.add(k));updateGeneratorIcons(g);updateVendors(g,lobby);flush(999);
+ activeChunks.forEach(k=>dirty.add(k));updateGeneratorIcons(g);updateVendors(g,lobby);syncBedVisuals(g);flush(999);
 }
 function updateChunkLOD(){const max=lowEnd?155:330;for(const [k,m] of Object.entries(M)){const [cx,cz]=k.split(',').map(Number),x=cx*CS+CS/2,z=cz*CS+CS/2;m.visible=Math.hypot(pl.x-x,pl.z-z)<max}}
 activeChunks.forEach(k=>{const[a,b]=k.split(',').map(Number);build(a,b)});
@@ -535,7 +568,7 @@ case'init':me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;reconnectToken=m.
 case'reconnected':
  reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('');me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;saveReconnect();
  INFO={};(m.roster||[]).forEach(([id,n,t])=>INFO[id]={n,t});loadMap(m.mapId||currentMap,m.st==='lobby',m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);bed=m.bed||bed;
- inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
+ syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
 case'reconnectFail':reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break;
 case'lobby':{
  INFO={};m.l.forEach(([id,n,t,d])=>INFO[id]={n,t,d});const mine=m.l.find(q=>q[0]===me.id);if(mine)me.team=mine[2];
@@ -548,7 +581,7 @@ case'lobby':{
  $('mapPick').innerHTML=(m.maps||Object.values(MAPS)).map(mp=>`<button class="map-card${mp.id===m.mapId?' active':''}" ${me.id===m.host?'':'disabled'} onclick="send({t:'map',map:'${mp.id}'})">${mp.name}<small>${mp.description||''}</small></button>`).join('');
  $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · escolha o mapa.`:`Modo ${currentMode.toUpperCase()} · organize Azul x Vermelho e escolha o mapa.`):'Aguardando o anfitrião iniciar.';scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
-case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();scr(touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);break;
+case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;syncBedVisuals(worldMeta,bed);matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();scr(touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);break;
 case's':{syncProjectiles(m.pr||[]);if(m.time!=null)matchTime=m.time;if(m.bed)bed=m.bed;if(m.gen)genState=m.gen;const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin,out,rt,kills,finalKills])=>{seen.add(id);matchPlayers.set(id,{id,team:tm,alive:!!al,out:!!out,admin:!!radmin,kills:kills||0,finalKills:finalKills||0,rt:rt||0});if(id===me.id){me.hp=hp;me.alive=al;me.out=!!out;myMatchStats={kills:kills||0,finalKills:finalKills||0};return}
 let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id);matchPlayers.delete(id)}});renderScoreboard();break}
@@ -572,7 +605,7 @@ case'adminMode':setAdminMode(m.enabled,m.players||[]);break;
 case'anim':{const r=PL.get(m.id);if(r)r.action=performance.now()+(m.k==='mine'?500:320);break}
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();break;
 case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}break;
-case'bed':bed=m.bed;sfx('bed');bedBurst(m.team,m.pos);hud();renderScoreboard(true);break;
+case'bed':bed=m.bed;removeBedVisual(m.team);sfx('bed');bedBurst(m.team,m.pos);hud();renderScoreboard(true);break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
 case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0)resourceSfx(m.k,g);break}
