@@ -681,7 +681,7 @@ for(let i=PT.length;i--;){const p=PT[i];p.t-=dt;p.vy-=20*dt;p.m.position.x+=p.vx
 for(let i=BEDFX.length;i--;){const b=BEDFX[i];b.t-=dt;b.m.material.opacity=Math.max(0,b.t/1.35);if(b.t<=0){sc.remove(b.m);b.m.material.dispose();BEDFX.splice(i,1)}}
 BRIDGE_PRED.forEach((b,key)=>{if(now-b.at>320){BRIDGE_PRED.delete(key);if(get(b.x,b.y,b.z)&&pf[ix(b.x,b.y,b.z)]){sb(b.x,b.y,b.z,0,0);flush(lowEnd?2:4)}}});
 PROJ.forEach(p=>{const ahead=Math.min(.09,(performance.now()-p.snapAt)/1000),a=Math.min(1,dt*28),x=p.tx+p.vx*ahead,y=p.ty+p.vy*ahead,z=p.tz+p.vz*ahead;p.m.position.x+=(x-p.m.position.x)*a;p.m.position.y+=(y-p.m.position.y)*a;p.m.position.z+=(z-p.m.position.z)*a})
-DROP.forEach((o,id)=>{o.m.position.y+=Math.sin(now/250+id)*.0007;o.m.material.rotation=now/1200});
+// Drops 3D sao animados exclusivamente por updateDropVisuals(); nao usar material de Sprite aqui.
 refreshHeld();swing=Math.max(0,swing-dt*5);useAnim=Math.max(0,useAnim-dt*4);
 const speedNow=Math.hypot(pl.vx,pl.vz),movingGround=pl.g&&speedNow>.25,bobStrength=touchMode?.45:1;
 if(movingGround)bobPhase+=dt*(7.5+Math.min(4,speedNow*.75));else bobPhase+=dt*2.5;
