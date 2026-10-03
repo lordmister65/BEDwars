@@ -1,0 +1,10 @@
+const fs=require('fs');
+const p='server.js';
+let s=fs.readFileSync(p,'utf8');
+const from="        R.st = 'play';";
+const to="        R.t = 0;\n        R.st = 'play';";
+const n=s.split(from).length-1;
+if(n!==1)throw new Error(`expected 1 start marker, found ${n}`);
+s=s.replace(from,to);
+fs.writeFileSync(p,s);
+console.log('Match clock reset applied.');
