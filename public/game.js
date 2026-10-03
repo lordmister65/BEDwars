@@ -68,7 +68,7 @@ function bbModel(key,tint=null){
 ['sword','helmet','chest','leggings','boots'].forEach(k=>parseBB(k).catch(()=>{}));
 const hand=new THREE.Group(),handMat=new THREE.MeshBasicMaterial({color:0xe8b98a});
 const arm=new THREE.Mesh(new THREE.BoxGeometry(.18,.18,.55),handMat);arm.position.set(.48,-.44,-.72);arm.rotation.x=-.35;hand.add(arm);
-const heldRoot=new THREE.Group();const heldViewBase={x:.68,y:-.42,z:-1.02,rx:0,ry:0,rz:0};heldRoot.position.set(heldViewBase.x,heldViewBase.y,heldViewBase.z);hand.add(heldRoot);cam.add(hand);let swing=0,useAnim=0,lastHeldSig='',miningTool=null;
+const heldRoot=new THREE.Group();const heldViewBase={x:.68,y:-.32,z:-1.02,rx:0,ry:0,rz:0};heldRoot.position.set(heldViewBase.x,heldViewBase.y,heldViewBase.z);hand.add(heldRoot);cam.add(hand);let swing=0,useAnim=0,lastHeldSig='',miningTool=null;
 const HMAT=new Map();const hmat=(c,o=1)=>{const k=c+':'+o;if(!HMAT.has(k))HMAT.set(k,new THREE.MeshBasicMaterial({color:c,transparent:o<1,opacity:o}));return HMAT.get(k)};
 const box=(w,h,d,c)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),hmat(c));
 const sphere=(r,c,o=1)=>new THREE.Mesh(new THREE.SphereGeometry(r,7,6),hmat(c,o));
@@ -167,14 +167,14 @@ function heldModel(slot,team=me.team,swordLevel=sw){
  return new THREE.Group()
 }
 function heldView(slot,mining=false){
- const k=mining?miningTool:slotKey(slot);let v={x:.69,y:-.43,z:-1.03,rx:.02,ry:0,rz:0,scale:1};
- if(slot===0&&!mining)v={x:.78,y:-.53,z:-1.08,rx:.02,ry:-.08,rz:.02,scale:.93};
- else if(mining)v={x:.76,y:-.50,z:-1.05,rx:.03,ry:-.06,rz:0,scale:.96};
- else if(['wool','planks','endstone','glass','obsidian'].includes(k))v={x:.72,y:-.47,z:-1.00,rx:.02,ry:-.08,rz:0,scale:.88};
- else if(k==='bow')v={x:.76,y:-.44,z:-1.08,rx:.03,ry:-.12,rz:.04,scale:.96};
- else if(['speedPotion','jumpPotion','invisPotion','apple'].includes(k))v={x:.73,y:-.49,z:-.95,rx:.04,ry:-.06,rz:.02,scale:.92};
- else if(['fireball','snowball','pearl'].includes(k))v={x:.73,y:-.46,z:-.96,rx:0,ry:-.05,rz:0,scale:.92};
- else if(String(k).startsWith('tnt'))v={x:.72,y:-.47,z:-1.00,rx:.02,ry:-.08,rz:0,scale:.88};
+ const k=mining?miningTool:slotKey(slot);let v={x:.69,y:-.33,z:-1.03,rx:.02,ry:0,rz:0,scale:1};
+ if(slot===0&&!mining)v={x:.78,y:-.42,z:-1.08,rx:.02,ry:-.08,rz:.02,scale:.93};
+ else if(mining)v={x:.76,y:-.39,z:-1.05,rx:.03,ry:-.06,rz:0,scale:.96};
+ else if(['wool','planks','endstone','glass','obsidian'].includes(k))v={x:.72,y:-.37,z:-1.00,rx:.02,ry:-.08,rz:0,scale:.88};
+ else if(k==='bow')v={x:.76,y:-.34,z:-1.08,rx:.03,ry:-.12,rz:.04,scale:.96};
+ else if(['speedPotion','jumpPotion','invisPotion','apple'].includes(k))v={x:.73,y:-.38,z:-.95,rx:.04,ry:-.06,rz:.02,scale:.92};
+ else if(['fireball','snowball','pearl'].includes(k))v={x:.73,y:-.35,z:-.96,rx:0,ry:-.05,rz:0,scale:.92};
+ else if(String(k).startsWith('tnt'))v={x:.72,y:-.37,z:-1.00,rx:.02,ry:-.08,rz:0,scale:.88};
  return v
 }
 function applyHeldView(){const v=heldView(cur,!!miningTool);Object.assign(heldViewBase,v);heldRoot.position.set(v.x,v.y,v.z);heldRoot.rotation.set(v.rx,v.ry,v.rz);heldRoot.scale.setScalar(v.scale)}
