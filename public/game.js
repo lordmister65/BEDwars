@@ -340,7 +340,7 @@ function addChat(m){
  setTimeout(()=>{if(el.parentNode)el.remove()},10000);
 }
 function toggleChat(open=true){$('chatForm').classList.toggle('open',open);if(open){try{document.exitPointerLock()}catch(e){};$('chatInput').focus()}else $('chatInput').blur()}
-$('chatForm').onsubmit=e=>{e.preventDefault();const text=$('chatInput').value.trim();if(text)send({t:'chat',scope:$('chatScope').value,text});$('chatInput').value='';toggleChat(false);if(started&&!touchMode)cv.requestPointerLock()};
+$('chatForm').onsubmit=e=>{e.preventDefault();const text=$('chatInput').value.trim();if(text)send({t:'chat',scope:$('chatScope').value,text});$('chatInput').value='';toggleChat(false);if(started)requestGameLock()};
 function adminPanel(){let p=$('adminPanel');if(p)return p;p=document.createElement('div');p.id='adminPanel';p.innerHTML='<div class=admin-title>ADMIN / SPECTADOR</div><div class=admin-row><b>Modo</b><button id=adminBuild>CONSTRUÇÃO</button></div><div class=admin-row><b>Bloco</b><select id=adminBlock></select></div><div class=admin-row><b>Dar item</b><select id=adminPlayer></select><select id=adminItem></select><input id=adminQty type=number min=1 max=999 value=64><button id=adminGive>DAR</button></div><div class=admin-row><b>Equipar</b><button id=adminSword>Espada Diamante</button><button id=adminArmor>Armadura Diamante</button></div><div class=admin-hint>Voo: WASD · Espaço sobe · Shift desce · clique esquerdo quebra · clique direito coloca.</div>';document.body.appendChild(p);const names=['Lã Azul','Lã Vermelha','Lã Verde','Lã Amarela','Madeira','Pedra','Vidro','Cama Azul','Cama Vermelha','Cama Verde','Cama Amarela','End Stone','TNT','Ouro','Diamante','Obsidiana','Bloco Azul','Bloco Vermelho','Bloco Verde','Bloco Amarelo','Pedra Escura','Lava','Luz','Terra','Solo','Terracota Ciano','Grama','Pedra Cinza','Musgo','Madeira Selva','Terracota Rosa','Diamante Brilhante','Esmeralda','Glow'];$('adminBlock').innerHTML=names.map((n,i)=>'<option value='+(i+1)+'>'+n+'</option>').join('');const items=['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em'];$('adminItem').innerHTML=items.map(k=>'<option>'+k+'</option>').join('');$('adminBlock').onchange=()=>ADMIN.block=+$('adminBlock').value;$('adminBuild').onclick=()=>{ADMIN.build=!ADMIN.build;$('adminBuild').textContent=ADMIN.build?'CONSTRUÇÃO':'ITENS'};$('adminGive').onclick=()=>send({t:'adminGive',id:+$('adminPlayer').value,k:$('adminItem').value,n:+$('adminQty').value});$('adminSword').onclick=()=>send({t:'adminSetGear',sw:3,ar});$('adminArmor').onclick=()=>send({t:'adminSetGear',sw,ar:2});return p}
 function setAdminMode(on,players=[]){ADMIN.on=!!on;const p=adminPanel();p.classList.toggle('open',ADMIN.on);$('adminPlayer').innerHTML=(players||[]).map(q=>'<option value='+q[0]+'>'+q[1]+' · '+TN[q[2]]+'</option>').join('');if($('adminBuild'))$('adminBuild').textContent=ADMIN.build?'CONSTRUÇÃO':'ITENS';lastHeldSig='';hud()}
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
@@ -403,9 +403,9 @@ function openShop(){
  if(!canUseShop()){msg('Chegue mais perto da loja do seu time.');sfx('blocked');return}
  shopOpen=1;drawShop(true);try{document.exitPointerLock()}catch(e){};scr('shop')
 }
-function closeShop(){shopOpen=0;if(!touchMode)cv.requestPointerLock();else scr(null)}
+function closeShop(){shopOpen=0;scr(null);requestGameLock()}
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(shopOpen?'shop':'ov')});
-$('ov').onclick=()=>{audioInit();if(!touchMode)cv.requestPointerLock();else scr(null)};
+$('ov').onclick=()=>{audioInit();scr(null);requestGameLock()};
 // rede e reconexão
 const send=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
 function saveReconnect(){if(roomCode&&reconnectToken)sessionStorage.setItem('bwReconnect',JSON.stringify({room:roomCode,token:reconnectToken,name:$('nm').value||'Jogador'}))}
@@ -437,7 +437,7 @@ function startReconnect(){
   };attempt();
 }
 $('go').onclick=()=>{$('er').textContent='Conectando…';connectSocket('join')};
-$('st').onclick=()=>{send({t:'start'});if(!touchMode)cv.requestPointerLock()};
+$('st').onclick=()=>{send({t:'start'});requestGameLock()};
 function leaveToLobby(){clearReconnect();location.reload()}
 function exploreLobby(){if(started)return;lobbyExplore=true;scr(null);if(!touchMode)cv.requestPointerLock()}
 function showLobby(){if(started)return;lobbyExplore=false;try{document.exitPointerLock()}catch(e){}scr('lobby')}
@@ -537,14 +537,18 @@ case'end':{
  scr('end');break
 }}}
 // entrada
-const touchMode=matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,lastBridgeAt=0;const BRIDGE_PRED=new Map();
+const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;const BRIDGE_PRED=new Map();
 addEventListener('keydown',e=>{if(document.activeElement===$('chatInput')){if(e.code==='Escape'){e.preventDefault();toggleChat(false)}return}if(e.code==='KeyT'||e.code==='Enter'){e.preventDefault();toggleChat(true);return}
 if(e.code==='KeyW'&&!e.repeat){const n=performance.now();if(n-lastWTap<=280)doubleSprint=true;lastWTap=n}
 K[e.code]=1;if(e.code>='Digit1'&&e.code<='Digit9')pick(+e.code[5]-1);
 if(e.code==='KeyL'&&!started&&me.id){e.preventDefault();lobbyExplore?showLobby():exploreLobby();return}
 });
 addEventListener('keyup',e=>{K[e.code]=0;if(e.code==='KeyW')doubleSprint=false});addEventListener('wheel',e=>pick(cur+(e.deltaY>0?1:-1)));
-addEventListener('mousemove',e=>{if(!document.pointerLockElement)return;pl.yaw-=e.movementX*.0023;pl.pitch=Math.max(-1.55,Math.min(1.55,pl.pitch-e.movementY*.0023))});
+addEventListener('mousemove',e=>{let dx=0,dy=0;if(document.pointerLockElement){dx=e.movementX;dy=e.movementY}else if(dragLook&&!touchMode&&(started||lobbyExplore)){dx=e.clientX-lastDragX;dy=e.clientY-lastDragY;lastDragX=e.clientX;lastDragY=e.clientY}else return;pl.yaw-=dx*.0023;pl.pitch=Math.max(-1.55,Math.min(1.55,pl.pitch-dy*.0023))});
+addEventListener('mouseup',()=>dragLook=false);
+function requestGameLock(){if(touchMode||document.pointerLockElement)return;try{const q=cv.requestPointerLock();if(q&&q.catch)q.catch(()=>{})}catch(e){}}
+cv.addEventListener('mousedown',e=>{if(!touchMode&&(started||lobbyExplore)){if(!document.pointerLockElement){dragLook=true;lastDragX=e.clientX;lastDragY=e.clientY;requestGameLock()}}});
+document.addEventListener('pointerlockerror',()=>{if(started||lobbyExplore)msg('Clique novamente no jogo ou segure e arraste o mouse para olhar.')});
 addEventListener('contextmenu',e=>e.preventDefault());
 function ray(){
  const d=new THREE.Vector3();cam.getWorldDirection(d);let x=Math.floor(cam.position.x),y=Math.floor(cam.position.y),z=Math.floor(cam.position.z),prev=[x,y,z];
@@ -605,7 +609,7 @@ if(touchMode){
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70;hud();
 function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
-if((started||lobbyExplore)&&!over&&(document.pointerLockElement||touchMode)&&me.alive){
+if((started||lobbyExplore)&&!over&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
 let sneak=false,sprinting=false;
 if(ADMIN.on){const sp=10;pl.vx=(fx_*mf+rx*mr)/l*sp;pl.vz=(fz*mf+rz*mr)/l*sp;pl.vy=(K.Space?8:0)-(K.ShiftLeft?8:0);pl.x+=pl.vx*dt;pl.y+=pl.vy*dt;pl.z+=pl.vz*dt;pl.g=false}else{
