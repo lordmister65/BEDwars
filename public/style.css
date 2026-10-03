@@ -297,3 +297,5 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   .shop-card{min-height:78px}
   .shop-card .slot-icon{font-size:25px}
 }
+
+#adminPanel{display:none;position:fixed;right:12px;top:70px;z-index:40;width:min(400px,92vw);background:rgba(12,14,18,.95);border:2px solid #ffcf33;padding:10px;color:#fff;font-family:monospace;box-shadow:0 0 24px #0008}#adminPanel.open{display:block}.admin-title{font-weight:900;color:#ffdf58;margin-bottom:8px}.admin-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:7px 0}.admin-row select,.admin-row input,.admin-row button{font:inherit;padding:5px;background:#252a32;color:#fff;border:1px solid #666}.admin-row input{width:58px}.admin-hint{font-size:11px;color:#cfd4db;line-height:1.4}
