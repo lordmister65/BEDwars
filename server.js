@@ -3,7 +3,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
-const ADMIN_COMMAND='/lordmister';
+const ADMIN_COMMAND=String(process.env.ADMIN_COMMAND||'/lordmister').toLowerCase();
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em']);
 const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=34;
 const MODES={
@@ -277,7 +277,7 @@ function segmentHitPlayer(R,pr,nx,ny,nz){
   let best=null,bestT=Infinity;
   const sx=pr.x,sy=pr.y,sz=pr.z,dx=nx-sx,dy=ny-sy,dz=nz-sz;
   for(const q of R.ps.values()){
-    if(!q.alive||q.team===pr.team||q.out)continue;
+    if(!q.alive||q.team===pr.team||q.out||q.admin)continue;
     // Caixa do corpo com pequena margem para compensar snapshot/interpolação.
     const minX=Math.min(q.x,q.px??q.x)-.40,maxX=Math.max(q.x,q.px??q.x)+.40,
           minY=Math.min(q.y,q.py??q.y)-.08,maxY=Math.max(q.y,q.py??q.y)+1.84,
@@ -343,7 +343,7 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,admin:p.admin?1:0,adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
@@ -384,10 +384,15 @@ wss.on('connection', ws => {
       case 'chat': {
         const rawText=String(m.text||'').trim();
         if(rawText.toLowerCase()===ADMIN_COMMAND){
-          p.admin=!p.admin;p.alive=1;p.hp=20;p.out=0;p.breaking=null;p.ih=0;
+          if(!p.admin){
+            p.adminBackup={inv:{...p.inv},sw:p.sw,ar:p.ar,tools:{...p.tools},up:{...p.up}};p.admin=true;
+            for(const k of ADMIN_ITEMS)p.inv[k]=k==='bow'?1:999;p.sw=3;p.ar=2;p.tools={pick:2,axe:2,shears:1};
+          }else{
+            p.admin=false;const b=p.adminBackup;if(b){p.inv={...b.inv};p.sw=b.sw;p.ar=b.ar;p.tools={...b.tools};p.up={...b.up}}p.adminBackup=null;spawn(p);
+          }
+          p.alive=1;p.hp=20;p.out=0;p.breaking=null;p.ih=0;pinv(p);
           tx(p,{t:'adminMode',enabled:p.admin?1:0,players:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team])});
-          if(p.admin)tx(p,{t:'m',s:'Modo ADMIN ativado.'});else{spawn(p);tx(p,{t:'m',s:'Modo ADMIN desativado.'})}
-          win(R);break;
+          tx(p,{t:'m',s:p.admin?'Modo ADMIN ativado.':'Modo ADMIN desativado.'});win(R);break;
         }
         if(!allow(p,'chat',650))break;
         const text=rawText.replace(/[<>]/g,'').slice(0,120);if(!text)break;
@@ -396,20 +401,20 @@ wss.on('connection', ws => {
         break;
       }
       case 'start':
-        if (R.st !== 'lobby' || p.id !== R.host || R.ps.size < 2) break;
-        { const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team));
+        if (R.st !== 'lobby' || p.id !== R.host || [...R.ps.values()].filter(q=>!q.admin).length < 2) break;
+        { const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team));
           if(mc.solo){
             if(active.length<2){tx(p,{t:'m',s:'O modo Solo precisa de pelo menos 2 jogadores.'});break}
             if(teams.size!==active.length){tx(p,{t:'m',s:'Cada jogador precisa estar em uma base diferente no Solo.'});break}
           }else{
             if(teams.size<2){tx(p,{t:'m',s:'É necessário ter jogadores nos times Azul e Vermelho.'});break}
-            if(active.some(q=>[...R.ps.values()].filter(x=>x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
+            if(active.some(q=>[...R.ps.values()].filter(x=>!x.admin&&x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
           }
         }
         const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
-          R.bed[t] = [...R.ps.values()].some(q => q.team === t) ? 1 : 0;
+          R.bed[t] = [...R.ps.values()].some(q => !q.admin&&q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
         R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks }); break;
@@ -428,7 +433,7 @@ wss.on('connection', ws => {
       case 'adminBreak': {
         if(!p.admin)break;const x=Math.floor(m.x),y=Math.floor(m.y),z=Math.floor(m.z);
         if(![x,y,z].every(Number.isInteger)||!S.inXZ(x,z)||y<0||y>=S.H)break;
-        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;setb(R,x,y,z,0,0);break;
+        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;const b=get(R,x,y,z);if(b>=8&&b<=11)killBed(R,b-8,p);else setb(R,x,y,z,0,0);break;
       }
       case 'adminGive': {
         if(!p.admin||!Number.isInteger(m.id))break;const q=R.ps.get(m.id),k=String(m.k||''),n=Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));
@@ -446,7 +451,7 @@ wss.on('connection', ws => {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !allow(p, 'hit', 90) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const q = R.ps.get(m.id);
-        if (!q || q === p || !q.alive || q.team === p.team) break;
+        if (!q || q === p || !q.alive || q.team === p.team || q.admin) break;
         const cy = Math.cos(m.pitch), d = [-Math.sin(m.yaw) * cy, Math.sin(m.pitch), -Math.cos(m.yaw) * cy];
         const dx = q.x - p.x, dy = q.y + .9 - (p.y + 1.62), dz = q.z - p.z, L = Math.hypot(dx, dy, dz);
         if (L > 3.8 || L < .01 || (dx * d[0] + dy * d[1] + dz * d[2]) / L < .9) break;
