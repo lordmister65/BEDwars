@@ -43,3 +43,4 @@ if(index.includes('<script src="/game.js"></script>')){
 fs.writeFileSync('public/game.js',game);
 fs.writeFileSync('public/index.html',index);
 console.log('Bed v2 applied and cache-busted');
+// trigger 2
