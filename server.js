@@ -130,9 +130,10 @@ function win(R) {
 function die(R, q, cause='combat') {
   if(!q.alive)return;
   q.stats.deaths++;
-  q.alive = 0; q.hp = 0; q.rt = 3; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
+  q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
   const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
   const final = !R.bed[q.team];
+  tx(q,{t:'deathState',final:final?1:0,respawn:final?0:5,cause,killer:killer?killer.name:''});
   if(killer){
     if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
@@ -145,10 +146,12 @@ function die(R, q, cause='combat') {
 }
 function hurt(R, q, d, kx, kz, src, cr, cause='combat') {
   if (!q.alive || q.ih > 0 || q.admin) return;
-  q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; q.hp -= d;
+  q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; const dealt=Math.max(0,d);q.hp -= dealt;
   if (src) { q.src = src; q.st = R.t; }
   tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
   bc(R, { t: 'fx', x: q.x, y: q.y + 1, z: q.z, c: cr ? 0xffd23d : 0xd23c3c });
+  bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});
+  tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0});
   if (q.hp <= 0) die(R, q, cause);
 }
 function killBed(R, t, src) {
@@ -157,7 +160,7 @@ function killBed(R, t, src) {
   if(src){src.stats.bedsDestroyed++;feed(R,`${src.name} destruiu a cama do Time ${S.TN[t]}!`,src.team,t,'bed');}
   else feed(R,`A cama do Time ${S.TN[t]} foi destruída!`,-1,t,'bed');
   bc(R, { t:'bed', bed:R.bed, team:t, pos:R.BD[t] });
-  R.ps.forEach(q => { if (q.team === t && !q.alive && !q.out) { q.out = 1; msg(R, q.name + ' foi eliminado!'); } });
+  R.ps.forEach(q => { if (q.team === t && !q.alive && !q.out) { q.out = 1; tx(q,{t:'eliminated',reason:'Sua cama foi destruída durante o respawn.'}); msg(R, q.name + ' foi eliminado!'); } });
   win(R);
 }
 function boom(R, q) {
@@ -574,7 +577,7 @@ setInterval(() => {
             else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
           }
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
-        } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
+        } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
       R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
@@ -602,7 +605,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
   });
 }, 50);
 
