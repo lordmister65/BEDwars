@@ -257,7 +257,7 @@ const sel=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1
 const crackMat=new THREE.MeshBasicMaterial({color:0x111111,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
 const crackBox=new THREE.Mesh(new THREE.BoxGeometry(1.015,1.015,1.015),crackMat);crackBox.visible=false;sc.add(crackBox);
 // jogador local
-const pl={x:0,y:BASE_Y+2.02,z:0,vx:0,vy:0,vz:0,kx:0,kz:0,g:false,yaw:0,pitch:-.2},me={id:0,team:0,hp:20,alive:1};
+const pl={x:0,y:BASE_Y+2.02,z:0,vx:0,vy:0,vz:0,kx:0,kz:0,g:false,yaw:0,pitch:-.2},me={id:0,team:0,hp:20,alive:1},ADMIN={on:false,block:1};
 const hit=(x,y,z)=>{for(let a=Math.floor(x-.3);a<=Math.floor(x+.3);a++)for(let b=Math.floor(y);b<=Math.floor(y+1.75);b++)for(let c=Math.floor(z-.3);c<=Math.floor(z+.3);c++)if(get(a,b,c))return true;return false};
 const playerIntersectsBlock=(x,y,z,px=pl.x,py=pl.y,pz=pl.z)=>px+.34>x&&px-.34<x+1&&pz+.34>z&&pz-.34<z+1&&py+.03<y+1&&py+1.77>y;
 function safePlaceTarget(x,y,z){
@@ -341,6 +341,8 @@ function addChat(m){
 }
 function toggleChat(open=true){$('chatForm').classList.toggle('open',open);if(open){try{document.exitPointerLock()}catch(e){};$('chatInput').focus()}else $('chatInput').blur()}
 $('chatForm').onsubmit=e=>{e.preventDefault();const text=$('chatInput').value.trim();if(text)send({t:'chat',scope:$('chatScope').value,text});$('chatInput').value='';toggleChat(false);if(started&&!touchMode)cv.requestPointerLock()};
+function adminPanel(){let p=$('adminPanel');if(p)return p;p=document.createElement('div');p.id='adminPanel';p.innerHTML='<div class=admin-title>ADMIN / SPECTADOR</div><div class=admin-row><b>Bloco</b><select id=adminBlock></select></div><div class=admin-row><b>Dar item</b><select id=adminPlayer></select><select id=adminItem></select><input id=adminQty type=number min=1 max=999 value=64><button id=adminGive>DAR</button></div><div class=admin-row><b>Equipar</b><button id=adminSword>Espada Diamante</button><button id=adminArmor>Armadura Diamante</button></div><div class=admin-hint>Voo: WASD · Espaço sobe · Shift desce · clique esquerdo quebra · clique direito coloca.</div>';document.body.appendChild(p);const names=['Lã Azul','Lã Vermelha','Lã Verde','Lã Amarela','Madeira','Pedra','Vidro','Cama Azul','Cama Vermelha','Cama Verde','Cama Amarela','End Stone','TNT','Ouro','Diamante','Obsidiana','Bloco Azul','Bloco Vermelho','Bloco Verde','Bloco Amarelo','Pedra Escura','Lava','Luz','Terra','Solo','Terracota Ciano','Grama','Pedra Cinza','Musgo','Madeira Selva','Terracota Rosa','Diamante Brilhante','Esmeralda','Glow'];$('adminBlock').innerHTML=names.map((n,i)=>'<option value='+(i+1)+'>'+n+'</option>').join('');const items=['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em'];$('adminItem').innerHTML=items.map(k=>'<option>'+k+'</option>').join('');$('adminBlock').onchange=()=>ADMIN.block=+$('adminBlock').value;$('adminGive').onclick=()=>send({t:'adminGive',id:+$('adminPlayer').value,k:$('adminItem').value,n:+$('adminQty').value});$('adminSword').onclick=()=>send({t:'adminSetGear',sw:3,ar});$('adminArmor').onclick=()=>send({t:'adminSetGear',sw,ar:2});return p}
+function setAdminMode(on,players=[]){ADMIN.on=!!on;const p=adminPanel();p.classList.toggle('open',ADMIN.on);$('adminPlayer').innerHTML=(players||[]).map(q=>'<option value='+q[0]+'>'+q[1]+' · '+TN[q[2]]+'</option>').join('');lastHeldSig='';hud()}
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
 function hud(){
 html('bar',SL.map((name,i)=>{
@@ -502,8 +504,8 @@ case'lobby':{
  $('st').style.display=me.id===m.host?'block':'none';$('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · escolha o mapa.`:`Modo ${currentMode.toUpperCase()} · organize Azul x Vermelho e escolha o mapa.`):'Aguardando o anfitrião iniciar.';scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
 case'start':currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;bed=m.bed;scr(touchMode||document.pointerLockElement?null:'ov');hud();break;
-case's':{syncProjectiles(m.pr||[]);const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
-let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
+case's':{syncProjectiles(m.pr||[]);const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin])=>{seen.add(id);if(id===me.id){if(started&&me.alive&&!al)msg('Você morreu');me.hp=hp;me.alive=al;return}
+let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id)}});break}
 case'bb':m.l.forEach(a=>{sb(...a);BRIDGE_PRED.delete(a[0]+','+a[1]+','+a[2])});unstick();break;
 case'breakp':breakDur=m.d;breakAt=performance.now();$('breakBox').style.display='block';break;
@@ -516,6 +518,7 @@ case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);sfx(p.k==='f
 case'projHit':{const p=PROJ.get(m.id);if(p){sc.remove(p.m);PROJ.delete(m.id)}break}
 case'feed':addFeed(m);break;
 case'chat':addChat(m);break;
+case'adminMode':setAdminMode(m.enabled,m.players||[]);break;
 case'anim':{const r=PL.get(m.id);if(r)r.action=performance.now()+(m.k==='mine'?500:320);break}
 case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();break;
 case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}break;
@@ -561,7 +564,7 @@ function playerTarget(){
 }
 let breaking=null,breakAt=0,breakDur=0;
 function bestToolForBlock(b){const want=BLOCKS[b]?.tool;if(!want||!(tools[want]>0))return null;return want}
-function primary(){if(!started||!me.alive)return;audioInit();
+function primary(){if(!started||!me.alive)return;audioInit();if(ADMIN.on){const r=ray();if(r)send({t:'adminBreak',x:r.h[0],y:r.h[1],z:r.h[2]});return}
  const vendor=vendorTarget();if(vendor){if(vendor.team!==me.team){msg('Este vendedor pertence a outro time.');sfx('blocked');return}openShop();return}
  swing=1;useAnim=1;clk.push(performance.now());while(clk.length>40)clk.shift();const enemy=playerTarget();if(enemy!==null){send({t:'hit',id:enemy,yaw:pl.yaw,pitch:pl.pitch});return}if(tg){const b=get(tg.h[0],tg.h[1],tg.h[2]);miningTool=bestToolForBlock(b);lastHeldSig='';refreshHeld();breaking=tg.h.join(',');breakAt=performance.now();breakDur=0;$('breakBox').style.display='none';send({t:'breakStart',x:tg.h[0],y:tg.h[1],z:tg.h[2]})}}
 function stopBreak(){if(breaking){breaking=null;send({t:'breakStop'});$('breakBox').style.display='none';crackBox.visible=false}miningTool=null;lastHeldSig='';refreshHeld()}
@@ -589,7 +592,7 @@ function autoBridge(now=performance.now()){
  sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);
  send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z});
 }
-function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
+function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;if(ADMIN.on){const r=ray();if(r){const f=r.f||[0,1,0],x=r.h[0]+f[0],y=r.h[1]+f[1],z=r.h[2]+f[2];send({t:'adminPlace',x,y,z,b:ADMIN.block})}return}const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
 addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()}});
 addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2)bridgeHeld=false});
 if(touchMode){
@@ -604,10 +607,10 @@ let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFo
 function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
 if((started||lobbyExplore)&&!over&&(document.pointerLockElement||touchMode)&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
-const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1)*(fxs.slow>0?.55:1);
+if(ADMIN.on){const sp=10;pl.vx=(fx_*mf+rx*mr)/l*sp;pl.vz=(fz*mf+rz*mr)/l*sp;pl.vy=(K.Space?8:0)-(K.ShiftLeft?8:0);pl.x+=pl.vx*dt;pl.y+=pl.vy*dt;pl.z+=pl.vz*dt;pl.g=false}else{const sneak=!!K.ShiftLeft,sprinting=!sneak&&(!!K.ControlLeft||doubleSprint)&&mf>.15,baseSp=sneak?1.3:(sprinting?5.7:4.3),sp=baseSp*(fxs.speed>0?1.28:1)*(fxs.slow>0?.55:1);
 pl.vx=(fx_*mf+rx*mr)/l*sp;pl.vz=(fz*mf+rz*mr)/l*sp;
 if(sneak&&pl.g){const gr=(x,z)=>hit(x,pl.y-.15,z);if(!gr(pl.x+pl.vx*.12,pl.z))pl.vx=0;if(!gr(pl.x,pl.z+pl.vz*.12))pl.vz=0}
-if(K.Space&&pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}step(pl,dt);
+if(K.Space&&pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}step(pl,dt)}
 if(pl.g&&Math.hypot(pl.vx,pl.vz)>.8&&now-lastStep>(sneak?470:sprinting?245:315)){lastStep=now;sfx('step')}
 targetFov=sprinting?78:(fxs.speed>0?75:70);
 autoBridge(now);

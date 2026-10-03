@@ -3,6 +3,9 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
+const ADMIN_COMMAND='/lordmister';
+const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em']);
+const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=34;
 const MODES={
   '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
   '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
@@ -62,7 +65,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1,
+const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false,
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, reconnectDeadline:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, tntImpulse:0, tntSlow:0, tntDamage:0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
@@ -115,7 +118,7 @@ const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:
 
 function win(R) {
   if (R.st !== 'play') return;
-  const live = [...R.ps.values()].filter(q => !q.out), teams = new Set(live.map(q => q.team));
+  const live = [...R.ps.values()].filter(q => !q.out&&!q.admin), teams = new Set(live.map(q => q.team));
   if (teams.size <= 1) {
     const winnerTeam=live[0]?.team ?? -1,winnerId=live[0]?.id??-1,winnerName=live[0]?.name||'';
     R.st = 'ended';
@@ -141,7 +144,7 @@ function die(R, q, cause='combat') {
   if (final) { q.out = 1; win(R); }
 }
 function hurt(R, q, d, kx, kz, src, cr, cause='combat') {
-  if (!q.alive || q.ih > 0) return;
+  if (!q.alive || q.ih > 0 || q.admin) return;
   q.ih = .35; d *= 1 - .25 * q.ar - .1 * q.up.prot; q.hp -= d;
   if (src) { q.src = src; q.st = R.t; }
   tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
@@ -379,8 +382,15 @@ wss.on('connection', ws => {
         bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R);break;
       }
       case 'chat': {
+        const rawText=String(m.text||'').trim();
+        if(rawText.toLowerCase()===ADMIN_COMMAND){
+          p.admin=!p.admin;p.alive=1;p.hp=20;p.out=0;p.breaking=null;p.ih=0;
+          tx(p,{t:'adminMode',enabled:p.admin?1:0,players:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team])});
+          if(p.admin)tx(p,{t:'m',s:'Modo ADMIN ativado.'});else{spawn(p);tx(p,{t:'m',s:'Modo ADMIN desativado.'})}
+          win(R);break;
+        }
         if(!allow(p,'chat',650))break;
-        const text=String(m.text||'').replace(/[<>]/g,'').trim().slice(0,120);if(!text)break;
+        const text=rawText.replace(/[<>]/g,'').slice(0,120);if(!text)break;
         const mc=modeCfg(R),scope=(m.scope==='team'&&!mc.solo)?'team':'global',payload={t:'chat',scope,id:p.id,name:p.name,team:p.team,text};
         if(scope==='team'){const data=JSON.stringify(payload);R.ps.forEach(q=>{if(q.team===p.team&&canSend(q.ws))q.ws.send(data)})}else bc(R,payload);
         break;
@@ -406,9 +416,27 @@ wss.on('connection', ws => {
       case 'mv': {
         if (!p.alive || !allow(p, 'mv', 15)) break;
         const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
-        const d = Math.hypot(m.x - p.x, m.z - p.z);
-        if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > dt * 12 + 1.5 || m.y - p.y > dt * 11 + 1.2 || m.x < S.MIN_X-5 || m.x > S.MAX_X+5 || m.z < S.MIN_Z-5 || m.z > S.MAX_Z+5 || m.y > S.H+10) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
+        const d = Math.hypot(m.x - p.x, m.z - p.z),maxH=p.admin?dt*24+3:dt*12+1.5,maxV=p.admin?dt*24+3:dt*11+1.2;
+        if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > maxH || Math.abs(m.y-p.y) > maxV || m.x < S.MIN_X-8 || m.x > S.MAX_X+8 || m.z < S.MIN_Z-8 || m.z > S.MAX_Z+8 || m.y > S.H+20 || m.y < -30) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
         p.dy = (m.y - p.y) / dt; p.px=p.x;p.py=p.y;p.pz=p.z; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
+      }
+      case 'adminPlace': {
+        if(!p.admin)break;const x=Math.floor(m.x),y=Math.floor(m.y),z=Math.floor(m.z),b=Math.floor(m.b);
+        if(![x,y,z,b].every(Number.isInteger)||b<ADMIN_BLOCK_MIN||b>ADMIN_BLOCK_MAX||!S.inXZ(x,z)||y<1||y>=S.H-1)break;
+        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;setb(R,x,y,z,b,1);break;
+      }
+      case 'adminBreak': {
+        if(!p.admin)break;const x=Math.floor(m.x),y=Math.floor(m.y),z=Math.floor(m.z);
+        if(![x,y,z].every(Number.isInteger)||!S.inXZ(x,z)||y<0||y>=S.H)break;
+        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;setb(R,x,y,z,0,0);break;
+      }
+      case 'adminGive': {
+        if(!p.admin||!Number.isInteger(m.id))break;const q=R.ps.get(m.id),k=String(m.k||''),n=Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));
+        if(!q||q.admin||!ADMIN_ITEMS.has(k))break;
+        if(k==='bow')q.inv.bow=1;else q.inv[k]=(q.inv[k]||0)+n;pinv(q);tx(p,{t:'m',s:'Itens entregues para '+q.name+'.'});break;
+      }
+      case 'adminSetGear': {
+        if(!p.admin)break;p.sw=Math.max(0,Math.min(3,Math.floor(Number(m.sw)||0)));p.ar=Math.max(0,Math.min(2,Math.floor(Number(m.ar)||0)));pinv(p);break;
       }
       case 'held': {
         if (Number.isInteger(m.s) && m.s >= 0 && m.s <= 14) p.held = m.s;
@@ -540,7 +568,7 @@ setInterval(() => {
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
             else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
           }
-          if (p.y <= -20) die(R, p, 'void');
+          if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p); }
       });
       R.g.base.forEach((g, i) => {
@@ -569,7 +597,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
   });
 }, 50);
 
