@@ -42,8 +42,8 @@ const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
 const canSend = ws => !!ws && ws.readyState === 1 && ws.bufferedAmount < MAX_SOCKET_BUFFER;
 const tx = (p, o) => { if (canSend(p.ws)) p.ws.send(JSON.stringify(o)); };
 const bc = (R, o) => {
-  const data = JSON.stringify(o);
-  R.ps.forEach(p => { if (canSend(p.ws)) p.ws.send(data); });
+  let data;try{data=JSON.stringify(o)}catch(e){console.warn('Falha ao serializar broadcast',e);return}
+  R.ps.forEach(p=>{const ws=p.ws;if(!canSend(ws))return;try{ws.send(data)}catch(e){p.disconnected=true;p.ws=null}});
 };
 const msg = (R, s) => bc(R, { t: 'm', s });
 const get = (R, x, y, z) => (y < 0 || !S.inXZ(x,z) || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
@@ -345,6 +345,7 @@ wss.on('connection', ws => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', raw => {
+    try{
     if(raw.length>4096){try{ws.close(1009,'mensagem muito grande')}catch(e){}return}
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
     if (m.t === 'reconnect' && !p) {
@@ -357,14 +358,16 @@ wss.on('connection', ws => {
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'join' && !p) {
-      const code = String(m.room || 'sala').slice(0, 12).toLowerCase(); R = room(code);
+      const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room(code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
+      for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
+      if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
       const mc=modeCfg(R);
       if (R.ps.size>=mc.maxPlayers) return tx({ws},{t:'err',s:`Sala cheia para o modo ${mc.name} (${mc.maxPlayers} jogadores).`});
       const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
       if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os dois times estão cheios.'});
-      p = mkp(ws, String(m.name || 'Jogador').slice(0, 14), team); p.id = ++uid;
+      p = mkp(ws, (String(m.name || 'Jogador').trim()||'Jogador').slice(0,14), team); p.id = ++uid;
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
       tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
@@ -543,6 +546,7 @@ wss.on('connection', ws => {
       }
       case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
     }
+    }catch(err){console.error('Erro isolado em mensagem WebSocket',err);try{tx(p||{ws},{t:'err',s:'Ação ignorada por segurança. Tente novamente.'})}catch(e){}}
   });
   ws.on('close', () => {
     if (!p) return;
@@ -611,7 +615,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.10){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
   });
 }, 50);
 
