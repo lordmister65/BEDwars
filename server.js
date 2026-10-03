@@ -256,6 +256,12 @@ function addDrop(R,k,n,x,y,z,max=64){
   if(['iron','gold','dia','em'].includes(k)) sfxAt(R,'resource_'+k,x,y,z,k==='iron'?4.5:6);
   bc(R,{t:'drops',l:R.drops});
 }
+function genSnapshot(R){
+  const players=[...R.ps.values()];
+  const base=R.g.base.map((g,i)=>{const o=players.find(q=>q.team===i),fm=1+.5*(o?o.up.forge:0);return [+(Math.max(0,1.2/fm-g.iron)).toFixed(2),+(Math.max(0,5/fm-g.gold)).toFixed(2)]});
+  const dia=R.g.dia.map(g=>+(Math.max(0,12-g.t)).toFixed(2));
+  return {base,dia,em:+Math.max(0,22-R.g.em.t).toFixed(2)};
+}
 function pickupDrops(R, players){
   let changed=false;
   for(let i=R.drops.length-1;i>=0;i--){
@@ -605,7 +611,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.066){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
   });
 }, 50);
 
