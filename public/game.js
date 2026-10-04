@@ -153,26 +153,23 @@ function fireballModel(){const g=new THREE.Group(),core=sphere(.15,0xff6a00),inn
 function snowballModel(){const g=new THREE.Group(),core=sphere(.17,0xf7fbff);g.add(core);for(const [x,y,z] of [[.08,.08,.12],[-.09,.04,.12],[.02,-.10,.13]]){const p=box(.045,.035,.02,0xd4e8f5);p.position.set(x,y,z);g.add(p)}return g}
 function pearlModel(){const g=new THREE.Group(),core=sphere(.145,0x6d34a6),inner=sphere(.095,0xb66df2);g.add(core,inner);const ring=box(.34,.035,.035,0xd59cff);ring.rotation.z=.55;g.add(ring);return g}
 function compassModel(){const g=new THREE.Group(),rim=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.07,16),hmat(0xb89343)),face=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,.075,16),hmat(0xf1e2b5)),needle=box(.035,.025,.27,0xd84242);rim.rotation.x=face.rotation.x=Math.PI/2;needle.position.z=.01;needle.rotation.y=.35;g.add(rim,face,needle);g.rotation.z=-.18;return g}
+function milkModel(){const g=new THREE.Group(),cup=box(.26,.30,.22,0xece8df),milk=box(.21,.045,.17,0xffffff),rim=box(.30,.045,.26,0xc9c5bd);milk.position.y=.13;rim.position.y=.17;g.add(cup,milk,rim);g.rotation.z=.12;return g}
+function eggModel(){const g=new THREE.Group(),e=new THREE.Mesh(new THREE.SphereGeometry(.17,8,6),hmat(0xffe6a2));e.scale.set(.82,1.12,.82);g.add(e);return g}
+function popupTowerModel(){const g=new THREE.Group();for(const [x,y,z] of [[-.15,0,0],[.15,0,0],[0,.18,0],[0,.36,0]]){const b=box(.22,.22,.22,TC[me.team]||0x3d6fe0);b.position.set(x,y,z);g.add(b)}g.rotation.set(.1,.4,.05);return g}
+function stickModel(){const g=new THREE.Group(),s=box(.075,.62,.075,0x8b5a32);s.rotation.z=-.38;g.add(s);return g}
 function toolModel(k){const lvl=Math.max(1,tools[k]||1),metal=lvl>1?0xe5e8eb:0xbfc5c7,dark=lvl>1?0x90979e:0x7e8588,g=new THREE.Group(),h=box(.065,.52,.065,0x76513a);h.position.y=-.08;g.add(h);const grip=box(.085,.13,.085,0x4b3425);grip.position.y=-.30;g.add(grip);if(k==='pick'){const head=box(.44,.075,.09,metal);head.position.y=.22;g.add(head);for(const x of [-.22,.22]){const tip=box(.07,.15,.08,dark);tip.position.set(x,.17,0);tip.rotation.z=x<0?.32:-.32;g.add(tip)}}else if(k==='axe'){const head=box(.24,.25,.09,metal);head.position.set(.10,.16,0);g.add(head);const edge=box(.055,.29,.095,0xf3f6f7);edge.position.set(.23,.16,0);g.add(edge)}else{const a=box(.30,.045,.055,metal),b=a.clone();a.rotation.z=.55;b.rotation.z=-.55;a.position.y=b.position.y=.16;g.add(a,b);const pin=box(.07,.07,.07,dark);pin.position.y=.15;g.add(pin)}g.rotation.z=-.45;return g}
-function heldModel(slot,team=me.team,swordLevel=sw){
- const k=slotKey(slot);
- if(slot===0)return swordModel(swordLevel);
+function heldModel(canonical,team=me.team,swordLevel=sw){
+ const k=canonicalKey(canonical);
+ if(canonical===0)return swordModel(swordLevel);
  if(['wool','planks','endstone','glass','obsidian'].includes(k))return heldBlockModel(k,team);
  if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(k)){const t=TNT_TYPES.find(x=>x[0]===k);return tntModel(t?t[2]:0xd7352f)}
- if(k==='apple')return appleModel();
- if(k==='bow')return bowModel();
- if(k==='fireball')return fireballModel();
- if(k==='snowball')return snowballModel();
- if(k==='pearl')return pearlModel();
- if(k==='compass')return compassModel();
- if(k==='speedPotion')return potionModel(0x55ddff);
- if(k==='jumpPotion')return potionModel(0xaaff55);
- if(k==='invisPotion')return potionModel(0xbbbbff);
- return new THREE.Group()
+ if(k==='apple')return appleModel();if(k==='bow')return bowModel();if(k==='fireball')return fireballModel();if(k==='snowball')return snowballModel();if(k==='pearl')return pearlModel();if(k==='compass')return compassModel();
+ if(k==='magicMilk')return milkModel();if(k==='bridgeEgg')return eggModel();if(k==='popupTower')return popupTowerModel();if(k==='knockbackStick')return stickModel();
+ if(k==='speedPotion')return potionModel(0x55ddff);if(k==='jumpPotion')return potionModel(0xaaff55);if(k==='invisPotion')return potionModel(0xbbbbff);return new THREE.Group()
 }
 function heldView(slot,mining=false){
  const k=mining?miningTool:slotKey(slot);let v={x:.69,y:-.33,z:-1.03,rx:.02,ry:0,rz:0,scale:1};
- if(slot===0&&!mining)v={x:.78,y:-.42,z:-1.08,rx:.02,ry:-.08,rz:.02,scale:.93};
+ if(canonicalSlot(slot)===0&&!mining)v={x:.78,y:-.42,z:-1.08,rx:.02,ry:-.08,rz:.02,scale:.93};
  else if(mining)v={x:.76,y:-.39,z:-1.05,rx:.03,ry:-.06,rz:0,scale:.96};
  else if(['wool','planks','endstone','glass','obsidian'].includes(k))v={x:.72,y:-.37,z:-1.00,rx:.02,ry:-.08,rz:0,scale:.88};
  else if(k==='bow')v={x:.76,y:-.34,z:-1.08,rx:.03,ry:-.12,rz:.04,scale:.96};
@@ -186,8 +183,8 @@ function refreshHeld(){
  const sig=miningTool?'tool:'+miningTool:'slot:'+cur+':'+slotKey(cur)+':'+sw+':'+me.team;
  if(lastHeldSig===sig)return;lastHeldSig=sig;
  while(heldRoot.children.length)heldRoot.remove(heldRoot.children[0]);
- heldRoot.add(miningTool?toolModel(miningTool):heldModel(cur));applyHeldView();
- if(!miningTool)send({t:'held',s:cur});
+ const ci=canonicalSlot(cur);heldRoot.add(miningTool?toolModel(miningTool):heldModel(ci));applyHeldView();
+ if(!miningTool)send({t:'held',s:ci});
 }
 const iconTex={};
 for(const k of Object.keys(RI)){const t=new THREE.TextureLoader().load(RI[k]);t.magFilter=t.minFilter=THREE.NearestFilter;iconTex[k]=t}
@@ -370,15 +367,19 @@ function step(e,dt){const k=Math.max(0,1-5*dt),vx=e.vx+e.kx,vz=e.vz+e.kz;e.kx*=k
 let n=e.x+vx*dt;if(!hit(n,e.y,e.z))e.x=n;n=e.z+vz*dt;if(!hit(e.x,e.y,n))e.z=n;
 e.vy-=28*dt;n=e.y+e.vy*dt;e.g=false;if(!hit(e.x,n,e.z))e.y=n;else{if(e.vy<0)e.g=true;e.vy=0}}
 // estado
-const K={},SL=['Espada','Lã','Tábuas','End Stone','Vidro','Obsidiana','TNT','Maçã','Arco','B. Fogo','B. Neve','Pérola','Veloc.','Salto','Invis.','Bússola'],KY=[0,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass'],SC=['#ccc','#3d6fe0','#b58a4e','#e8dfb0','#ddecff','#2c2036','#d83030','#ffd23d','#8b5a2b','#ff7a20','#eef6ff','#7b3fc6','#55ddff','#aaff55','#bbbbff','#d9b85f'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
+const K={},SL=['Espada','Lã','Tábuas','End Stone','Vidro','Obsidiana','TNT','Maçã','Arco','B. Fogo','B. Neve','Pérola','Veloc.','Salto','Invis.','Bússola','Magic Milk','Bridge Egg','Pop-up Tower','Knockback Stick'],KY=[0,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'],SC=['#ccc','#3d6fe0','#b58a4e','#e8dfb0','#ddecff','#2c2036','#d83030','#ffd23d','#8b5a2b','#ff7a20','#eef6ff','#7b3fc6','#55ddff','#aaff55','#bbbbff','#d9b85f','#f6f2df','#ffe07b','#d55353','#8b5a32'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
 const TNT_TYPES=[['tnt','Explosiva',0xd7352f],['tntImpulse','Impulso',0xe8f4ff],['tntSlow','Lentidão',0x4f9dff],['tntDamage','Dano',0xff3154]];
 let tntSel=0;
-let inv={wool:0,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,tools={pick:0,axe:0,shears:0},fxs={speed:0,jump:0,invis:0,slow:0,fatigue:0},up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0},cur=1,started=0,over=0,shopOpen=0,chestOpen=0,chestKind='team',chestData={},bed=[1,1,1,1],INFO={},tg=null,ws;
-let myProfile=null,rankingData=[];const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass'];const CHEST_LABEL={iron:'Ferro',gold:'Ouro',dia:'Diamante',em:'Esmeralda',wool:'Lã',planks:'Tábuas',endstone:'End Stone',glass:'Vidro',obsidian:'Obsidiana',tnt:'TNT',tntImpulse:'TNT Impulso',tntSlow:'TNT Lentidão',tntDamage:'TNT Dano',apple:'Maçã',bow:'Arco',arrow:'Flechas',fireball:'Bola de Fogo',snowball:'Bola de Neve',pearl:'Pérola',speedPotion:'Velocidade',jumpPotion:'Salto',invisPotion:'Invisibilidade',compass:'Bússola'};
+let inv={wool:0,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,tools={pick:0,axe:0,shears:0},fxs={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0},up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0},trapQueue=[],cur=1,started=0,over=0,shopOpen=0,chestOpen=0,chestKind='team',chestData={},bed=[1,1,1,1],INFO={},tg=null,ws;
+let myProfile=null,rankingData=[];const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];const CHEST_LABEL={iron:'Ferro',gold:'Ouro',dia:'Diamante',em:'Esmeralda',wool:'Lã',planks:'Tábuas',endstone:'End Stone',glass:'Vidro',obsidian:'Obsidiana',tnt:'TNT',tntImpulse:'TNT Impulso',tntSlow:'TNT Lentidão',tntDamage:'TNT Dano',apple:'Maçã',bow:'Arco',arrow:'Flechas',fireball:'Bola de Fogo',snowball:'Bola de Neve',pearl:'Pérola',speedPotion:'Velocidade',jumpPotion:'Salto',invisPotion:'Invisibilidade',compass:'Bússola',magicMilk:'Magic Milk',bridgeEgg:'Bridge Egg',popupTower:'Pop-up Tower',knockbackStick:'Knockback Stick'};
 function ownedTnts(){return TNT_TYPES.filter(t=>(inv[t[0]]||0)>0)}
 function activeTnt(){const owned=ownedTnts();if(!owned.length)return TNT_TYPES[tntSel%TNT_TYPES.length];const key=TNT_TYPES[tntSel%TNT_TYPES.length][0];return owned.find(t=>t[0]===key)||owned[0]}
-function slotKey(i){return i===6?activeTnt()[0]:KY[i]}
-function slotName(i){return i===6?'TNT '+activeTnt()[1]:SL[i]}
+const HOTBAR_DEFAULT=SL.map((_,i)=>i);
+let hotbarOrder=(()=>{try{const a=JSON.parse(localStorage.getItem('bwHotbarOrder')||'null');if(Array.isArray(a)&&a.length===SL.length&&new Set(a).size===SL.length&&a.every(x=>Number.isInteger(x)&&x>=0&&x<SL.length))return a}catch(e){}return [...HOTBAR_DEFAULT]})();
+const canonicalSlot=i=>hotbarOrder[i]??i;
+const canonicalKey=c=>c===6?activeTnt()[0]:KY[c];
+function slotKey(i){return canonicalKey(canonicalSlot(i))}
+function slotName(i){const c=canonicalSlot(i);return c===6?'TNT '+activeTnt()[1]:SL[c]}
 function cycleTnt(){const owned=ownedTnts();if(owned.length<2)return;const key=activeTnt()[0],i=owned.findIndex(t=>t[0]===key),next=owned[(i+1)%owned.length];tntSel=TNT_TYPES.findIndex(t=>t[0]===next[0]);lastHeldSig='';refreshHeld();hud();msg('TNT: '+next[1])}
 let roomCode='',reconnectToken='',reconnectUntil=0,reconnectTimer=null,reconnecting=false,bowCharging=false,bowChargeAt=0,lobbyExplore=false;
 let matchTime=0,respawnEnds=0,respawnFinal=false,lastScoreboardAt=0;const matchPlayers=new Map();let myMatchStats={kills:0,finalKills:0};
@@ -446,6 +447,12 @@ function drawProfile(){if(!myProfile)return;const p=myProfile,next=500-(p.xp%500
 function openProfile(){drawProfile();scr('profile')}
 function drawRanking(){html('rankingBody',(rankingData||[]).map((p,i)=>`<div class="rank-row"><b>#${i+1}</b><span>${p.name}</span><em>Nv. ${p.level}</em><strong>${p.xp} XP</strong><small>${p.wins} vitórias · ${p.finalKills} finais</small></div>`).join('')||'<p>Ainda não há partidas registradas.</p>')}
 function openRanking(){send({t:'ranking'});drawRanking();scr('ranking')}
+let hotbarEditSelected=-1;
+function saveHotbarOrder(){try{localStorage.setItem('bwHotbarOrder',JSON.stringify(hotbarOrder))}catch(e){}}
+function drawHotbarEditor(){html('hotbarEditorGrid',hotbarOrder.map((ci,i)=>`<button class="hotbar-edit-slot${hotbarEditSelected===i?' selected':''}" onclick="editHotbarSlot(${i})"><b>${i<9?i+1:'↕'}</b><span>${SL[ci]}</span><small>${i<9?'tecla '+(i+1):'roda do mouse'}</small></button>`).join(''))}
+function editHotbarSlot(i){if(hotbarEditSelected<0){hotbarEditSelected=i;drawHotbarEditor();return}if(hotbarEditSelected===i){hotbarEditSelected=-1;drawHotbarEditor();return}const a=hotbarEditSelected,t=hotbarOrder[a];hotbarOrder[a]=hotbarOrder[i];hotbarOrder[i]=t;hotbarEditSelected=-1;saveHotbarOrder();lastHeldSig='';drawHotbarEditor();refreshHeld();hud()}
+function resetHotbarEditor(){hotbarOrder=[...HOTBAR_DEFAULT];hotbarEditSelected=-1;saveHotbarOrder();lastHeldSig='';drawHotbarEditor();refreshHeld();hud()}
+function openHotbarEditor(){hotbarEditSelected=-1;drawHotbarEditor();scr('hotbarEditor')}
 function drawChest(){const box=chestData||{};html('chestTitle',chestKind==='ender'?'ENDER CHEST':'BAÚ DO TIME');html('chestGrid',CHEST_KEYS.filter(k=>(box[k]||0)>0||(inv[k]||0)>0).map(k=>`<div class="chest-row"><span>${CHEST_LABEL[k]||k}</span><b>Você: ${inv[k]||0}</b><b>Baú: ${box[k]||0}</b><button onclick="chestMove('deposit','${k}',1)">+1</button><button onclick="chestMove('deposit','${k}','all')">+Tudo</button><button onclick="chestMove('withdraw','${k}',1)">-1</button><button onclick="chestMove('withdraw','${k}','all')">-Tudo</button></div>`).join('')||'<p>Baú vazio. Leve recursos ou itens para guardar.</p>')}
 function chestMove(dir,key,n){send({t:'chestMove',kind:chestKind,dir,key,n})}
 function openChest(kind){chestKind=kind;send({t:'chestOpen',kind})}
@@ -469,45 +476,46 @@ function screenHurt(cr=false){const el=$('damageFlash');el.className='show'+(cr?
 function floatingDamage(x,y,z,d,cr){const v=new THREE.Vector3(x,y,z).project(cam);if(v.z<-1||v.z>1)return;const el=document.createElement('div');el.className='damage-number'+(cr?' crit':'');el.textContent=(cr?'✦ ':'-')+Number(d).toFixed(d>=10?0:1);el.style.left=((v.x*.5+.5)*innerWidth)+'px';el.style.top=((-v.y*.5+.5)*innerHeight)+'px';$('hitNumbers').appendChild(el);setTimeout(()=>el.remove(),720)}
 function combatBurst(m){fx(m.x,m.y,m.z,m.cr?0xffe45c:0xff4545,m.cr?20:12);if(m.cr)fx(m.x,m.y+.08,m.z,0xffffff,8);floatingDamage(m.x,m.y+.45,m.z,m.d,m.cr);if(m.target===me.id)screenHurt(!!m.cr)};
 function hud(){
-html('bar',SL.map((name,i)=>{
- const key=i?slotKey(i):0;let q=i?(inv[key]||0):'';if(i===8)q=inv.bow?('F'+inv.arrow):0;
- const owned=i===0||(i===8?inv.bow>0:(q||0)>0),was=ownedState[i],reveal=owned&&was===false;
- ownedState[i]=owned;
- const label=slotName(i),clr=i===6?(activeTnt()[2]||0xd7352f):SC[i];
- return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}" title="${owned?label:''}" onclick="pick(${i})"><i style="background:${typeof clr==='number'?'#'+hex(clr):clr}"></i><em>${i<9?i+1:''}</em><b>${owned?q:''}</b><span class="slot-label">${i===6&&owned?activeTnt()[1]:''}</span></div>`
+html('bar',SL.map((_,i)=>{
+ const ci=canonicalSlot(i),key=ci?slotKey(i):0;let q=ci?(inv[key]||0):'';if(ci===8)q=inv.bow?('F'+inv.arrow):0;
+ const owned=ci===0||(ci===8?inv.bow>0:(q||0)>0),was=ownedState[i],reveal=owned&&was===false;ownedState[i]=owned;
+ const label=slotName(i),clr=ci===6?(activeTnt()[2]||0xd7352f):SC[ci];
+ return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}" title="${owned?label:''}" onclick="pick(${i})"><i style="background:${typeof clr==='number'?'#'+hex(clr):clr}"></i><em>${i<9?i+1:''}</em><b>${owned?q:''}</b><span class="slot-label">${ci===6&&owned?activeTnt()[1]:''}</span></div>`
 }).join(''));
 html('res',[
   ['iron','Ferro',inv.iron],['gold','Ouro',inv.gold],['dia','Diamante',inv.dia],['em','Esmeralda',inv.em]
 ].map(([k,n,v])=>`<div class="resource-row"><img class="ri" src="${RI[k]}"><span>${n}</span><strong>${v}</strong></div>`).join(''));
 const hp=Math.max(0,Math.min(20,Math.ceil(me.hp))),hearts=Array.from({length:10},(_,i)=>`<span class="heart${hp<=i*2?' empty':''}">♥</span>`).join('');
-html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}${fxs.fatigue>0?'⛏ FADIGA ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
+html('hp',`<div class="hearts">${hearts}</div><div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}${fxs.fatigue>0?'⛏ FADIGA ':''}${fxs.blind>0?'🌑 CEGUEIRA ':''}${fxs.milk>0?'🥛 MAGIC MILK ':''}</div><div class="statline">Espada: ${SN[sw]} · Armadura: ${AN[ar]} · CPS ${clk.filter(t=>performance.now()-t<1000).length}</div>`);
 if(started)renderScoreboard(true);else html('tm',TN.map((n,t)=>{const o=Object.values(INFO).find(i=>i.t===t),alive=o&&bed[t];return `<div class="team-row"><span class="team-dot" style="background:#${hex(TC[t])}"></span><span>${n}</span><span>${o?o.n:'vazio'}</span><span class="team-bed ${alive?'alive':'dead'}">${!o?'—':bed[t]?'CAMA':'SEM CAMA'}</span></div>`}).join(''));
 }
-const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}const next=(n+SL.length)%SL.length;if(next===6&&cur===6){cycleTnt();return}cur=next;lastHeldSig='';refreshHeld();hud()};
+const pick=n=>{if(bowCharging){bowCharging=false;$('bowCharge').style.display='none'}const next=(n+SL.length)%SL.length;if(next===cur&&canonicalSlot(next)===6){cycleTnt();return}cur=next;lastHeldSig='';refreshHeld();hud()};
 let shopCat='Compra Rápida',lastBuyAt=0,lastShopSig='';
 const SHOP_CATS=['Compra Rápida','Blocos','Combate','Armadura','Ferramentas','Arcos','Poções','Utilidades','Melhorias'];
-const QUICK_KEYS=['wool','planks','endstone','sw1','ar1','pick1','bow','arrow','tnt','fireball','apple','pearl','compass','speedPotion','jumpPotion'];
+const QUICK_KEYS=['wool','planks','endstone','sw1','ar1','pick1','bow','arrow','tnt','fireball','apple','pearl','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','speedPotion','jumpPotion'];
+const TRAP_LABEL={trapMiner:'Fadiga de Mineração',trapBlind:'É uma Armadilha!',trapAlarm:'Alarme / Revelação',trapCounter:'Contra-Ataque'};
 const CK={Blocos:'🧱',Combate:'⚔️',Armadura:'🛡️',Ferramentas:'⛏️',Arcos:'🏹',Poções:'🧪',Utilidades:'💥',Melhorias:'💎'};
 function shopKey(s){if(s[3]==='sw')return 'sw'+s[5];if(s[3]==='ar')return 'ar'+s[5];if(s[3]==='tool')return s[4]+s[5];return String(s[4])}
-function shopPrice(s){const modes=s[8]||null;return modes&&modes[currentMode]!=null?modes[currentMode]:s[2]}
+function shopPrice(s){if(s[3]==='trap')return [1,2,4][Math.min(2,trapQueue.length)]||4;const modes=s[8]||null;return modes&&modes[currentMode]!=null?modes[currentMode]:s[2]}
 function buyItem(i){const now=performance.now();if(now-lastBuyAt<120)return;lastBuyAt=now;send({t:'buy',i})}
 function shopOwned(s){
  if(s[3]==='sw')return sw>=s[5];
  if(s[3]==='ar')return ar>=s[5];
  if(s[3]==='tool')return (tools[s[4]]||0)>=s[5];
  if(s[3]==='up')return (up[s[4]]||0)>=s[5];
- if(s[3]==='inv'&&s[4]==='bow')return (inv.bow||0)>0;
+ if(s[3]==='trap')return false;
+ if(s[3]==='inv'&&['bow','compass','knockbackStick'].includes(s[4]))return (inv[s[4]]||0)>0;
  return false;
 }
-function shopSig(){return [shopCat,currentMode,inv.iron,inv.gold,inv.dia,inv.em,inv.bow,inv.compass,sw,ar,tools.pick,tools.axe,tools.shears,up.sharp,up.prot,up.forge,up.haste,up.regen,up.trapMiner,up.trapSlow,up.trapCounter].join('|')}
+function shopSig(){return [shopCat,currentMode,inv.iron,inv.gold,inv.dia,inv.em,inv.bow,inv.compass,inv.magicMilk,inv.bridgeEgg,inv.popupTower,inv.knockbackStick,sw,ar,tools.pick,tools.axe,tools.shears,up.sharp,up.prot,up.forge,up.haste,up.regen,trapQueue.join(',')].join('|')}
 function drawShop(force=false){
  const sig=shopSig();if(!force&&sig===lastShopSig)return;lastShopSig=sig;
  html('shopTabs',SHOP_CATS.map(c=>`<button class="shop-tab ${c===shopCat?'active':''}" onclick="shopCat='${c}';drawShop(true)"><span class="tab-icon">${c==='Compra Rápida'?'★':CK[c]||'•'}</span><span>${c}</span></button>`).join(''));
  const list=SH.map((s,i)=>({s,i,key:shopKey(s)})).filter(o=>shopCat==='Compra Rápida'?QUICK_KEYS.includes(o.key):(o.s[6]||'Outros')===shopCat);
  html('sl',list.map(o=>{
-   const s=o.s,price=shopPrice(s),currency=s[1],cant=(inv[currency]||0)<price,owned=shopOwned(s),icon=s[7]||'□';
+   const s=o.s,price=shopPrice(s),currency=s[1],trapFull=s[3]==='trap'&&trapQueue.length>=3,trapDead=s[3]==='trap'&&!bed[me.team],cant=(inv[currency]||0)<price||trapFull||trapDead,owned=shopOwned(s),icon=s[7]||'□';
    const state=owned?'owned':cant?'cant':'';
-   const costText=owned?'COMPRADO':price+' '+(CN[currency]||currency);
+   const costText=trapFull?'FILA CHEIA':trapDead?'SEM CAMA':owned?'COMPRADO':price+' '+(CN[currency]||currency);
    return `<button class="shop-card ${state}" onclick="buyItem(${o.i})" ${owned?'disabled':''}>
      <span class="slot-icon">${icon}</span>
      <span class="item-name">${s[0]}</span>
@@ -515,10 +523,11 @@ function drawShop(force=false){
      ${cant&&!owned?'<span class="cant-mark">✕</span>':''}
    </button>`
  }).join(''));
+ html('trapQueue',shopCat==='Melhorias'?`<div class="trap-queue"><b>Fila de traps (${trapQueue.length}/3)</b>${trapQueue.length?trapQueue.map((k,i)=>`<span>${i+1}. ${TRAP_LABEL[k]||k}</span>`).join(''):'<span>Vazia</span>'}<small>Próxima: ${[1,2,4][Math.min(2,trapQueue.length)]||4} diamante(s)</small></div>`:'');
  html('shopWallet',`<span class="wallet iron"><img src="${RI.iron}"> ${inv.iron}</span><span class="wallet gold"><img src="${RI.gold}"> ${inv.gold}</span><span class="wallet dia"><img src="${RI.dia}"> ${inv.dia}</span><span class="wallet em"><img src="${RI.em}"> ${inv.em}</span>`);
 }
 drawShop();
-const scr=n=>['menu','lobby','ov','shop','chest','profile','ranking','end'].forEach(k=>$(k).style.display=k===n?'flex':'none'),cv=R.domElement;
+const scr=n=>['menu','lobby','ov','shop','chest','profile','ranking','hotbarEditor','end'].forEach(k=>$(k).style.display=k===n?'flex':'none'),cv=R.domElement;
 const SHOP_RADIUS=10;
 function shopPosition(){return worldMeta.SHOP&&worldMeta.SHOP[me.team]||[IS[me.team][0]+.5,BASE_Y+2,IS[me.team][1]+.5]}
 function canUseShop(){const [x,y,z]=shopPosition();return Math.hypot(pl.x-x,pl.z-z)<=SHOP_RADIUS&&Math.abs(pl.y-y)<6}
@@ -604,8 +613,8 @@ const held=new THREE.Group();held.position.set(.48,1.06,-.18);held.rotation.set(
 const armorRoot=new THREE.Group();g.add(armorRoot);
 sc.add(g);return{m:g,held,armorRoot,armorTier:-1,limbs:{ll,rl,la,ra},hs:-1,tx:0,ty:0,tz:0,lx:0,lz:0,speed:0,yaw:0,al:1,init:0,action:0}}
 const FX_GEO=new THREE.BoxGeometry(.15,.15,.15),FX_MAT=new Map(),PROJ=new Map();
-const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereGeometry(.18,6,6),snowball:new THREE.SphereGeometry(.13,6,6),pearl:new THREE.SphereGeometry(.15,7,7),tnt:new THREE.BoxGeometry(.32,.32,.32),tntImpulse:new THREE.BoxGeometry(.32,.32,.32),tntSlow:new THREE.BoxGeometry(.32,.32,.32),tntDamage:new THREE.BoxGeometry(.32,.32,.32)};
-const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff}),pearl:new THREE.MeshBasicMaterial({color:0x8b4bc7}),tnt:new THREE.MeshBasicMaterial({color:0xd7352f}),tntImpulse:new THREE.MeshBasicMaterial({color:0xe8f4ff}),tntSlow:new THREE.MeshBasicMaterial({color:0x4f9dff}),tntDamage:new THREE.MeshBasicMaterial({color:0xff3154})};
+const PJ_GEO={arrow:new THREE.BoxGeometry(.06,.06,.5),fireball:new THREE.SphereGeometry(.18,6,6),snowball:new THREE.SphereGeometry(.13,6,6),pearl:new THREE.SphereGeometry(.15,7,7),bridgeEgg:new THREE.SphereGeometry(.16,8,6),tnt:new THREE.BoxGeometry(.32,.32,.32),tntImpulse:new THREE.BoxGeometry(.32,.32,.32),tntSlow:new THREE.BoxGeometry(.32,.32,.32),tntDamage:new THREE.BoxGeometry(.32,.32,.32)};
+const PJ_MAT={arrow:new THREE.MeshBasicMaterial({color:0x9b6a3c}),fireball:new THREE.MeshBasicMaterial({color:0xff6a00}),snowball:new THREE.MeshBasicMaterial({color:0xffffff}),pearl:new THREE.MeshBasicMaterial({color:0x8b4bc7}),bridgeEgg:new THREE.MeshBasicMaterial({color:0xffe6a2}),tnt:new THREE.MeshBasicMaterial({color:0xd7352f}),tntImpulse:new THREE.MeshBasicMaterial({color:0xe8f4ff}),tntSlow:new THREE.MeshBasicMaterial({color:0x4f9dff}),tntDamage:new THREE.MeshBasicMaterial({color:0xff3154})};
 function fx(x,y,z,c,n=8){let mm=FX_MAT.get(c);if(!mm){mm=new THREE.MeshBasicMaterial({color:c});FX_MAT.set(c,mm)}for(let i=0;i<n;i++){const m=new THREE.Mesh(FX_GEO,mm);m.position.set(x,y,z);sc.add(m);PT.push({m,vx:(Math.random()-.5)*8,vy:Math.random()*6,vz:(Math.random()-.5)*8,t:.6})}}
 const BEDFX=[];
 function bedBurst(team,pos){if(!pos)return;const c=TC[team]||0xffffff;fx(pos[0]+.5,pos[1]+.7,pos[2]+.5,c,26);const beam=new THREE.Mesh(new THREE.BoxGeometry(.16,18,.16),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.8}));beam.position.set(pos[0]+.5,pos[1]+9,pos[2]+.5);sc.add(beam);BEDFX.push({m:beam,t:1.35})}
@@ -626,7 +635,7 @@ case'init':me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;reconnectToken=m.
 case'reconnected':
  finishReconnect();me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;saveReconnect();
  INFO={};(m.roster||[]).forEach(([id,n,t])=>INFO[id]={n,t});loadMap(m.mapId||currentMap,m.st==='lobby',m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);bed=m.bed||bed;
- syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
+ syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;trapQueue=m.traps||trapQueue;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
 case'reconnectFail':{reconnectFailCount++;if(reconnecting&&Date.now()<reconnectUntil&&reconnectFailCount<3){setReconnectBanner('Servidor ainda não confirmou a sessão. Nova tentativa...');try{if(ws&&ws.readyState<=1)ws.close(4004,'retry reconnect')}catch(e){}break}reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break}
 case'netPong':lastNetMessageAt=Date.now();break;
 case'profileUpdate':myProfile=m.profile||myProfile;drawProfile();if(m.xpGain)msg('+'+m.xpGain+' XP');break;
@@ -665,7 +674,7 @@ case'feed':addFeed(m);break;
 case'chat':addChat(m);break;
 case'adminMode':setAdminMode(m.enabled,m.players||[]);break;
 case'anim':{const r=PL.get(m.id);if(r)r.action=performance.now()+(m.k==='mine'?500:320);break}
-case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;hud();if(shopOpen)drawShop();if(chestOpen)drawChest();break;
+case'inv':inv=m.i;sw=m.sw;ar=m.ar;up=m.up;tools=m.tools||tools;fxs=m.fx||fxs;trapQueue=m.traps||trapQueue;hud();if(shopOpen)drawShop();if(chestOpen)drawChest();break;
 case'buyResult':if(!m.ok){msg(m.text||'Compra não realizada.');sfx('blocked')}break;
 case'bed':bed=m.bed;removeBedVisual(m.team);sfx('bed');bedBurst(m.team,m.pos);hud();renderScoreboard(true);break;
 case'm':msg(m.s);break;
@@ -717,7 +726,7 @@ function bestToolForBlock(b){const want=BLOCKS[b]?.tool;if(!want||!(tools[want]>
 function primary(){if(!started||!me.alive)return;audioInit();if(ADMIN.on&&ADMIN.build){const r=ray();if(r)send({t:'adminBreak',x:r.h[0],y:r.h[1],z:r.h[2]});return}
  const chest=chestTarget();if(chest){if(chest.team!==me.team){msg('Esse baú pertence a outro time.');sfx('blocked');return}openChest(chest.kind);return}
  const vendor=vendorTarget();if(vendor){if(vendor.team!==me.team){msg('Este vendedor pertence a outro time.');sfx('blocked');return}openShop();return}
- swing=1;useAnim=1;clk.push(performance.now());while(clk.length>40)clk.shift();const enemy=playerTarget();if(enemy!==null){send({t:'hit',id:enemy,yaw:pl.yaw,pitch:pl.pitch});return}if(tg){const b=get(tg.h[0],tg.h[1],tg.h[2]);miningTool=bestToolForBlock(b);lastHeldSig='';refreshHeld();breaking=tg.h.join(',');breakAt=performance.now();breakDur=0;$('breakBox').style.display='none';send({t:'breakStart',x:tg.h[0],y:tg.h[1],z:tg.h[2]})}}
+ swing=1;useAnim=1;clk.push(performance.now());while(clk.length>40)clk.shift();const enemy=playerTarget();if(enemy!==null){send({t:'hit',id:enemy,yaw:pl.yaw,pitch:pl.pitch,k:slotKey(cur)});return}if(tg){const b=get(tg.h[0],tg.h[1],tg.h[2]);miningTool=bestToolForBlock(b);lastHeldSig='';refreshHeld();breaking=tg.h.join(',');breakAt=performance.now();breakDur=0;$('breakBox').style.display='none';send({t:'breakStart',x:tg.h[0],y:tg.h[1],z:tg.h[2]})}}
 function stopBreak(){if(breaking){breaking=null;send({t:'breakStop'});$('breakBox').style.display='none';crackBox.visible=false}miningTool=null;lastHeldSig='';refreshHeld()}
 function beginBow(){if(!started||!me.alive||!inv.bow||inv.arrow<1)return;bowCharging=true;bowChargeAt=performance.now();$('bowCharge').style.display='block';$('bowChargeFill').style.width='0%'}
 function releaseBow(){if(!bowCharging)return;bowCharging=false;const ratio=Math.max(.2,Math.min(1,(performance.now()-bowChargeAt)/1200));$('bowCharge').style.display='none';useAnim=1;send({t:'shoot',k:'bow',yaw:pl.yaw,pitch:pl.pitch,charge:ratio})}
@@ -743,7 +752,7 @@ function autoBridge(now=performance.now()){
  sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);
  send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z});
 }
-function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;if(ADMIN.on&&ADMIN.build){const r=ray();if(r){const f=r.f||[0,1,0],x=r.h[0]+f[0],y=r.h[1]+f[1],z=r.h[2]+f[2];send({t:'adminPlace',x,y,z,b:ADMIN.block})}return}const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(cur>0&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
+function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;if(ADMIN.on&&ADMIN.build){const r=ray();if(r){const f=r.f||[0,1,0],x=r.h[0]+f[0],y=r.h[1]+f[1],z=r.h[2]+f[2];send({t:'adminPlace',x,y,z,b:ADMIN.block})}return}const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion','magicMilk','bridgeEgg'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(k==='popupTower'){if(tg&&tg.p){const[x,y,z]=tg.p;send({t:'use',k,x,y,z})}else{msg('Mire no chão para colocar a Pop-up Tower');sfx('blocked')}}else if(PLACEABLE.has(k)&&tg&&tg.p){const[x,y,z]=tg.p;if(!safePlaceTarget(x,y,z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}send({t:'place',k,x,y,z})}}
 addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()}});
 addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2)bridgeHeld=false});
 if(touchMode){
@@ -755,7 +764,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70;hud();
-function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;updateRespawnUI();acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);
+function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-last)/1000,.05);last=now;updateRespawnUI();acc+=dt;lodAcc+=dt;if(lodAcc>.45){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
 if((started||lobbyExplore)&&!over&&me.alive){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
 let sneak=false,sprinting=false;

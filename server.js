@@ -4,10 +4,10 @@ const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND=String(process.env.ADMIN_COMMAND||'/lordmister').toLowerCase();
-const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','iron','gold','dia','em']);
+const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
 const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=34;
 const STATS_FILE=process.env.BW_STATS_FILE||path.join(__dirname,'data','stats.json');
-const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass'];
+const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
 let PROFILE_DB={};
 try{PROFILE_DB=JSON.parse(fs.readFileSync(STATS_FILE,'utf8'))||{}}catch(e){PROFILE_DB={}}
 function saveProfiles(){try{fs.mkdirSync(path.dirname(STATS_FILE),{recursive:true});const tmp=STATS_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(PROFILE_DB,null,2));fs.renameSync(tmp,STATS_FILE)}catch(e){console.warn('[STATS] não foi possível salvar',e.message)}}
@@ -105,7 +105,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], trapAt:[0,0,0,0], st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -118,7 +118,7 @@ function room(code) {
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false,
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'',
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
-  rl: Object.create(null), breaking: null, enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, iron:0, gold:0, dia:0, em:0 } });
+  rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
 const allow = (p, key, gap) => {
   const n = Date.now(), last = p.rl[key] || 0;
   if (n - last < gap) return false;
@@ -131,7 +131,7 @@ const nearBase = p => {
 };
 const buyFail=(p,code,text)=>tx(p,{t:'buyResult',ok:0,code,text});
 const buyOk=p=>tx(p,{t:'buyResult',ok:1});
-const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx });
+const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx, traps:p.trapQueue||[] });
 const sfx = (p,k) => tx(p,{t:'sfx',k});
 const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
 const statsPayload = R => [...R.ps.values()].map(p=>({
@@ -162,7 +162,7 @@ function playerHitsBlock(q,x,y,z){
     return horizontal&&vertical;
   });
 }
-function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
 
@@ -185,7 +185,7 @@ function win(R) {
 function die(R, q, cause='combat') {
   if(!q.alive)return;
   q.stats.deaths++;
-  q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
+  q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null;q.fx.blind=0;q.fx.fatigue=0;q.fx.slow=0;q.fx.milk=0; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
   const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
   const final = !R.bed[q.team];
   tx(q,{t:'deathState',final:final?1:0,respawn:final?0:5,cause,killer:killer?killer.name:''});
@@ -334,7 +334,30 @@ function nearOwnBase(p){const b=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S
 function enemyInBase(R,p){const b=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];return [...R.ps.values()].find(q=>q.alive&&q.team!==p.team&&Math.hypot(q.x-b[0],q.z-b[2])<20)}
 function teamPlayers(R,t){return [...R.ps.values()].filter(q=>q.team===t&&!q.admin)}
 function setTeamUp(R,t,key,value){teamPlayers(R,t).forEach(q=>{q.up[key]=value;pinv(q)})}
-function triggerTeamTraps(R){for(const t of modeCfg(R).activeTeams){if(R.t-(R.trapAt[t]||0)<2.5)continue;const defenders=teamPlayers(R,t),anchor=defenders.find(q=>q.alive)||defenders[0];if(!anchor)continue;const enemy=enemyInBase(R,anchor);if(!enemy)continue;const has=k=>defenders.some(q=>(q.up[k]||0)>0),consume=k=>setTeamUp(R,t,k,0);if(has('trapMiner')){consume('trapMiner');enemy.fx.fatigue=Math.max(enemy.fx.fatigue||0,10);pinv(enemy);feed(R,`Armadilha de Fadiga do Time ${S.TN[t]} ativada!`,t,enemy.team,'trap')}else if(has('trapSlow')){consume('trapSlow');enemy.fx.slow=Math.max(enemy.fx.slow||0,8);pinv(enemy);feed(R,`Armadilha de Lentidão do Time ${S.TN[t]} ativada!`,t,enemy.team,'trap')}else if(has('trapCounter')){consume('trapCounter');defenders.forEach(q=>{q.fx.speed=Math.max(q.fx.speed||0,10);pinv(q)});feed(R,`Contra-Ataque do Time ${S.TN[t]} ativado!`,t,enemy.team,'trap')}else if(has('trap')){consume('trap');enemy.fx.slow=Math.max(enemy.fx.slow||0,5);pinv(enemy);feed(R,`Armadilha do Time ${S.TN[t]} ativada!`,t,enemy.team,'trap')}else continue;R.trapAt[t]=R.t;defenders.forEach(q=>tx(q,{t:'m',s:'⚠ INIMIGO NA BASE!'}))}}
+const TRAP_NAME={trapMiner:'Fadiga de Mineração',trapBlind:'É uma Armadilha!',trapAlarm:'Alarme / Revelação',trapCounter:'Contra-Ataque'};
+function syncTeamTraps(R,t){const queue=[...(R.traps?.[t]||[])];teamPlayers(R,t).forEach(q=>{q.trapQueue=queue;pinv(q)})}
+function teamTrapAlert(R,t,text,enemyTeam=-1){teamPlayers(R,t).forEach(q=>tx(q,{t:'feed',text,aTeam:t,bTeam:enemyTeam,kind:'trap'}))}
+function triggerTeamTraps(R){
+  if(!R.traps)return;
+  for(const t of modeCfg(R).activeTeams){
+    const defenders=teamPlayers(R,t),anchor=defenders.find(q=>q.alive)||defenders[0];
+    if(!anchor||!R.bed[t])continue;
+    const b=anchor.roomSpawn||[S.IS[t][0]+.5,S.BASE_Y+2.02,S.IS[t][1]+.5];
+    const inside=new Set([...R.ps.values()].filter(q=>q.alive&&!q.out&&!q.admin&&q.team!==t&&Math.hypot(q.x-b[0],q.z-b[2])<20).map(q=>q.id));
+    const prev=R.trapInside[t]||new Set(),enemy=[...inside].map(id=>R.ps.get(id)).find(q=>q&&!prev.has(q.id));
+    R.trapInside[t]=inside;
+    if(!enemy||!R.traps[t].length)continue;
+    const trap=R.traps[t].shift(),milk=(enemy.fx.milk||0)>0,name=TRAP_NAME[trap]||'Armadilha';
+    syncTeamTraps(R,t);
+    teamTrapAlert(R,t,`⚠ ${enemy.name} ativou ${name}!`,enemy.team);
+    if(milk){teamTrapAlert(R,t,`🥛 Magic Milk neutralizou o efeito da armadilha, mas o invasor foi detectado.`,enemy.team);continue}
+    if(trap==='trapMiner')enemy.fx.fatigue=Math.max(enemy.fx.fatigue||0,10);
+    else if(trap==='trapBlind'){enemy.fx.blind=Math.max(enemy.fx.blind||0,8);enemy.fx.slow=Math.max(enemy.fx.slow||0,8)}
+    else if(trap==='trapAlarm')enemy.fx.invis=0;
+    else if(trap==='trapCounter')defenders.filter(nearOwnBase).forEach(q=>{q.fx.speed=Math.max(q.fx.speed||0,10);q.fx.jump=Math.max(q.fx.jump||0,10);pinv(q)});
+    pinv(enemy);
+  }
+}
 function chestPos(meta,t,kind){const sp=meta.SPAWN?.[t];if(!sp)return null;const [cx,cz]=S.IS[t],L=Math.hypot(cx,cz)||1,ix=-cx/L,iz=-cz/L,txv=-iz,tz=ix,side=kind==='team'?4:-4;return[sp[0]+txv*side+ix*1.5,sp[1],sp[2]+tz*side+iz*1.5]}
 function nearChest(R,p,kind){const a=chestPos(R,p.team,kind);return !!a&&Math.hypot(p.x-a[0],p.z-a[2])<4.8&&Math.abs(p.y-a[1])<4}
 function chestState(R,p,kind){const items=kind==='team'?R.teamChest[p.team]:p.enderChest;tx(p,{t:'chestState',kind,items})}
@@ -370,6 +393,29 @@ function segmentHitsBlock(R,x0,y0,z0,x1,y1,z1){
   for(let i=1;i<=steps;i++){const a=i/steps,x=x0+(x1-x0)*a,y=y0+(y1-y0)*a,z=z0+(z1-z0)*a;if(get(R,Math.floor(x),Math.floor(y),Math.floor(z)))return{x,y,z}}
   return null;
 }
+function bridgeEggTrail(R,pr,nx,ny,nz){
+  const L=Math.hypot(nx-pr.x,ny-pr.y,nz-pr.z),steps=Math.max(1,Math.ceil(L/.32));
+  for(let i=1;i<=steps;i++){
+    const a=i/steps,x=Math.floor(pr.x+(nx-pr.x)*a),y=Math.floor(pr.y+(ny-pr.y)*a-1.45),z=Math.floor(pr.z+(nz-pr.z)*a);
+    if(!S.inXZ(x,z)||y<1||y>=S.H-2||get(R,x,y,z))continue;
+    if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z)))continue;
+    setb(R,x,y,z,pr.team+1,1);
+  }
+}
+function buildPopupTower(R,p,x,y,z){
+  if(![x,y,z].every(Number.isInteger)||!S.inXZ(x,z)||y<1||y>=S.H-6||Math.hypot(x+.5-p.x,y+.5-p.y,z+.5-p.z)>6.5||!get(R,x,y-1,z))return false;
+  const blocks=[],dx=p.x-(x+.5),dz=p.z-(z+.5),doorAxis=Math.abs(dx)>Math.abs(dz)?'x':'z',doorSign=doorAxis==='x'?(dx>=0?1:-1):(dz>=0?1:-1);
+  for(let h=0;h<4;h++)for(let ox=-2;ox<=2;ox++)for(let oz=-2;oz<=2;oz++){
+    if(Math.abs(ox)!==2&&Math.abs(oz)!==2)continue;
+    const door=doorAxis==='x'?ox===2*doorSign&&oz===0:oz===2*doorSign&&ox===0;
+    if(door&&h<2)continue;blocks.push([x+ox,y+h,z+oz]);
+  }
+  for(let ox=-2;ox<=2;ox++)for(let oz=-2;oz<=2;oz++)if((Math.abs(ox)===2||Math.abs(oz)===2)&&((ox+oz)&1)===0)blocks.push([x+ox,y+4,z+oz]);
+  [[-1,-1,0],[0,-1,1],[0,0,2],[1,0,3]].forEach(([ox,oz,h])=>blocks.push([x+ox,y+h,z+oz]));
+  const free=blocks.filter(([X,Y,Z])=>!get(R,X,Y,Z)&&![...R.ps.values()].some(q=>playerHitsBlock(q,X,Y,Z)));
+  if(free.length<18)return false;
+  free.forEach(([X,Y,Z])=>setb(R,X,Y,Z,p.team+1,1));return true;
+}
 function projectileImpact(R,pr,x,y,z,target){
   const owner=R.ps.get(pr.o);
   if(pr.k==='arrow'&&target)hurt(R,target,4+5*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.12,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.12,owner);
@@ -382,16 +428,17 @@ function projectileImpact(R,pr,x,y,z,target){
 function tickProjectiles(R,dt){
   for(let i=R.projectiles.length-1;i>=0;i--){
     const pr=R.projectiles[i];pr.age+=dt;
-    const grav=pr.k==='fireball'?0:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:pr.k.startsWith('tnt')?9.2:7.5;
+    const grav=pr.k==='fireball'?0:pr.k==='bridgeEgg'?1.8:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:pr.k.startsWith('tnt')?9.2:7.5;
     pr.vy-=grav*dt;
     const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
-    let target=segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
+    if(pr.k==='bridgeEgg')bridgeEggTrail(R,pr,nx,ny,nz);
+    let target=pr.k==='bridgeEgg'?null:segmentHitPlayer(R,pr,nx,ny,nz),block=segmentHitsBlock(R,pr.x,pr.y,pr.z,nx,ny,nz);
     if(block&&target){
       const db=Math.hypot(block.x-pr.x,block.y-pr.y,block.z-pr.z),dtar=Math.hypot(target.x-pr.x,target.y+.9-pr.y,target.z-pr.z);
       if(db<dtar)target=null;
     }
     const outside=nx<S.MIN_X-8||nx>S.MAX_X+8||nz<S.MIN_Z-8||nz>S.MAX_Z+8;
-    const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='snowball'?9:pr.k.startsWith('tnt')?1.35:8;
+    const maxAge=pr.k==='arrow'?14:pr.k==='pearl'?10:pr.k==='bridgeEgg'?5:pr.k==='snowball'?9:pr.k.startsWith('tnt')?1.35:8;
     if(ny<=-20||outside||pr.age>maxAge){
       if(pr.k.startsWith('tnt'))throwableTntBoom(R,pr.k,nx,ny,nz,R.ps.get(pr.o));
       bc(R,{t:'projHit',id:pr.id,k:pr.k,x:nx,y:ny,z:nz});R.projectiles.splice(i,1);continue;
@@ -416,7 +463,7 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,admin:p.admin?1:0,adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
@@ -491,7 +538,7 @@ wss.on('connection', ws => {
             if(active.some(q=>[...R.ps.values()].filter(x=>!x.admin&&x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
           }
         }
-        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
+        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.ps.forEach(q=>q.trapQueue=[]);
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => !q.admin&&q.team === t) ? 1 : 0;
@@ -524,7 +571,7 @@ wss.on('connection', ws => {
         if(!p.admin)break;p.sw=Math.max(0,Math.min(3,Math.floor(Number(m.sw)||0)));p.ar=Math.max(0,Math.min(2,Math.floor(Number(m.ar)||0)));pinv(p);break;
       }
       case 'held': {
-        if (Number.isInteger(m.s) && m.s >= 0 && m.s <= 15) p.held = m.s;
+        if (Number.isInteger(m.s) && m.s >= 0 && m.s <= 19) p.held = m.s;
         break;
       }
       case 'hit': {
@@ -535,8 +582,8 @@ wss.on('connection', ws => {
         const cy = Math.cos(m.pitch), d = [-Math.sin(m.yaw) * cy, Math.sin(m.pitch), -Math.cos(m.yaw) * cy];
         const dx = q.x - p.x, dy = q.y + .9 - (p.y + 1.62), dz = q.z - p.z, L = Math.hypot(dx, dy, dz);
         if (L > 3.8 || L < .01 || (dx * d[0] + dy * d[1] + dz * d[2]) / L < .9) break;
-        const cr = p.dy < -1;
-        hurt(R, q, (DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1), d[0], d[2], p, cr);
+        const stick=m.k==='knockbackStick'&&(p.inv.knockbackStick||0)>0,cr = !stick&&p.dy < -1,kb=stick?1.9:1,damage=stick?1.5:(DMG[p.sw] + 2 * p.up.sharp) * (cr ? 1.5 : 1);
+        hurt(R, q, damage, d[0]*kb, d[2]*kb, p, cr);
         tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });bc(R,{t:'anim',id:p.id,k:'attack'});
         break;
       }
@@ -569,19 +616,21 @@ wss.on('connection', ws => {
         const item=S.SH[m.i];
         if(!item){buyFail(p,'invalid_item','Item inválido.');break}
         if(!nearBase(p)){buyFail(p,'too_far','Chegue mais perto da loja do seu time.');break}
-        const [name,currency,basePrice,type,key,value]=item,modePrices=item[8]||null,price=modePrices&&modePrices[R.modeId]!=null?modePrices[R.modeId]:basePrice;
+        const [name,currency,basePrice,type,key,value]=item,modePrices=item[8]||null,trapQueue=R.traps[p.team]||[],price=type==='trap'?([1,2,4][trapQueue.length]??4):(modePrices&&modePrices[R.modeId]!=null?modePrices[R.modeId]:basePrice);
+        if(type==='trap'&&(!R.bed[p.team]||trapQueue.length>=3)){buyFail(p,'trap_full',!R.bed[p.team]?'Seu time não possui mais cama.':'A fila de traps está cheia (3/3).');break}
         if((p.inv[currency]||0)<price){buyFail(p,'no_resource',`Recursos insuficientes para ${name}.`);break}
-        let ok=1,teamUpgrade=false;
+        let ok=1,teamUpgrade=false,trapBought=false;
         if(type==='inv'&&key==='bow'){if(p.inv.bow>0)ok=0;else p.inv.bow=1}
         else if(type==='inv')p.inv[key]=(p.inv[key]||0)+value;
         else if(type==='sw'&&p.sw<value)p.sw=value;
         else if(type==='ar'&&p.ar<value)p.ar=value;
         else if(type==='tool'&&(p.tools[key]||0)<value)p.tools[key]=value;
         else if(type==='up'&&(p.up[key]||0)===value-1){setTeamUp(R,p.team,key,value);teamUpgrade=true}
+        else if(type==='trap'){trapQueue.push(key);p.trapQueue=[...trapQueue];trapBought=true}
         else ok=0;
         if(!ok){buyFail(p,'already_owned','Você já possui esse item ou uma versão melhor.');break}
         p.inv[currency]-=price;
-        if(!teamUpgrade)pinv(p);buyOk(p);sfx(p,'buy');
+        if(trapBought)syncTeamTraps(R,p.team);else if(teamUpgrade)teamPlayers(R,p.team).forEach(pinv);else pinv(p);buyOk(p);sfx(p,'buy');
         break;
       }
       case 'shoot': {
@@ -610,6 +659,9 @@ wss.on('connection', ws => {
         } else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p);}
         else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p);}
         else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p);}
+        else if(k==='magicMilk'&&p.inv.magicMilk>0){p.inv.magicMilk--;p.fx.milk=60;pinv(p);sfx(p,'buy');}
+        else if(k==='bridgeEgg'&&p.inv.bridgeEgg>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){p.inv.bridgeEgg--;spawnProjectile(R,p,'bridgeEgg',m.yaw,m.pitch,21,1);pinv(p);}
+        else if(k==='popupTower'&&p.inv.popupTower>0&&buildPopupTower(R,p,Math.floor(m.x),Math.floor(m.y),Math.floor(m.z))){p.inv.popupTower--;pinv(p);sfx(p,'place');}
         break;
       }
       case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
@@ -632,7 +684,7 @@ setInterval(() => {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih = Math.max(0, p.ih - dt);
-        p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);
+        p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);p.fx.blind=Math.max(0,(p.fx.blind||0)-dt);p.fx.milk=Math.max(0,(p.fx.milk||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);
           p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;
