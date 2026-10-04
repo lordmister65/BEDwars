@@ -1,0 +1,28 @@
+name: Fix Gameplay Mousedown
+on:
+  push:
+    branches: [feature/gameplay-pack-hotbar-traps]
+    paths:
+      - '.github/workflows/fix-gameplay-mousedown.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gameplay-pack-hotbar-traps
+      - name: Fix migrator
+        run: python3 .github/scripts/fix-gameplay-mousedown.py
+      - name: Validate migrator
+        run: python3 -m py_compile .github/scripts/apply-gameplay-pack.py
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/scripts/apply-gameplay-pack.py
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix gameplay mousedown migration"
+            git push origin HEAD:feature/gameplay-pack-hotbar-traps
+          fi
