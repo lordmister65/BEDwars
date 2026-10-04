@@ -442,7 +442,7 @@ function adminPanel(){let p=$('adminPanel');if(p)return p;p=document.createEleme
 function setAdminMode(on,players=[]){ADMIN.on=!!on;const p=adminPanel();p.classList.toggle('open',ADMIN.on);$('adminPlayer').innerHTML=(players||[]).map(q=>'<option value='+q[0]+'>'+q[1]+' · '+TN[q[2]]+'</option>').join('');if($('adminBuild'))$('adminBuild').textContent=ADMIN.build?'CONSTRUÇÃO':'ITENS';lastHeldSig='';hud()}
 const uiCache=Object.create(null);const html=(id,v)=>{if(uiCache[id]!==v){uiCache[id]=v;$(id).innerHTML=v}};
 const localProfileId=(()=>{let id='';try{id=localStorage.getItem('bwProfileId')||'';if(!id){id=(crypto.randomUUID?crypto.randomUUID():('p-'+Date.now()+'-'+Math.random().toString(36).slice(2))).replace(/[^a-zA-Z0-9_-]/g,'');localStorage.setItem('bwProfileId',id)}}catch(e){id='p-'+Date.now()+'-'+Math.random().toString(36).slice(2)}return id})();
-function drawProfile(){if(!myProfile)return;const p=myProfile,next=500-(p.xp%500||0);html('profileBody',`<div class="profile-level">NÍVEL ${p.level}</div><div class="xpbar"><i style="width:${((p.xp%500)/5).toFixed(1)}%"></i></div><p><b>XP:</b> ${p.xp} · próximo nível em ${next===500?0:next} XP</p><div class="profile-grid"><span>Partidas<b>${p.matches}</b></span><span>Vitórias<b>${p.wins}</b></span><span>Derrotas<b>${p.losses}</b></span><span>Kills<b>${p.kills}</b></span><span>Final Kills<b>${p.finalKills}</b></span><span>Camas<b>${p.bedsDestroyed}</b></span></div>`)}
+function drawProfile(){if(!myProfile)return;const p=myProfile,next=500-(p.xp%500);html('profileBody',`<div class="profile-level">NÍVEL ${p.level}</div><div class="xpbar"><i style="width:${((p.xp%500)/5).toFixed(1)}%"></i></div><p><b>XP:</b> ${p.xp} · próximo nível em ${next} XP</p><div class="profile-grid"><span>Partidas<b>${p.matches}</b></span><span>Vitórias<b>${p.wins}</b></span><span>Derrotas<b>${p.losses}</b></span><span>Kills<b>${p.kills}</b></span><span>Final Kills<b>${p.finalKills}</b></span><span>Camas<b>${p.bedsDestroyed}</b></span></div>`)}
 function openProfile(){drawProfile();scr('profile')}
 function drawRanking(){html('rankingBody',(rankingData||[]).map((p,i)=>`<div class="rank-row"><b>#${i+1}</b><span>${p.name}</span><em>Nv. ${p.level}</em><strong>${p.xp} XP</strong><small>${p.wins} vitórias · ${p.finalKills} finais</small></div>`).join('')||'<p>Ainda não há partidas registradas.</p>')}
 function openRanking(){send({t:'ranking'});drawRanking();scr('ranking')}
@@ -528,7 +528,7 @@ function openShop(){
  shopOpen=1;drawShop(true);try{document.exitPointerLock()}catch(e){};scr('shop')
 }
 function closeShop(){shopOpen=0;scr(null);requestGameLock()}
-document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(shopOpen?'shop':'ov')});
+document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(chestOpen?'chest':shopOpen?'shop':'ov')});
 $('ov').onclick=()=>{audioInit();scr(null);requestGameLock()};
 // rede e reconexão
 const NET_RECONNECT_MS=60000,NET_CONNECT_TIMEOUT_MS=8000,NET_STALE_MS=25000,NET_PING_MS=10000;

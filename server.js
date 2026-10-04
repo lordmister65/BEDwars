@@ -13,7 +13,7 @@ try{PROFILE_DB=JSON.parse(fs.readFileSync(STATS_FILE,'utf8'))||{}}catch(e){PROFI
 function saveProfiles(){try{fs.mkdirSync(path.dirname(STATS_FILE),{recursive:true});const tmp=STATS_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(PROFILE_DB,null,2));fs.renameSync(tmp,STATS_FILE)}catch(e){console.warn('[STATS] não foi possível salvar',e.message)}}
 const profileLevel=xp=>1+Math.floor(Math.max(0,Number(xp)||0)/500);
 function ensureProfile(id,name='Jogador'){const k=String(id||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');let p=PROFILE_DB[k];if(!p)p=PROFILE_DB[k]={id:k,name:String(name||'Jogador').slice(0,14),xp:0,matches:0,wins:0,losses:0,kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};p.name=String(name||p.name||'Jogador').slice(0,14);return p}
-function publicProfile(p){return{id:p.id,name:p.name,xp:p.xp||0,level:profileLevel(p.xp),matches:p.matches||0,wins:p.wins||0,losses:p.losses||0,kills:p.kills||0,finalKills:p.finalKills||0,bedsDestroyed:p.bedsDestroyed||0,deaths:p.deaths||0,resourcesCollected:p.resourcesCollected||0}}
+function publicProfile(p){return{name:p.name,xp:p.xp||0,level:profileLevel(p.xp),matches:p.matches||0,wins:p.wins||0,losses:p.losses||0,kills:p.kills||0,finalKills:p.finalKills||0,bedsDestroyed:p.bedsDestroyed||0,deaths:p.deaths||0,resourcesCollected:p.resourcesCollected||0}}
 function rankingPayload(limit=20){return Object.values(PROFILE_DB).sort((a,b)=>(b.xp||0)-(a.xp||0)||(b.wins||0)-(a.wins||0)||(b.finalKills||0)-(a.finalKills||0)).slice(0,limit).map(publicProfile)}
 function emptyChest(){return Object.fromEntries(CHEST_KEYS.map(k=>[k,0]))}
 const MODES={
