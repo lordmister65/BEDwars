@@ -1,0 +1,34 @@
+name: Apply Network Hardening
+on:
+  push:
+    branches: [ fix/network-disconnect-hardening ]
+    paths:
+      - '.github/scripts/apply-network-hardening.js'
+      - '.github/workflows/apply-network-hardening.yml'
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/network-disconnect-hardening
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apply hardening
+        run: node .github/scripts/apply-network-hardening.js
+      - name: Validate syntax
+        run: |
+          node --check server.js
+          node --check public/game.js
+      - name: Commit network hardening
+        run: |
+          git config user.name lordmister65
+          git config user.email actions@users.noreply.github.com
+          git add server.js public/game.js public/index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Harden WebSocket disconnect and reconnect handling"
+            git push
+          fi
