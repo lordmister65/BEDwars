@@ -21,16 +21,20 @@
   <section><h2>Jogadores</h2><div id="pl"></div></section>
   <section><h2>Modo</h2><div id="modePick" class="mode-pick"></div><h2>Escolha seu time</h2><div id="teamPick" class="team-pick"></div><h2>Mapa</h2><div id="mapPick"></div></section>
 </div>
-<button id="st" style="display:none;text-align:center;margin-top:10px">Iniciar partida</button><button onclick="exploreLobby()" style="text-align:center">Explorar ilha de espera (L)</button><p id="wt"></p></div></div>
+<button id="st" style="display:none;text-align:center;margin-top:10px">Iniciar partida</button><button onclick="exploreLobby()" style="text-align:center">Explorar ilha de espera (L)</button><div class="meta-actions"><button onclick="openProfile()">Meu Perfil / XP</button><button onclick="openRanking()">Ranking</button></div><p id="wt"></p></div></div>
 <div class="ov" id="ov"><div><h1>Pronto?</h1>
 <p>WASD move · SPACE jump · CTRL sprint · SHIFT sneak · mouse attack/mine · right click use/place</p><p>Esquerdo bate ou quebra · direito usa o item</p>
 <p>1–9 ou roda do mouse troca o item · CTRL ou duplo W corre · SHIFT agacha · segure botão direito/COLOCAR para speed bridge · clique no VENDEDOR para abrir a loja</p>
 <p>Cada clique é um golpe. Golpe caindo = crítico.</p><p><b>Clique para jogar</b></p></div></div>
 <div class="ov" id="shop"><div><h1>Loja de Itens</h1><div id="shopTabs"></div><div id="sl"></div><div class="shop-wallet" id="shopWallet"></div><button class="shop-close" onclick="closeShop()">Fechar</button></div></div>
+<div class="ov" id="chest"><div class="chest-panel"><h1 id="chestTitle">BAÚ</h1><div id="chestGrid"></div><button onclick="closeChest()">Fechar</button></div></div>
+<div class="ov" id="profile"><div class="meta-panel"><h1>MEU PERFIL</h1><div id="profileBody"></div><button onclick="scr('lobby')">Voltar</button></div></div>
+<div class="ov" id="ranking"><div class="meta-panel ranking-panel"><h1>RANKING</h1><div id="rankingBody"></div><button onclick="scr('lobby')">Voltar</button></div></div>
+<div id="compassHud"></div>
 <div class="ov" id="end"><div class="end-panel"><h1 id="et"></h1><p id="endSub"></p><div id="endStats"></div><button onclick="leaveToLobby()">Voltar ao lobby / nova sala</button></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=net-hardening-20261003"></script>
+<script src="/game.js?v=progression-pack-20261004"></script>
 </body></html>
