@@ -345,10 +345,12 @@ index=once(index,
 "<div class=\"ov\" id=\"shop\"><div><h1>Loja de Itens</h1><div id=\"shopTabs\"></div><div id=\"sl\"></div><div class=\"shop-wallet\" id=\"shopWallet\"></div>",
 "<div class=\"ov\" id=\"shop\"><div><h1>Loja de Itens</h1><div id=\"shopTabs\"></div><div id=\"sl\"></div><div id=\"trapQueue\"></div><div class=\"shop-wallet\" id=\"shopWallet\"></div>",
 'shop trap queue container')
-index=once(index,
-"<div class=\"ov\" id=\"ranking\"><div class=\"meta-panel ranking-panel\"><h1>RANKING</h1><div id=\"rankingBody\"></div><button onclick=\"scr('lobby')\">Voltar</button></div></div>\n<div id=\"compassHud\"></div>",
-"<div class=\"ov\" id=\"ranking\"><div class=\"meta-panel ranking-panel\"><h1>RANKING</h1><div id=\"rankingBody\"></div><button onclick=\"scr('lobby')\">Voltar</button></div></div>\n<div class=\"ov\" id=\"hotbarEditor\"><div class=\"meta-panel hotbar-editor-panel\"><h1>EDITOR DA HOTBAR</h1><p>Selecione um slot e depois outro para trocar de posição. Os 9 primeiros respondem às teclas 1–9.</p><div id=\"hotbarEditorGrid\"></div><div class=\"meta-actions\"><button onclick=\"resetHotbarEditor()\">Restaurar padrão</button><button onclick=\"scr('lobby')\">Concluir</button></div></div></div>\n<div id=\"blindOverlay\"></div><div id=\"compassHud\"></div>",
-hotbar editor overlay')
+old_rank_html = '''<div class="ov" id="ranking"><div class="meta-panel ranking-panel"><h1>RANKING</h1><div id="rankingBody"></div><button onclick="scr('lobby')">Voltar</button></div></div>
+<div id="compassHud"></div>'''
+new_rank_html = '''<div class="ov" id="ranking"><div class="meta-panel ranking-panel"><h1>RANKING</h1><div id="rankingBody"></div><button onclick="scr('lobby')">Voltar</button></div></div>
+<div class="ov" id="hotbarEditor"><div class="meta-panel hotbar-editor-panel"><h1>EDITOR DA HOTBAR</h1><p>Selecione um slot e depois outro para trocar de posição. Os 9 primeiros respondem às teclas 1–9.</p><div id="hotbarEditorGrid"></div><div class="meta-actions"><button onclick="resetHotbarEditor()">Restaurar padrão</button><button onclick="scr('lobby')">Concluir</button></div></div></div>
+<div id="blindOverlay"></div><div id="compassHud"></div>'''
+index=once(index,old_rank_html,new_rank_html,'hotbar editor overlay')
 index=re.sub(r'<script src="/game\.js\?v=[^"]+"></script>','<script src="/game.js?v=gameplay-pack-20261004"></script>',index,count=1)
 
 # ---------------- CSS ----------------
