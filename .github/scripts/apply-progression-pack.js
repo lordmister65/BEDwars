@@ -172,8 +172,8 @@ game=once(game,
 'quick compass');
 
 game=once(game,
-`<div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}</div>`,
-`<div class="effectline">${fxs.speed>0?'⚡ VELOCIDADE ':''}${fxs.jump>0?'↥ SALTO ':''}${fxs.invis>0?'◌ INVISÍVEL ':''}${fxs.slow>0?'🐌 LENTIDÃO ':''}${fxs.fatigue>0?'⛏ FADIGA ':''}</div>`,
+`<div class="effectline">\${fxs.speed>0?'⚡ VELOCIDADE ':''}\${fxs.jump>0?'↥ SALTO ':''}\${fxs.invis>0?'◌ INVISÍVEL ':''}\${fxs.slow>0?'🐌 LENTIDÃO ':''}</div>`,
+`<div class="effectline">\${fxs.speed>0?'⚡ VELOCIDADE ':''}\${fxs.jump>0?'↥ SALTO ':''}\${fxs.invis>0?'◌ INVISÍVEL ':''}\${fxs.slow>0?'🐌 LENTIDÃO ':''}\${fxs.fatigue>0?'⛏ FADIGA ':''}</div>`,
 'fatigue HUD');
 
 // world interactions
