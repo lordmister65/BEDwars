@@ -1,0 +1,32 @@
+name: Finalize Gameplay Overhaul V3
+on:
+  push:
+    branches: [feature/gameplay-overhaul-v3]
+    paths:
+      - '.github/scripts/finalize-gameplay-overhaul-v3.js'
+      - '.github/workflows/finalize-gameplay-overhaul-v3.yml'
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gameplay-overhaul-v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply final fixes
+        run: node .github/scripts/finalize-gameplay-overhaul-v3.js
+      - name: Validate syntax
+        run: |
+          node --check server.js
+          node --check public/game.js
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/game.js
+          git diff --cached --quiet || git commit -m "Finalize gameplay overhaul V3"
+          git push origin HEAD:feature/gameplay-overhaul-v3
