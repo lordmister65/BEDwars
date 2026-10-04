@@ -636,7 +636,7 @@ let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){if(d
 function on(m){switch(m.t){
 case'init':me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;reconnectToken=m.token||reconnectToken;myProfile=m.profile||myProfile;rankingData=m.ranking||rankingData;drawProfile();drawRanking();saveReconnect();loadMap(m.mapId||'classic',true,m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);pl.yaw=0;break;
 case'reconnected':
- finishReconnect();me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;saveReconnect();
+ finishReconnect();me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;me.alive=m.alive??me.alive;me.out=!!m.out;spectator=!!m.spectator;saveReconnect();
  INFO={};(m.roster||[]).forEach(([id,n,t])=>INFO[id]={n,t});loadMap(m.mapId||currentMap,m.st==='lobby',m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);bed=m.bed||bed;
  syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;trapQueue=m.traps||trapQueue;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
 case'reconnectFail':{reconnectFailCount++;if(reconnecting&&Date.now()<reconnectUntil&&reconnectFailCount<3){setReconnectBanner('Servidor ainda não confirmou a sessão. Nova tentativa...');try{if(ws&&ws.readyState<=1)ws.close(4004,'retry reconnect')}catch(e){}break}reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break}
@@ -673,7 +673,7 @@ case'eliminated':setRespawn(true,0,m.reason||'Você foi eliminado.');spectator=t
 case'respawn':spectator=false;me.out=false;lastRespawnBeep=-1;clearRespawn();break;
 case'spawnProtect':me.spawnProtect=!!m.v;break;
 case'phase':matchPhase=m.phase||'normal';if(matchPhase==='sudden')msg('☠ MORTE SÚBITA — todas as camas foram destruídas!');break;
-case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);sfx(p.k==='fireball'||String(p.k).startsWith('tnt')?'fireball':p.k==='arrow'?'arrow':p.k==='pearl'?'pearl':'snowball');break}
+case'projSpawn':{const p=m.p;ensureProjectile(p.id,p.k,p.x,p.y,p.z);const g=positionalGain(p.x,p.y,p.z,12),k=p.k==='fireball'||String(p.k).startsWith('tnt')?'fireball':p.k==='arrow'?'arrow':p.k==='pearl'?'pearl':'snowball';if(g>.02){if(k==='arrow')tone(440,.055,'triangle',.025*g,-180);else if(k==='fireball'){tone(85,.16,'sawtooth',.06*g,-45);noise(.12,.035*g,500)}else sfx(k)}break}
 case'projHit':{const p=PROJ.get(m.id);if(p){sc.remove(p.m);PROJ.delete(m.id)}break}
 case'feed':addFeed(m);break;
 case'chat':addChat(m);break;
@@ -800,7 +800,7 @@ PL.forEach(r=>{const p=r.m.position;p.x+=(r.tx-p.x)*lerpA;p.y+=(r.ty-p.y)*lerpA;
 const moving=r.speed>.015,run=r.speed>.22,air=Math.abs(r.ty-p.y)>.18,phase=Math.sin(now/(run?65:95)),amp=moving?(run?.9:.58):0;
 r.limbs.ll.rotation.x=air?-.35:phase*amp;r.limbs.rl.rotation.x=air?.35:-phase*amp;
 r.limbs.la.rotation.x=air?.55:-phase*amp*.8;r.limbs.ra.rotation.x=air?.55:phase*amp*.8;
-if(r.action>now){r.limbs.ra.rotation.x=-1.35+Math.sin(now/45)*.18;r.held.rotation.x=-.7}else r.held.rotation.x=.1;if(r.flashUntil&&now>r.flashUntil){r.flashUntil=0;r.m.traverse(o=>{if(o.material&&o.material.color&&o.userData.baseColor!=null)o.material.color.setHex(o.userData.baseColor)})}});
+if(r.action>now){r.limbs.ra.rotation.x=-1.35+Math.sin(now/45)*.18;r.held.rotation.x=-.7}else r.held.rotation.x=.1;if(moving&&r.al&&now-(r.lastStepSound||0)>(run?280:370)){r.lastStepSound=now;const g=positionalGain(p.x,p.y,p.z,8);if(g>.035)noise(.028,.012*g,700)}if(r.flashUntil&&now>r.flashUntil){r.flashUntil=0;r.m.traverse(o=>{if(o.material&&o.material.color&&o.userData.baseColor!=null)o.material.color.setHex(o.userData.baseColor)})}});
 for(let i=PT.length;i--;){const p=PT[i];p.t-=dt;p.vy-=20*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;if(p.t<=0){sc.remove(p.m);PT.splice(i,1)}}
 for(let i=BEDFX.length;i--;){const b=BEDFX[i];b.t-=dt;b.m.material.opacity=Math.max(0,b.t/1.35);if(b.t<=0){sc.remove(b.m);b.m.material.dispose();BEDFX.splice(i,1)}}
 BRIDGE_PRED.forEach((b,key)=>{if(now-b.at>320){BRIDGE_PRED.delete(key);if(get(b.x,b.y,b.z)&&pf[ix(b.x,b.y,b.z)]){sb(b.x,b.y,b.z,0,0);flush(lowEnd?2:4)}}});
@@ -821,7 +821,7 @@ if(bowCharging){const br=Math.max(.2,Math.min(1,(now-bowChargeAt)/1200));$('bowC
 else heldRoot.rotation.y=heldViewBase.ry;if(!swing)hand.rotation.y*=Math.max(0,1-dt*14)
 hand.visible=started&&me.alive;
 flush(lowEnd?1:2);if(breaking&&breakDur){const a=Math.min(1,(performance.now()-breakAt)/1000/breakDur);$('breakFill').style.width=(a*100)+'%';crackBox.visible=!!tg;crackMat.opacity=.08+a*.34;if(tg)crackBox.position.set(tg.h[0]+.5,tg.h[1]+.5,tg.h[2]+.5);if(a>=1){breaking=null;miningTool=null;lastHeldSig='';$('breakBox').style.display='none';crackBox.visible=false;refreshHeld()}}else crackBox.visible=false;if(acc>.25){acc=0;hud()}
-if(!respawnCamera(dt)){const shake=camShake>0?(Math.random()-.5)*camShake:0;camShake=Math.max(0,camShake-dt*.65);cam.position.set(pl.x+bobX+shake,pl.y+(K.ShiftLeft?1.42:1.62)-bobY+shake*.4,pl.z+shake);cam.rotation.set(pl.pitch+Math.sin(bobPhase*.5)*.003*bobStrength+shake*.06,pl.yaw+shake*.04,0)}
+if(!respawnCamera(dt)){const shake=camShake>0?(Math.random()-.5)*camShake:0;camShake=Math.max(0,camShake-dt*.65);cam.position.set(pl.x+bobX+shake,pl.y+(K.ShiftLeft?1.42:1.62)-bobY+shake*.4,pl.z+shake);cam.rotation.set(pl.pitch+Math.sin(bobPhase*.5)*.003*bobStrength+shake*.06,pl.yaw+shake*.04,0);if(spectator&&specTarget){const r=PL.get(specTarget);if(r)cam.lookAt(r.m.position.x,r.m.position.y+1,r.m.position.z)}}
 const cf=me.alive&&started?chestTarget():null,vf=me.alive&&started&&!cf?vendorTarget():null;tg=me.alive&&started&&!vf&&!cf?ray():null;sel.visible=!!tg;if(tg)sel.position.set(tg.h[0]+.5,tg.h[1]+.5,tg.h[2]+.5);const enemyAim=me.alive&&started?playerTarget():null;$('cross').classList.toggle('enemy',enemyAim!==null);$('cross').style.filter=(vf||cf)?'drop-shadow(0 0 4px #fff55c)':'drop-shadow(1px 1px 0 #000)';updateCompass();
 try{updateGenerators(now);updateDropVisuals(now)}catch(e){}
 try{R.render(sc,cam)}catch(err){if(!window.__renderErr){window.__renderErr=1;console.error('Render recuperável',err)}}}
