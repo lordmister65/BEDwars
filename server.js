@@ -22,6 +22,18 @@ const MODES={
   'solo':{id:'solo',name:'Solo / FFA',teamCap:1,maxPlayers:4,activeTeams:[0,1,2,3],solo:true,description:'Todos contra todos · 2 a 4 jogadores · uma base por jogador'}
 };
 const modeCfg=R=>MODES[R.modeId]||MODES['2v2'];
+const BASE_GEN_TIERS=[
+  {iron:3.0,gold:0,dia:0,name:'Ferro básico'},
+  {iron:2.8,gold:8.0,dia:0,name:'Ouro desbloqueado'},
+  {iron:2.25,gold:6.0,dia:0,name:'Gerador eficiente'},
+  {iron:2.05,gold:5.5,dia:18.0,name:'Diamante desbloqueado'}
+];
+const GEN_UPGRADE_COSTS=[
+  {key:'dia',n:5,label:'5 diamantes',name:'Desbloquear ouro'},
+  {key:'gold',n:15,label:'15 ouros',name:'Aumentar eficiência'},
+  {key:'em',n:5,label:'5 esmeraldas',name:'Desbloquear diamantes'}
+];
+const CENTRAL_GEN={diamond:24,emerald:40};
 function rebalanceForMode(R,mc){
   const players=[...R.ps.values()];
   if(mc.solo){
@@ -105,9 +117,9 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], st: 'lobby', t: 0, host: null, final:null,
       g: {
-        base: [0,1,2,3].map(() => ({ iron:0, gold:0 })),
+        base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
         em: { t:0 }
       } };
@@ -313,10 +325,9 @@ function addDrop(R,k,n,x,y,z,max=64){
   bc(R,{t:'drops',l:R.drops});
 }
 function genSnapshot(R){
-  const players=[...R.ps.values()];
-  const base=R.g.base.map((g,i)=>{const o=players.find(q=>q.team===i),fm=1+.5*(o?o.up.forge:0);return [+(Math.max(0,1.2/fm-g.iron)).toFixed(2),+(Math.max(0,5/fm-g.gold)).toFixed(2)]});
-  const dia=R.g.dia.map(g=>+(Math.max(0,12-g.t)).toFixed(2));
-  return {base,dia,em:+Math.max(0,22-R.g.em.t).toFixed(2)};
+  const base=R.g.base.map((g,i)=>{const tier=Math.max(0,Math.min(3,R.genTier?.[i]||0)),cfg=BASE_GEN_TIERS[tier];return [+(Math.max(0,cfg.iron-g.iron)).toFixed(2),cfg.gold?+(Math.max(0,cfg.gold-g.gold)).toFixed(2):-1,cfg.dia?+(Math.max(0,cfg.dia-g.dia)).toFixed(2):-1,tier]});
+  const dia=R.g.dia.map(g=>+(Math.max(0,CENTRAL_GEN.diamond-g.t)).toFixed(2));
+  return {base,dia,em:+Math.max(0,CENTRAL_GEN.emerald-R.g.em.t).toFixed(2),tiers:[...(R.genTier||[])]};
 }
 function pickupDrops(R, players){
   let changed=false;
@@ -360,7 +371,11 @@ function triggerTeamTraps(R){
 }
 function chestPos(meta,t,kind){const sp=meta.SPAWN?.[t];if(!sp)return null;const [cx,cz]=S.IS[t],L=Math.hypot(cx,cz)||1,ix=-cx/L,iz=-cz/L,txv=-iz,tz=ix,side=kind==='team'?4:-4;return[sp[0]+txv*side+ix*1.5,sp[1],sp[2]+tz*side+iz*1.5]}
 function nearChest(R,p,kind){const a=chestPos(R,p.team,kind);return !!a&&Math.hypot(p.x-a[0],p.z-a[2])<4.8&&Math.abs(p.y-a[1])<4}
-function chestState(R,p,kind){const items=kind==='team'?R.teamChest[p.team]:p.enderChest;tx(p,{t:'chestState',kind,items})}
+function generatorUpgradeInfo(R,t){
+  const tier=Math.max(0,Math.min(3,R.genTier?.[t]||0)),next=GEN_UPGRADE_COSTS[tier]||null;
+  return{tier,next:next?{key:next.key,n:next.n,label:next.label,name:next.name}:null,current:BASE_GEN_TIERS[tier].name};
+}
+function chestState(R,p,kind){const items=kind==='team'?R.teamChest[p.team]:p.enderChest,gi=kind==='team'?generatorUpgradeInfo(R,p.team):null;tx(p,{t:'chestState',kind,items,genTier:gi?.tier??0,genNext:gi?.next||null,genCurrent:gi?.current||''})}
 function projectileDir(yaw,pitch){const c=Math.cos(pitch);return{x:-Math.sin(yaw)*c,y:Math.sin(pitch),z:-Math.cos(yaw)*c};}
 function spawnProjectile(R,p,k,yaw,pitch,speed,charge=1){
   const d=projectileDir(yaw,pitch), id=++R.projSeq;
@@ -489,6 +504,16 @@ wss.on('connection', ws => {
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'chestOpen': {const kind=m.kind==='ender'?'ender':'team';if(!play||!nearChest(R,p,kind))break;chestState(R,p,kind);break}
       case 'chestMove': {const kind=m.kind==='ender'?'ender':'team',key=String(m.key||'');if(!play||!CHEST_KEYS.includes(key)||!nearChest(R,p,kind))break;const box=kind==='team'?R.teamChest[p.team]:p.enderChest,dir=m.dir==='withdraw'?'withdraw':'deposit';let n=m.n==='all'?Infinity:Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));if(dir==='deposit'){n=Math.min(n,p.inv[key]||0);if(n>0){p.inv[key]-=n;box[key]=(box[key]||0)+n}}else{n=Math.min(n,box[key]||0);if(n>0){box[key]-=n;p.inv[key]=(p.inv[key]||0)+n}}pinv(p);chestState(R,p,kind);break}
+      case 'genUpgrade': {
+        if(!play||!nearChest(R,p,'team'))break;
+        const tier=Math.max(0,Math.min(3,R.genTier?.[p.team]||0)),cost=GEN_UPGRADE_COSTS[tier],box=R.teamChest[p.team];
+        if(!cost){tx(p,{t:'m',s:'O gerador da sua base já está no nível máximo.'});chestState(R,p,'team');break}
+        if((box[cost.key]||0)<cost.n){tx(p,{t:'m',s:'Deposite '+cost.label+' no baú do time para essa melhoria.'});chestState(R,p,'team');break}
+        box[cost.key]-=cost.n;R.genTier[p.team]=tier+1;
+        const bg=R.g.base[p.team];if(bg){if(tier===0)bg.gold=0;if(tier===2)bg.dia=0}
+        teamPlayers(R,p.team).forEach(q=>tx(q,{t:'feed',text:'⚙ Gerador da base evoluiu para Nível '+(tier+1)+' — '+BASE_GEN_TIERS[tier+1].name+'.',aTeam:p.team,bTeam:-1,kind:'upgrade'}));
+        chestState(R,p,'team');break;
+      }
       case 'team': {
         const mc=modeCfg(R);
         if(R.st!=='lobby'||!Number.isInteger(m.team)||!mc.activeTeams.includes(m.team))break;
@@ -538,7 +563,7 @@ wss.on('connection', ws => {
             if(active.some(q=>[...R.ps.values()].filter(x=>!x.admin&&x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
           }
         }
-        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.ps.forEach(q=>q.trapQueue=[]);
+        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.genTier=[0,0,0,0];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
         R.st = 'play';
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => !q.admin&&q.team === t) ? 1 : 0;
@@ -616,9 +641,10 @@ wss.on('connection', ws => {
         const item=S.SH[m.i];
         if(!item){buyFail(p,'invalid_item','Item inválido.');break}
         if(!nearBase(p)){buyFail(p,'too_far','Chegue mais perto da loja do seu time.');break}
-        const [name,currency,basePrice,type,key,value]=item,modePrices=item[8]||null,trapQueue=R.traps[p.team]||[],price=type==='trap'?([1,2,4][trapQueue.length]??4):(modePrices&&modePrices[R.modeId]!=null?modePrices[R.modeId]:basePrice);
+        const [name,currency,basePrice,type,key,value]=item,modePrices=item[8]||null,trapQueue=R.traps[p.team]||[],price=type==='trap'?([1,2,4][trapQueue.length]??4):(modePrices&&modePrices[R.modeId]!=null?modePrices[R.modeId]:basePrice),diamondArmor=type==='ar'&&value===2;
         if(type==='trap'&&(!R.bed[p.team]||trapQueue.length>=3)){buyFail(p,'trap_full',!R.bed[p.team]?'Seu time não possui mais cama.':'A fila de traps está cheia (3/3).');break}
-        if((p.inv[currency]||0)<price){buyFail(p,'no_resource',`Recursos insuficientes para ${name}.`);break}
+        if(diamondArmor&&((p.inv.em||0)<4||(p.inv.dia||0)<32)){buyFail(p,'no_resource','Armadura de Diamante custa 4 esmeraldas + 32 diamantes.');break}
+        if(!diamondArmor&&(p.inv[currency]||0)<price){buyFail(p,'no_resource',`Recursos insuficientes para ${name}.`);break}
         let ok=1,teamUpgrade=false,trapBought=false;
         if(type==='inv'&&key==='bow'){if(p.inv.bow>0)ok=0;else p.inv.bow=1}
         else if(type==='inv')p.inv[key]=(p.inv[key]||0)+value;
@@ -629,7 +655,7 @@ wss.on('connection', ws => {
         else if(type==='trap'){trapQueue.push(key);p.trapQueue=[...trapQueue];trapBought=true}
         else ok=0;
         if(!ok){buyFail(p,'already_owned','Você já possui esse item ou uma versão melhor.');break}
-        p.inv[currency]-=price;
+        p.inv[currency]-=price;if(diamondArmor)p.inv.dia-=32;
         if(trapBought)syncTeamTraps(R,p.team);else if(teamUpgrade)teamPlayers(R,p.team).forEach(pinv);else pinv(p);buyOk(p);sfx(p,'buy');
         break;
       }
@@ -709,22 +735,24 @@ setInterval(() => {
       R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
-        const o = players.find(q => q.team === i), fm = 1 + .5 * (o ? o.up.forge : 0);
-        g.iron += dt; g.gold += dt;
-        if (g.iron > 1.2 / fm) { g.iron = 0; addDrop(R,'iron',1,gx,gy+.2,gz,48); }
-        if (g.gold > 5 / fm) { g.gold = 0; addDrop(R,'gold',1,gx+1,gy+.2,gz,12); }
+        const tier=Math.max(0,Math.min(3,R.genTier?.[i]||0)),cfg=BASE_GEN_TIERS[tier];
+        g.iron+=dt;
+        if(cfg.gold)g.gold+=dt;else g.gold=0;
+        if(cfg.dia)g.dia+=dt;else g.dia=0;
+        if(g.iron>=cfg.iron){g.iron-=cfg.iron;addDrop(R,'iron',1,gx,gy+.2,gz,32)}
+        if(cfg.gold&&g.gold>=cfg.gold){g.gold-=cfg.gold;addDrop(R,'gold',1,gx+1,gy+.2,gz,10)}
+        if(cfg.dia&&g.dia>=cfg.dia){g.dia-=cfg.dia;addDrop(R,'dia',1,gx-1,gy+.2,gz,4)}
       });
       R.g.dia.forEach((g, i) => {
         g.t += dt;
-        if (g.t <= 12) return;
-        g.t = 0;
+        if(g.t<CENTRAL_GEN.diamond)return;
+        g.t-=CENTRAL_GEN.diamond;
         const [gx,gy,gz]=R.DIGEN[i];addDrop(R,'dia',1,gx,gy,gz,4);
       });
       R.g.em.t += dt;
-      if (R.g.em.t > 22) {
-        R.g.em.t = 0;
-        const [gx,gy,gz]=R.EMGEN;
-        addDrop(R,'em',1,gx,gy,gz,2);
+      if(R.g.em.t>=CENTRAL_GEN.emerald){
+        R.g.em.t-=CENTRAL_GEN.emerald;
+        const [gx,gy,gz]=R.EMGEN;addDrop(R,'em',1,gx,gy,gz,2);
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
