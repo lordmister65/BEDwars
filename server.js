@@ -37,6 +37,7 @@ const CENTRAL_GEN={diamond:24,emerald:40};
 // Hitbox de combate centralizada. A caixa é levemente maior que a colisão física
 // para compensar interpolação e até um snapshot curto de movimento, sem aumentar o alcance.
 const COMBAT_HITBOX={radius:.36,height:1.80,feetPad:.05,historyMax:.60,meleePad:.055,meleeReach:3.80};
+const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:12*60,collapseAt:15*60,collapseEvery:5};
 function rebalanceForMode(R,mc){
   const players=[...R.ps.values()];
   if(mc.solo){
@@ -120,7 +121,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0, st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -131,7 +132,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false,
-  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'',
+  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,lastCombatAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
 const allow = (p, key, gap) => {
@@ -177,7 +178,7 @@ function playerHitsBlock(q,x,y,z){
     return horizontal&&vertical;
   });
 }
-function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); }
+function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
 
@@ -197,32 +198,34 @@ function win(R) {
     setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 90000);
   }
 }
+function cancelSpawnProtection(p){if(p&&p.spawnProtect>0){p.spawnProtect=0;tx(p,{t:'spawnProtect',v:0})}}
 function die(R, q, cause='combat') {
   if(!q.alive)return;
   q.stats.deaths++;
-  q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null;q.fx.blind=0;q.fx.fatigue=0;q.fx.slow=0;q.fx.milk=0; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
+  q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null;q.spawnProtect=0;q.fx.blind=0;q.fx.fatigue=0;q.fx.slow=0;q.fx.milk=0; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
   const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
-  const final = !R.bed[q.team];
+  const final = !R.bed[q.team];if(final)q.spectator=true;
   tx(q,{t:'deathState',final:final?1:0,respawn:final?0:5,cause,killer:killer?killer.name:''});
   if(killer){
     if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
-    const verb=cause==='void'?'derrubou':cause==='explosion'?'explodiu':'eliminou';
+    const verb=cause==='void'?'derrubou':cause==='explosion'?'explodiu':cause==='fall'?'fez cair':'eliminou';
     feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
   } else {
-    feed(R,`${q.name} morreu${cause==='void'?' no vazio':cause==='explosion'?' em uma explosão':''}`,-1,q.team,'death');
+    feed(R,`${q.name} morreu${cause==='void'?' no vazio':cause==='explosion'?' em uma explosão':cause==='fall'?' por queda':''}`,-1,q.team,'death');
   }
   if (final) { q.out = 1; win(R); }
 }
-function hurt(R, q, d, kx, kz, src, cr, cause='combat') {
-  if (!q.alive || q.ih > 0 || q.admin) return;
-  q.ih = .35; d *= Math.max(.2,1 - .25 * q.ar - .1 * q.up.prot); const dealt=Math.max(0,d);q.hp -= dealt;
-  if (src) { q.src = src; q.st = R.t; }
-  tx(q, { t: 'kb', kx: kx * 7, kz: kz * 7, vy: 4.5 }); sfx(q,'hurt');
-  bc(R, { t: 'fx', x: q.x, y: q.y + 1, z: q.z, c: cr ? 0xffd23d : 0xd23c3c });
-  bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});
-  tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0});
-  if (q.hp <= 0) die(R, q, cause);
+function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5){
+  if(!q.alive||q.admin)return false;
+  if(q.spawnProtect>0&&src&&src!==q)return false;
+  if(q.ih>0)return false;
+  q.ih=GAMEPLAY.damageIFrames;d*=Math.max(.2,1-.25*q.ar-.1*q.up.prot);const dealt=Math.max(0,d);q.hp-=dealt;
+  if(src){q.src=src;q.st=R.t;q.lastCombatAt=R.t}
+  const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.84:1,comboMul=src&&src.comboCount>=2?.92:1;
+  tx(q,{t:'kb',kx:kx*7*airMul*comboMul,kz:kz*7*airMul*comboMul,vy:kbVy*(airborne?.90:1)});sfx(q,'hurt');
+  bc(R,{t:'fx',x:q.x,y:q.y+1,z:q.z,c:cr?0xffd23d:0xd23c3c});bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0});
+  if(q.hp<=0)die(R,q,cause);return true;
 }
 function killBed(R, t, src) {
   if (!R.bed[t]) return;
@@ -264,19 +267,10 @@ function aimRay(R, p, yaw, pitch, range) {
   }
   return { dx, dy, dz, best, dist: bd, x: p.x + dx * bd, y: p.y + 1.62 + dy * bd, z: p.z + dz * bd, bx, by, bz };
 }
-function fireballBoom(R, x, y, z, owner) {
-  const r = 2;
-  for (let a=-r;a<=r;a++) for (let b=-r;b<=r;b++) for (let c=-r;c<=r;c++) {
-    if (a*a+b*b+c*c>r*r) continue;
-    const X=Math.floor(x)+a,Y=Math.floor(y)+b,Z=Math.floor(z)+c;
-    if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]&&![7,16].includes(get(R,X,Y,Z))) setb(R,X,Y,Z,0);
-  }
-  bc(R,{t:'fx',x,y,z,c:0xff6a00});
-  R.ps.forEach(q=>{
-    if(!q.alive)return;
-    const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);
-    if(L<4.5) hurt(R,q,9*(1-L/4.5),dx/(L||1)*1.35,dz/(L||1)*1.35,owner,false,'explosion');
-  });
+function fireballBoom(R,x,y,z,owner){
+  const r=2;for(let a=-r;a<=r;a++)for(let b=-r;b<=r;b++)for(let c=-r;c<=r;c++){if(a*a+b*b+c*c>r*r)continue;const X=Math.floor(x)+a,Y=Math.floor(y)+b,Z=Math.floor(z)+c;if(get(R,X,Y,Z)&&R.pf[S.ix(X,Y,Z)]&&![7,16].includes(get(R,X,Y,Z)))setb(R,X,Y,Z,0)}
+  bc(R,{t:'fx',x,y,z,c:0xff6a00});sfxAt(R,'fireball',x,y,z,9);
+  R.ps.forEach(q=>{if(!q.alive)return;const dx=q.x-x,dy=q.y+.9-y,dz=q.z-z,L=Math.hypot(dx,dy,dz);if(L>=4.5)return;const f=Math.max(.08,1-L/4.5),self=q===owner,nx=dx/(L||1),nz=dz/(L||1),h=self?1.55:1.32,vy=self?5.8+5.0*f:4.8+3.0*f;hurt(R,q,9*f,nx*h,nz*h,owner,false,'explosion',vy)})
 }
 
 function throwableTntBoom(R,kind,x,y,z,owner){
@@ -335,9 +329,9 @@ function genSnapshot(R){
 function pickupDrops(R, players){
   let changed=false;
   for(let i=R.drops.length-1;i>=0;i--){
-    const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.25&&Math.abs(q.y-d.y)<2.5);
+    const d=R.drops[i], p=players.find(q=>q.alive&&Math.hypot(q.x-d.x,q.z-d.z)<1.55&&Math.abs(q.y-d.y)<2.6);
     if(!p) continue;
-    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.stats.resourcesCollected+=d.n;p.dirty=1;
+    p.inv[d.k]=(p.inv[d.k]||0)+d.n;p.stats.resourcesCollected+=d.n;p.dirty=0;pinv(p);
     if(['iron','gold','dia','em'].includes(d.k)) sfxAt(R,'pickup_'+d.k,d.x,d.y,d.z,6);
     else sfx(p,'pickup');
     R.drops.splice(i,1);changed=true;
@@ -458,13 +452,18 @@ function buildPopupTower(R,p,x,y,z){
   if(free.length<18)return false;
   free.forEach(([X,Y,Z])=>setb(R,X,Y,Z,p.team+1,1));return true;
 }
+function safePearlPos(R,pr,x,y,z){
+ const h=Math.hypot(pr.vx,pr.vz)||1,back=[-pr.vx/h*.48,-pr.vz/h*.48],tries=[[x+back[0],y,z+back[1]],[x+back[0],y+.7,z+back[1]],[x+back[0]*1.8,y+.2,z+back[1]*1.8],[x,y+1.2,z]];
+ for(const [X,Y,Z] of tries){if(Y<1||Y>S.H-3)continue;const solid=(yy)=>get(R,Math.floor(X),Math.floor(yy),Math.floor(Z));if(!solid(Y+.05)&&!solid(Y+1.05)&&!solid(Y+1.72))return[X,Math.max(1,Y),Z]}
+ return null
+}
 function projectileImpact(R,pr,x,y,z,target){
   const owner=R.ps.get(pr.o);
   if(pr.k==='arrow'&&target)hurt(R,target,4+5*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.12,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.12,owner);
   else if(pr.k==='snowball'&&target)hurt(R,target,2.5,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.45,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.45,owner);
   else if(pr.k==='fireball')fireballBoom(R,x,y,z,owner);
   else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(pr.k))throwableTntBoom(R,pr.k,x,y,z,owner);
-  else if(pr.k==='pearl'&&owner&&owner.alive){owner.x=x-pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.y=Math.max(1,y);owner.z=z-pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*.4;owner.hp=Math.max(1,owner.hp-2);tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z});}
+  else if(pr.k==='pearl'&&owner&&owner.alive){const pos=safePearlPos(R,pr,x,y,z);if(pos){owner.x=pos[0];owner.y=pos[1];owner.z=pos[2];owner.hp=Math.max(1,owner.hp-2);owner.px=owner.x;owner.py=owner.y;owner.pz=owner.z;tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z,hard:1})}else tx(owner,{t:'m',s:'A pérola não encontrou um local seguro.'});}
   bc(R,{t:'projHit',id:pr.id,k:pr.k,x,y,z});
 }
 function tickProjectiles(R,dt){
@@ -591,18 +590,20 @@ wss.on('connection', ws => {
           }
         }
         const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.genTier=[0,0,0,0];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
-        R.st = 'play';
+        R.st = 'play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;
         for (let t = 0; t < 4; t++) {
           R.bed[t] = [...R.ps.values()].some(q => !q.admin&&q.team === t) ? 1 : 0;
           if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
         }
         R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks }); break;
       case 'mv': {
-        if (!p.alive || !allow(p, 'mv', 15)) break;
-        const n = Date.now(), dt = Math.max(.02, Math.min(.5, (n - p.lt) / 1000)); p.lt = n;
-        const d = Math.hypot(m.x - p.x, m.z - p.z),maxH=p.admin?dt*24+3:dt*12+1.5,maxV=p.admin?dt*24+3:dt*11+1.2;
-        if (![m.x, m.y, m.z, m.yaw, m.pitch].every(Number.isFinite) || d > maxH || Math.abs(m.y-p.y) > maxV || m.x < S.MIN_X-8 || m.x > S.MAX_X+8 || m.z < S.MIN_Z-8 || m.z > S.MAX_Z+8 || m.y > S.H+20 || m.y < -30) { tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z }); break; }
-        p.dy = (m.y - p.y) / dt; p.px=p.x;p.py=p.y;p.pz=p.z; p.x = m.x; p.y = m.y; p.z = m.z; p.yaw = m.yaw; p.pitch = m.pitch; break;
+        const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
+        const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n;
+        const d=Math.hypot(m.x-p.x,m.z-p.z),maxH=(p.admin||spectating)?dt*24+3:dt*12+1.5,maxV=(p.admin||spectating)?dt*24+3:dt*11+1.2;
+        if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite)||d>maxH||Math.abs(m.y-p.y)>maxV||m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30){tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0});break}
+        const oldY=p.y,newDy=(m.y-p.y)/dt;p.hspeed=Math.min(20,d/dt);p.dy=newDy;p.px=p.x;p.py=p.y;p.pz=p.z;p.x=m.x;p.y=m.y;p.z=m.z;p.yaw=m.yaw;p.pitch=m.pitch;
+        if(!spectating&&!p.admin){const below=get(R,Math.floor(p.x),Math.floor(p.y-.08),Math.floor(p.z))||get(R,Math.floor(p.x+.25),Math.floor(p.y-.08),Math.floor(p.z));p.wasGrounded=p.grounded;p.grounded=!!below;if(newDy<p.fallVyMin)p.fallVyMin=newDy;if(p.grounded&&!p.wasGrounded){const impact=Math.abs(Math.min(0,p.fallVyMin));if(impact>10.8)hurt(R,p,Math.min(12,(impact-10.8)*.78),0,0,null,false,'fall',0);p.fallVyMin=0}else if(p.grounded)p.fallVyMin=0}
+        break;
       }
       case 'adminPlace': {
         if(!p.admin)break;const x=Math.floor(m.x),y=Math.floor(m.y),z=Math.floor(m.z),b=Math.floor(m.b);
@@ -628,27 +629,27 @@ wss.on('connection', ws => {
       }
       case 'hit': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!play || !allow(p, 'hit', 90) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
+        if (!play || !allow(p, 'hit', GAMEPLAY.hitCooldownMs) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;cancelSpawnProtection(p);
         const q = R.ps.get(m.id);
         if (!q || q === p || !q.alive || q.team === p.team || q.admin) break;
         const hit=meleeRayHit(R,p,q,m.yaw,m.pitch);if(!hit)break;
-        const d=[hit.dir.x,hit.dir.y,hit.dir.z],stick=m.k==='knockbackStick'&&(p.inv.knockbackStick||0)>0,cr=!stick&&p.dy<-1,kb=stick?1.9:1,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
-        hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr);
-        tx(p, { t:'hitok', id:q.id, hp:Math.max(0,Math.ceil(q.hp)), cr:cr?1:0 });bc(R,{t:'anim',id:p.id,k:'attack'});
+        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t;if(p.comboTarget===q.id&&now-p.lastCombatAt<1.05)p.comboCount=Math.min(8,p.comboCount+1);else p.comboCount=1;p.comboTarget=q.id;p.lastCombatAt=now;const stick=m.k==='knockbackStick'&&(p.inv.knockbackStick||0)>0,cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.12:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
+        if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr))break;
+        tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});
         break;
       }
       case 'place': {
-        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!allow(p, 'place', 70)) break;
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
+        if (!allow(p, 'place', 62)) break;
         const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16 }[m.k], { x, y, z } = m;
         if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y >= S.H-2 || get(R, x, y, z)) break;
-        if (Math.hypot(x + .5 - p.x, y + .5 - p.y - 1.6, z + .5 - p.z) > 6.4) break;
+        if (Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45) break;
         if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
         if ([...R.ps.values()].some(q => playerHitsBlock(q,x,y,z))) { sfx(p,'blocked'); break; }
-        setb(R, x, y, z, k, 1); p.inv[m.k]--; pinv(p); sfx(p,'place'); break;
+        setb(R,x,y,z,k,1);p.inv[m.k]--;pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break;
       }
       case 'breakStart': {
-        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         const {x,y,z}=m;
         if(!play||![x,y,z].every(Number.isInteger)||Math.hypot(x+.5-p.x,y+.5-p.y-1.6,z+.5-p.z)>7)break;
         const b=get(R,x,y,z); if(!b)break;
@@ -685,7 +686,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'shoot': {
-        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
         if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
         const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
         const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:kind.startsWith('tnt')?650:999999;
@@ -703,7 +704,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'use': {
-        if(!play||!allow(p,'use',300))break;
+        cancelSpawnProtection(p);if(!play||!allow(p,'use',300))break;
         const k=m.k;
         if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){
           p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,24,1);pinv(p);
@@ -734,7 +735,7 @@ setInterval(() => {
     if (R.st === 'play') {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
-        p.ih = Math.max(0, p.ih - dt);
+        p.ih=Math.max(0,p.ih-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);p.fx.blind=Math.max(0,(p.fx.blind||0)-dt);p.fx.milk=Math.max(0,(p.fx.milk||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);
@@ -751,11 +752,13 @@ setInterval(() => {
             const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
             const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
-            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');}p.breaking=null;}
+            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');sfxAt(R,'break',br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;}
           }
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
+      if(!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<4;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
+      if(R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
       triggerTeamTraps(R);
       R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
@@ -785,7 +788,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.10){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.10){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
     }catch(err){console.error(`[TICK] erro isolado na sala ${R.code}`,err);}
   });
 }, 50);

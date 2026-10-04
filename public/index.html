@@ -6,9 +6,9 @@
 <link rel="stylesheet" href="/style.css"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="killFeed"></div><div id="bar"></div>
 <div id="breakBox"><div id="breakFill"></div></div>
-<div id="bowCharge"><div id="bowChargeFill"></div></div>
+<div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
-<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button></div>
+<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button><button class="mb settings-btn" id="mobileSettingsBtn">⚙</button><div id="mobileSettings"><b>CONTROLES</b><label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label><label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label><label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label><label>Opacidade<input id="mopacity" type="range" min="35" max="100" value="78"></label></div></div>
 <div class="hud" id="tm"></div><div class="hud" id="res"></div><div class="hud" id="hp"></div>
 <div id="chatLog"></div>
 <form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
@@ -37,5 +37,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=hitbox-v2-20261004"></script>
+<script src="/game.js?v=gameplay-overhaul-v3-20261004"></script>
 </body></html>
