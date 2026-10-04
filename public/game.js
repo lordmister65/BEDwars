@@ -713,14 +713,28 @@ function ray(){
  for(let n=0;n<20&&dist<=6;n++){if(get(x,y,z))return{h:[x,y,z],p:prev};prev=[x,y,z];if(tx<ty&&tx<tz){x+=sx;dist=tx;tx+=adx}else if(ty<tz){y+=sy;dist=ty;ty+=ady}else{z+=sz;dist=tz;tz+=adz}}
  return null
 }
+function viewAabbDistance(ox,oy,oz,dx,dy,dz,b,maxDist){
+ let t0=0,t1=maxDist;
+ for(const [s,d,min,max] of [[ox,dx,b.minX,b.maxX],[oy,dy,b.minY,b.maxY],[oz,dz,b.minZ,b.maxZ]]){
+  if(Math.abs(d)<1e-8){if(s<min||s>max)return null;continue}
+  let a=(min-s)/d,c=(max-s)/d;if(a>c){const tmp=a;a=c;c=tmp}t0=Math.max(t0,a);t1=Math.min(t1,c);if(t0>t1)return null;
+ }
+ return t0>=0&&t0<=maxDist?t0:null
+}
+function viewBlocked(dist,d){
+ const ox=cam.position.x,oy=cam.position.y,oz=cam.position.z,end=Math.max(0,dist-.05);
+ for(let t=.12;t<end;t+=.08){const x=Math.floor(ox+d.x*t),y=Math.floor(oy+d.y*t),z=Math.floor(oz+d.z*t);if(get(x,y,z))return true}
+ return false
+}
 function playerTarget(){
-  const d=new THREE.Vector3();cam.getWorldDirection(d);let best=null,bd=3.8;
-  PL.forEach((r,id)=>{
-    if(!r.al)return;
-    const p=r.m.position,dx=p.x-pl.x,dy=p.y+.9-(pl.y+1.62),dz=p.z-pl.z,L=Math.hypot(dx,dy,dz);
-    if(L>.01&&L<bd&&(dx*d.x+dy*d.y+dz*d.z)/L>.9){best=id;bd=L}
-  });
-  return best;
+ const d=new THREE.Vector3();cam.getWorldDirection(d);let best=null,bd=3.8;
+ PL.forEach((r,id)=>{
+  if(!r.al)return;const mp=matchPlayers.get(id);if(mp&&(mp.team===me.team||mp.out||mp.admin))return;
+  const p=r.m.position,b={minX:p.x-.415,maxX:p.x+.415,minY:p.y-.07,maxY:p.y+1.87,minZ:p.z-.415,maxZ:p.z+.415},t=viewAabbDistance(cam.position.x,cam.position.y,cam.position.z,d.x,d.y,d.z,b,3.8);
+  if(t!=null&&t<bd){best=id;bd=t}
+ });
+ if(best!==null&&viewBlocked(bd,d))return null;
+ return best;
 }
 let breaking=null,breakAt=0,breakDur=0;
 function bestToolForBlock(b){const want=BLOCKS[b]?.tool;if(!want||!(tools[want]>0))return null;return want}
