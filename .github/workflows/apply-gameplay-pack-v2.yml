@@ -1,0 +1,36 @@
+name: Apply Gameplay Pack V2
+on:
+  push:
+    branches: [feature/gameplay-pack-hotbar-traps]
+    paths:
+      - '.github/workflows/apply-gameplay-pack-v2.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gameplay-pack-hotbar-traps
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply corrected gameplay pack
+        run: python3 .github/scripts/apply-gameplay-pack.py
+      - name: Validate syntax
+        run: |
+          node --check server.js
+          node --check public/game.js
+          node --check public/shared.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Commit gameplay pack
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/game.js public/shared.js public/index.html public/style.css
+          if ! git diff --cached --quiet; then
+            git commit -m "Add hotbar editor complete traps and utilities"
+            git push origin HEAD:feature/gameplay-pack-hotbar-traps
+          fi
