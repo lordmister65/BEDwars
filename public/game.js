@@ -510,35 +510,64 @@ function closeShop(){shopOpen=0;scr(null);requestGameLock()}
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement)scr(null);else if(started&&!over)scr(shopOpen?'shop':'ov')});
 $('ov').onclick=()=>{audioInit();scr(null);requestGameLock()};
 // rede e reconexão
-const send=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
+const NET_RECONNECT_MS=60000,NET_CONNECT_TIMEOUT_MS=8000,NET_STALE_MS=25000,NET_PING_MS=10000;
+let netSeq=0,netAttemptAt=0,socketOpenedAt=0,lastNetMessageAt=Date.now(),connectTimeout=null,reconnectFailCount=0;
+const send=o=>{
+ const sock=ws;if(!sock||sock.readyState!==1)return false;
+ try{sock.send(JSON.stringify(o));return true}catch(err){console.warn('[NET] falha ao enviar',err);try{sock.close(4003,'send error')}catch(e){}return false}
+};
 function saveReconnect(){if(roomCode&&reconnectToken)sessionStorage.setItem('bwReconnect',JSON.stringify({room:roomCode,token:reconnectToken,name:$('nm').value||'Jogador'}))}
 function clearReconnect(){sessionStorage.removeItem('bwReconnect');reconnectToken='';roomCode=''}
 function setReconnectBanner(text){$('reconnectBanner').textContent=text;$('reconnectBanner').style.display=text?'block':'none'}
+function stopConnectTimeout(){if(connectTimeout){clearTimeout(connectTimeout);connectTimeout=null}}
 function connectSocket(mode='join'){
-  if(ws&&ws.readyState<=1)try{ws.close()}catch(e){}
-  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
-  ws.onopen=()=>{
+  const seq=++netSeq,sock=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws=sock;netAttemptAt=Date.now();socketOpenedAt=0;stopConnectTimeout();
+  connectTimeout=setTimeout(()=>{if(ws===sock&&sock.readyState===0){console.warn('[NET] timeout em CONNECTING');try{sock.close(4000,'connect timeout')}catch(e){}}},NET_CONNECT_TIMEOUT_MS);
+  sock.onopen=()=>{
+    if(ws!==sock||seq!==netSeq)return;stopConnectTimeout();socketOpenedAt=Date.now();lastNetMessageAt=Date.now();
     if(mode==='reconnect')send({t:'reconnect',room:roomCode,token:reconnectToken});
     else{roomCode=($('rm').value||'sala').slice(0,12).toLowerCase();$('rc').textContent=roomCode;send({t:'join',name:$('nm').value||'Jogador',room:roomCode})}
   };
-  ws.onmessage=e=>{try{const m=JSON.parse(e.data);on(m)}catch(err){console.error('Pacote de rede ignorado sem travar o jogo',err);msg('Sincronização recuperada automaticamente')}};
-  ws.onerror=()=>{if(!reconnecting)$('er').textContent='Não consegui conectar ao servidor.'};
-  ws.onclose=()=>{
+  sock.onmessage=e=>{if(ws!==sock||seq!==netSeq)return;lastNetMessageAt=Date.now();try{const m=JSON.parse(e.data);on(m)}catch(err){console.error('Pacote de rede ignorado sem travar o jogo',err);msg('Sincronização recuperada automaticamente')}};
+  sock.onerror=e=>{if(ws!==sock)return;console.warn('[NET] WebSocket error',e);if(!reconnecting)$('er').textContent='Não consegui conectar ao servidor.'};
+  sock.onclose=e=>{
+    stopConnectTimeout();
+    if(ws!==sock||seq!==netSeq){console.debug('[NET] fechamento de socket antigo ignorado',e.code,e.reason);return}
+    console.warn('[NET] socket fechado',e.code,e.reason||'sem motivo');
     if(over)return;
     if(started&&reconnectToken){startReconnect()}else if(!reconnecting)msg('Conexão perdida');
   };
 }
+function finishReconnect(){reconnecting=false;clearTimeout(reconnectTimer);reconnectTimer=null;stopConnectTimeout();reconnectFailCount=0;lastNetMessageAt=Date.now();setReconnectBanner('')}
 function startReconnect(){
-  if(reconnecting)return;reconnecting=true;reconnectUntil=Date.now()+30000;
+  if(!reconnectToken)return;
+  if(!reconnecting){reconnecting=true;reconnectUntil=Date.now()+NET_RECONNECT_MS;reconnectFailCount=0}
   try{document.exitPointerLock()}catch(e){}
   const attempt=()=>{
-    const left=Math.max(0,Math.ceil((reconnectUntil-Date.now())/1000));
+    if(!reconnecting)return;
+    const now=Date.now(),left=Math.max(0,Math.ceil((reconnectUntil-now)/1000));
     if(!left){reconnecting=false;setReconnectBanner('Reconexão não foi possível.');clearReconnect();setTimeout(()=>location.reload(),1200);return}
     setReconnectBanner('Conexão perdida. Tentando reconectar... ('+left+'s)');
-    if(!ws||ws.readyState===3)connectSocket('reconnect');
-    reconnectTimer=setTimeout(attempt,2000);
-  };attempt();
+    const state=ws?ws.readyState:3,age=now-netAttemptAt;
+    if(state===0&&age>NET_CONNECT_TIMEOUT_MS){try{ws.close(4000,'connect timeout')}catch(e){}}
+    else if(state===1&&socketOpenedAt&&now-socketOpenedAt>NET_CONNECT_TIMEOUT_MS&&now-lastNetMessageAt>NET_CONNECT_TIMEOUT_MS){try{ws.close(4001,'reconnect handshake timeout')}catch(e){}}
+    else if(state===2&&age>3000)connectSocket('reconnect');
+    else if(!ws||state===3)connectSocket('reconnect');
+    reconnectTimer=setTimeout(attempt,1500);
+  };
+  clearTimeout(reconnectTimer);attempt();
 }
+setInterval(()=>{
+  if(over||!ws)return;
+  const now=Date.now();
+  if(ws.readyState===1){
+    send({t:'netPing',at:now});
+    if(started&&now-lastNetMessageAt>NET_STALE_MS){console.warn('[NET] conexão sem pacotes por '+(now-lastNetMessageAt)+'ms');try{ws.close(4002,'stale connection')}catch(e){}}
+  }else if(started&&reconnectToken&&!reconnecting)startReconnect();
+},NET_PING_MS);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&started&&reconnectToken&&(!ws||ws.readyState!==1))startReconnect()});
+addEventListener('online',()=>{if(started&&reconnectToken&&(!ws||ws.readyState!==1))startReconnect()});
 $('go').onclick=()=>{$('er').textContent='Conectando…';connectSocket('join')};
 $('st').onclick=()=>{send({t:'start'});requestGameLock()};
 function leaveToLobby(){clearReconnect();location.reload()}
@@ -574,10 +603,11 @@ let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){if(d
 function on(m){switch(m.t){
 case'init':me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;reconnectToken=m.token||reconnectToken;saveReconnect();loadMap(m.mapId||'classic',true,m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);pl.yaw=0;break;
 case'reconnected':
- reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('');me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;saveReconnect();
+ finishReconnect();me.id=m.id;me.team=m.team;roomCode=m.room;currentMode=m.modeId||currentMode;reconnectToken=m.token;saveReconnect();
  INFO={};(m.roster||[]).forEach(([id,n,t])=>INFO[id]={n,t});loadMap(m.mapId||currentMap,m.st==='lobby',m.activeChunks);(m.ed||[]).forEach(a=>sb(...a));flush(999);syncDrops(m.drops||[]);bed=m.bed||bed;
  syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
-case'reconnectFail':reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break;
+case'reconnectFail':{reconnectFailCount++;if(reconnecting&&Date.now()<reconnectUntil&&reconnectFailCount<3){setReconnectBanner('Servidor ainda não confirmou a sessão. Nova tentativa...');try{if(ws&&ws.readyState<=1)ws.close(4004,'retry reconnect')}catch(e){}break}reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break}
+case'netPong':lastNetMessageAt=Date.now();break;
 case'lobby':{
  INFO={};m.l.forEach(([id,n,t,d])=>INFO[id]={n,t,d});const mine=m.l.find(q=>q[0]===me.id);if(mine)me.team=mine[2];
  currentMode=m.modeId||currentMode;

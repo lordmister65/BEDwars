@@ -25,7 +25,11 @@ function rebalanceForMode(R,mc){
   }
   players.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team]});
 }
-const MAX_SOCKET_BUFFER = 256 * 1024;
+const SOFT_SOCKET_BUFFER = 512 * 1024;
+const HARD_SOCKET_BUFFER = 2 * 1024 * 1024;
+const RECONNECT_GRACE_MS = 60000;
+const HEARTBEAT_INTERVAL_MS = 20000;
+const HEARTBEAT_TIMEOUT_MS = 70000;
 let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
@@ -39,12 +43,48 @@ const srv = http.createServer((q, r) => {
   r.end(STATIC[f]);
 });
 const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
-const canSend = ws => !!ws && ws.readyState === 1 && ws.bufferedAmount < MAX_SOCKET_BUFFER;
-const tx = (p, o) => { if (canSend(p.ws)) p.ws.send(JSON.stringify(o)); };
-const bc = (R, o) => {
-  let data;try{data=JSON.stringify(o)}catch(e){console.warn('Falha ao serializar broadcast',e);return}
-  R.ps.forEach(p=>{const ws=p.ws;if(!canSend(ws))return;try{ws.send(data)}catch(e){p.disconnected=true;p.ws=null}});
+const netReason = v => String(v||'').slice(0,120);
+function netLog(p,event,extra=''){
+  const who=p?`id=${p.id||'?'} name=${p.name||'?'} room=${p.roomCode||'?'}`:'socket sem jogador';
+  console.log(`[NET] ${event} | ${who}${extra?' | '+extra:''}`);
+}
+function terminateSocket(ws,reason='network_error'){
+  if(!ws)return;ws._terminateReason=reason;
+  try{ws.terminate()}catch(e){try{ws.close(1011,reason.slice(0,120))}catch(_){}}
+}
+const socketOpen = ws => !!ws && ws.readyState === 1;
+function sendSocket(ws,data,{droppable=false}={}){
+  if(!socketOpen(ws))return false;
+  if(ws.bufferedAmount>=HARD_SOCKET_BUFFER){
+    console.warn('[NET] buffer crítico; encerrando socket',ws.bufferedAmount);terminateSocket(ws,'buffer_overflow');return false;
+  }
+  if(droppable&&ws.bufferedAmount>=SOFT_SOCKET_BUFFER)return false;
+  try{ws.send(data);return true}catch(err){console.warn('[NET] falha ao enviar pacote',err?.message||err);terminateSocket(ws,'send_error');return false}
+}
+const tx = (p,o) => {
+  let data;try{data=JSON.stringify(o)}catch(e){console.warn('Falha ao serializar pacote',e);return false}
+  return sendSocket(p&&p.ws,data);
 };
+const bc = (R,o) => {
+  let data;try{data=JSON.stringify(o)}catch(e){console.warn('Falha ao serializar broadcast',e);return}
+  const droppable=o&&o.t==='s';
+  R.ps.forEach(p=>sendSocket(p.ws,data,{droppable}));
+};
+function markDisconnected(R,p,ws,code=1006,reason=''){
+  if(!R||!p)return;
+  if(p.ws!==ws){netLog(p,'close ignorado de socket antigo',`code=${code} reason=${netReason(reason)}`);return}
+  p.ws=null;
+  if(R.st==='play'){
+    const first=!p.disconnected;p.disconnected=true;p.disconnectedAt=Date.now();p.reconnectDeadline=Date.now()+RECONNECT_GRACE_MS;
+    netLog(p,'desconectado',`code=${code} reason=${netReason(reason)||ws?._terminateReason||'sem motivo'} grace=${RECONNECT_GRACE_MS}ms`);
+    if(first)feed(R,`${p.name} desconectou. Aguardando reconexão por 60s...`,p.team,-1,'disconnect');
+    return;
+  }
+  netLog(p,'saiu do lobby',`code=${code} reason=${netReason(reason)}`);
+  R.ps.delete(p.id);if(R.host===p.id)R.host=[...R.ps.keys()][0]||null;
+  if(!R.ps.size){rooms.delete(R.code);return}
+  if(R.st==='lobby')lobby(R);
+}
 const msg = (R, s) => bc(R, { t: 'm', s });
 const get = (R, x, y, z) => (y < 0 || !S.inXZ(x,z) || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
 function setb(R, x, y, z, v, f = 0) {
@@ -66,7 +106,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team) => ({ ws, name, team, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false,
-  token: crypto.randomBytes(18).toString('hex'), disconnected:false, reconnectDeadline:0,
+  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'',
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0}, up: { sharp: 0, prot: 0, forge: 0, regen:0, trap:0 }, inv: { wool: 24, planks: 0, endstone:0, glass:0, obsidian:0, tnt: 0, tntImpulse:0, tntSlow:0, tntDamage:0, apple: 0, bow: 0, arrow: 0, fireball: 0, snowball: 0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, iron: 0, gold: 0, dia: 0, em: 0 } });
 const allow = (p, key, gap) => {
@@ -342,8 +382,9 @@ function tickProjectiles(R,dt){
 
 wss.on('connection', ws => {
   let R, p;
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+  ws.connectedAt=Date.now();ws.lastPongAt=Date.now();
+  ws.on('pong', () => { ws.lastPongAt=Date.now(); });
+  ws.on('error',err=>{netLog(p,'erro de socket',netReason(err&&err.message));if(ws.readyState!==3)terminateSocket(ws,'socket_error')});
   ws.on('message', raw => {
     try{
     if(raw.length>4096){try{ws.close(1009,'mensagem muito grande')}catch(e){}return}
@@ -352,7 +393,7 @@ wss.on('connection', ws => {
       const code=String(m.room||'').slice(0,12).toLowerCase(), rr=rooms.get(code);
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
-      R=rr;p=found;p.ws=ws;p.disconnected=false;p.reconnectDeadline=0;p.lt=Date.now();
+      R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
       tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,admin:p.admin?1:0,adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
@@ -367,13 +408,14 @@ wss.on('connection', ws => {
       const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
       if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os dois times estão cheios.'});
-      p = mkp(ws, (String(m.name || 'Jogador').trim()||'Jogador').slice(0,14), team); p.id = ++uid;
-      p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);
+      p = mkp(ws, (String(m.name || 'Jogador').trim()||'Jogador').slice(0,14), team); p.id = ++uid;p.roomCode=R.code;ws.playerId=p.id;
+      p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
       tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
+      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now()}); break;
       case 'team': {
         const mc=modeCfg(R);
         if(R.st!=='lobby'||!Number.isInteger(m.team)||!mc.activeTeams.includes(m.team))break;
@@ -548,22 +590,17 @@ wss.on('connection', ws => {
     }
     }catch(err){console.error('Erro isolado em mensagem WebSocket',err);try{tx(p||{ws},{t:'err',s:'Ação ignorada por segurança. Tente novamente.'})}catch(e){}}
   });
-  ws.on('close', () => {
-    if (!p) return;
-    if(R.st==='play'){
-      p.ws=null;p.disconnected=true;p.reconnectDeadline=Date.now()+30000;
-      feed(R,`${p.name} desconectou. Aguardando reconexão...`,p.team,-1,'disconnect');
-      return;
-    }
-    R.ps.delete(p.id); if (R.host === p.id) R.host = [...R.ps.keys()][0] || null;
-    if (!R.ps.size) { rooms.delete(R.code); return; }
-    if (R.st === 'lobby') lobby(R);
+  ws.on('close',(code,reasonBuf)=>{
+    if(!p)return;
+    const reason=reasonBuf&&reasonBuf.length?reasonBuf.toString():ws._terminateReason||'';
+    markDisconnected(R,p,ws,code,reason);
   });
 });
 
 setInterval(() => {
   const dt = .05;
   rooms.forEach(R => {
+    try{
     R.t += dt;
     if (R.st === 'play') {
       const players = [...R.ps.values()];
@@ -571,7 +608,8 @@ setInterval(() => {
         p.ih = Math.max(0, p.ih - dt);
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
-          p.disconnected=false;p.reconnectDeadline=0;
+          netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);
+          p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;
           for(const k of ['iron','gold','dia','em']){const n=p.inv[k]||0;if(n>0){addDrop(R,k,n,p.x,p.y+.25,p.z,k==='iron'?48:k==='gold'?12:8);p.inv[k]=0;}}
           if(p.alive)die(R,p,'disconnect');
           p.out=1;feed(R,`${p.name} não reconectou a tempo e foi eliminado.`,-1,p.team,'disconnect');win(R);return;
@@ -616,16 +654,22 @@ setInterval(() => {
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
     if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.10){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills]),pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    }catch(err){console.error(`[TICK] erro isolado na sala ${R.code}`,err);}
   });
 }, 50);
 
 const heartbeat = setInterval(() => {
+  const now=Date.now();
   wss.clients.forEach(ws => {
-    if (ws.isAlive === false) return ws.terminate();
-    ws.isAlive = false;
-    try { ws.ping(); } catch (e) {}
+    if(ws.readyState!==1)return;
+    const idle=now-(ws.lastPongAt||ws.connectedAt||now);
+    if(idle>HEARTBEAT_TIMEOUT_MS){
+      console.warn(`[NET] heartbeat timeout | player=${ws.playerId||'?'} idle=${idle}ms`);
+      return terminateSocket(ws,'heartbeat_timeout');
+    }
+    try{ws.ping()}catch(err){console.warn('[NET] falha no ping',err?.message||err);terminateSocket(ws,'ping_error')}
   });
-}, 30000);
+}, HEARTBEAT_INTERVAL_MS);
 wss.on('close', () => clearInterval(heartbeat));
 
 srv.listen(PORT, () => console.log('Bed Wars online na porta ' + PORT));
