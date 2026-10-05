@@ -1,0 +1,42 @@
+name: Apply Mobile D-pad V3
+on:
+  push:
+    branches: [feature/mobile-dpad-minecraft-v2]
+    paths:
+      - '.github/scripts/apply-mobile-dpad-v3.js'
+      - '.github/workflows/apply-mobile-dpad-v3.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/mobile-dpad-minecraft-v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply D-pad V3
+        run: node .github/scripts/apply-mobile-dpad-v3.js
+      - name: Validate JavaScript
+        run: |
+          node --check public/game.js
+          node --check server.js
+          node --check public/shared.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify D-pad hooks
+        run: |
+          grep -q 'moveForwardLeftBtn' public/index.html
+          grep -q 'jumpPadBtn' public/index.html
+          grep -q 'Native Minecraft-style D-pad' .github/scripts/apply-mobile-dpad-v3.js
+          grep -q 'mobile-dpad-v3-20261005' public/index.html
+          test ! -f public/mobile-minecraft-controls.js
+      - name: Commit functional changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/game.js public/index.html public/mobile-minecraft-controls.css public/mobile-minecraft-controls.js
+          git diff --cached --quiet || git commit -m 'Replace legacy mobile joystick with Minecraft-style D-pad'
+          git push origin HEAD:feature/mobile-dpad-minecraft-v2
