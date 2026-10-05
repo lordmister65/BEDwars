@@ -53,7 +53,16 @@ jobs:
           Integrated into Browser BedWars from the sound pack supplied by the project owner.
           The creator's pack description requests proper credit when using these sounds.
           EOF
-          find public/assets/sounds/leptoks -type f | sort
+      - name: Adapt migration to current sfx3d syntax
+        run: |
+          python - <<'PY'
+          p='.github/scripts/import-leptoks-sound-pack.js'
+          s=open(p,encoding='utf-8').read()
+          old="/case'sfx3d':\\{const g=positionalGain\\(m\\.x,m\\.y,m\\.z,m\\.r\\|\\|7\\);if\\(g>0\\)\\{[\\s\\S]*?\\}\\}break;/"
+          new="/case'sfx3d':\\{const g=positionalGain\\(m\\.x,m\\.y,m\\.z,m\\.r\\|\\|7\\);if\\(g>0\\)\\{[\\s\\S]*?\\}break\\}/"
+          if old not in s: raise SystemExit('old sfx3d matcher not found')
+          open(p,'w',encoding='utf-8').write(s.replace(old,new))
+          PY
       - name: Patch BedWars audio integration
         run: node .github/scripts/import-leptoks-sound-pack.js
       - name: Validate JavaScript
