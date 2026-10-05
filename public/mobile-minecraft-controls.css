@@ -1,0 +1,16 @@
+@media (pointer:coarse),(max-width:800px){
+  #joy,#actBtn,#placeBtn,#useBtn{display:none!important}
+  #look{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:auto;touch-action:none}
+  #dpad{position:absolute;left:calc(16px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));width:calc(154px * var(--mobile-scale));height:calc(154px * var(--mobile-scale));z-index:5;pointer-events:none;opacity:var(--mobile-opacity)}
+  .move-btn{position:absolute;width:calc(50px * var(--mobile-scale));height:calc(50px * var(--mobile-scale));margin:0!important;padding:0!important;display:flex!important;align-items:center;justify-content:center;text-align:center!important;pointer-events:auto!important;touch-action:none;border-radius:8px!important;background:rgba(38,42,47,.82)!important;border:2px solid rgba(255,255,255,.55)!important;box-shadow:0 3px 10px rgba(0,0,0,.35)!important;font-size:18px!important;color:#fff!important}
+  .move-btn:active,.move-btn.touch-active{transform:scale(.93);background:rgba(96,108,120,.94)!important}
+  .move-forward{left:calc(52px * var(--mobile-scale));top:0}.move-left{left:0;top:calc(52px * var(--mobile-scale))}.move-right{right:0;top:calc(52px * var(--mobile-scale))}.move-back{left:calc(52px * var(--mobile-scale));bottom:0}
+  #jumpBtn{right:calc(22px + env(safe-area-inset-right));bottom:calc(32px + env(safe-area-inset-bottom));width:calc(70px * var(--mobile-scale));height:calc(70px * var(--mobile-scale))!important;border-radius:50%!important;z-index:5}
+  .hotbar-nav{z-index:5}#bar{z-index:4}#mobileSettings,#mobileSettingsBtn,#mobileChatBtn{z-index:7}
+  .mobile-help{font-size:7px!important;line-height:1.5;color:#ddd!important;margin:4px 0 8px!important}
+  body.mobile-left-handed #dpad{left:auto;right:calc(16px + env(safe-area-inset-right))}
+  body.mobile-left-handed #jumpBtn{right:auto;left:calc(22px + env(safe-area-inset-left))}
+}
+@media (pointer:coarse) and (max-height:430px){
+  #dpad{width:132px;height:132px}.move-btn{width:43px;height:43px!important}.move-forward{left:44px}.move-left{top:44px}.move-right{top:44px}.move-back{left:44px}#jumpBtn{width:60px;height:60px!important}
+}
