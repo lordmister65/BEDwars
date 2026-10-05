@@ -32,3 +32,4 @@ jobs:
           git add server.js public/game.js
           git diff --cached --quiet || git commit -m "Finalize security multiplayer polish"
           git push origin HEAD:feature/security-multiplayer-polish
+# trigger-finalize-v1
