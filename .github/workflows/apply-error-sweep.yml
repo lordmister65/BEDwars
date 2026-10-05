@@ -1,0 +1,44 @@
+name: Apply Error Sweep
+on:
+  push:
+    branches: [audit/error-sweep-20261005]
+    paths:
+      - '.github/scripts/apply-error-sweep.js'
+      - '.github/workflows/apply-error-sweep.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/error-sweep-20261005
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply fixes
+        run: node .github/scripts/apply-error-sweep.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate JavaScript
+        run: |
+          node --check server.js
+          node --check public/shared.js
+          node --check public/blockbench-models.js
+          node --check public/game.js
+      - name: Validate fixes
+        run: |
+          grep -q 'safePlayerName' server.js
+          grep -q 'getStaticFile' server.js
+          grep -q 'sendSocket(q.ws,data)' server.js
+          ! grep -q 'canSend(q.ws)' server.js
+          grep -q 'document.createTextNode' public/game.js
+          grep -q 'Check stability regressions' .github/workflows/check.yml
+      - name: Commit functional changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.js public/game.js .github/workflows/check.yml
+          git diff --cached --quiet || git commit -m 'Fix runtime and static asset stability issues'
+          git push origin HEAD:audit/error-sweep-20261005
