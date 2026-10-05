@@ -65,6 +65,16 @@ jobs:
           PY
       - name: Patch BedWars audio integration
         run: node .github/scripts/import-leptoks-sound-pack.js
+      - name: Fix generated sfx3d case closure
+        run: |
+          python - <<'PY'
+          p='public/game.js'
+          s=open(p,encoding='utf-8').read()
+          old="else sfx(m.k)}break;\ncase'fx':"
+          new="else sfx(m.k)}break;}\ncase'fx':"
+          if old not in s: raise SystemExit('generated sfx3d closure not found')
+          open(p,'w',encoding='utf-8').write(s.replace(old,new,1))
+          PY
       - name: Validate JavaScript
         run: |
           node --check server.js
