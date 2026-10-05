@@ -4,7 +4,7 @@
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css?v=mobile-experience-v2-20261005">
-<link rel="stylesheet" href="/mobile-minecraft-controls.css?v=20261005"></head><body>
+<link rel="stylesheet" href="/mobile-minecraft-controls.css?v=dpad-v3-20261005"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
@@ -18,15 +18,21 @@
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
 <div id="mobile">
-  <div id="joy" aria-label="Movimento"><div id="knob"></div></div><div id="look" aria-label="Área de câmera"></div>
-  <button class="mb action-primary" id="actBtn" aria-label="Atacar ou quebrar">⚔<small>ATACAR</small></button>
-  <button class="mb action-place" id="placeBtn" aria-label="Colocar bloco">▦<small>COLOCAR</small></button>
-  <button class="mb action-jump" id="jumpBtn" aria-label="Pular">↑<small>PULAR</small></button>
-  <button class="mb action-use" id="useBtn" aria-label="Usar item">✦<small>USAR</small></button>
+  <div id="look" aria-label="Área de câmera e interação"></div>
+  <div id="dpad" aria-label="Controle direcional">
+    <button class="move-btn diagonal forward-left" id="moveForwardLeftBtn" aria-label="Frente e esquerda">↖</button>
+    <button class="move-btn forward" id="moveForwardBtn" aria-label="Andar para frente">▲</button>
+    <button class="move-btn diagonal forward-right" id="moveForwardRightBtn" aria-label="Frente e direita">↗</button>
+    <button class="move-btn left" id="moveLeftBtn" aria-label="Andar para esquerda">◀</button>
+    <button class="move-btn jump-pad" id="jumpPadBtn" aria-label="Pular"><span>⇧</span></button>
+    <button class="move-btn right" id="moveRightBtn" aria-label="Andar para direita">▶</button>
+    <button class="move-btn back" id="moveBackBtn" aria-label="Andar para trás">▼</button>
+  </div>
   <button class="mb hotbar-nav" id="prevItemBtn" aria-label="Item anterior">◀</button><button class="mb hotbar-nav" id="nextItemBtn" aria-label="Próximo item">▶</button>
   <button class="mb mobile-chat-btn" id="mobileChatBtn" aria-label="Abrir chat">💬</button>
   <button class="mb settings-btn" id="mobileSettingsBtn" aria-label="Configurações mobile">⚙</button>
   <div id="mobileSettings"><b>CONTROLES MOBILE</b>
+    <p class="mobile-help">Use os botões direcionais para andar. Toque na tela para atacar, usar ou colocar. Segure para quebrar blocos e arraste para olhar.</p>
     <label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label>
     <label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label>
     <label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label>
@@ -66,6 +72,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=mobile-experience-v2-20261005"></script>
-<script src="/mobile-minecraft-controls.js?v=20261005"></script>
+<script src="/game.js?v=mobile-dpad-v3-20261005"></script>
 </body></html>
