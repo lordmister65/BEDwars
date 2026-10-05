@@ -45,7 +45,7 @@ function heldAllows(p,k){const h=heldKey(p);if(k==='sword')return h==='sword';if
 function acFlag(p,type,detail=''){
  if(!p||p.admin)return false;
  p.ac=p.ac||{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''};
- p.ac.total++;p.ac[type]=(p.ac[type]||0)+1;p.ac.last=type+(detail?': '+String(detail).slice(0,70):'');p.acAt=Date.now();
+ p.ac.total++;p.ac[type]=(p.ac[type]||0)+1;p.ac.last=type+(detail?': '+String(detail).replace(/[<>]/g,'').slice(0,70):'');p.acAt=Date.now();
  console.warn('[AC]',p.name,p.roomCode,type,detail);
  try{tx(p,{t:'ac',type,total:p.ac.total,last:p.ac.last})}catch(e){}
  return true
@@ -554,8 +554,12 @@ wss.on('connection', ws => {
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
-        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;
-        R.ps.forEach((q,i)=>{q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i);tx(q,{t:'replay'})});
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=[emptyChest(),emptyChest(),emptyChest(),emptyChest()];R.genTier=[0,0,0,0];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};
+        R.ps.forEach((q,i)=>{
+ q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.trapQueue=[];q.enderChest=emptyChest();
+ if(!q.admin){q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};q.fx={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0};q.up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0};q.inv={wool:24,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0}}
+ q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i);pinv(q);tx(q,{t:'replay'})
+});
         bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});lobby(R);break
       }
       case 'chestOpen': {const kind=m.kind==='ender'?'ender':'team';if(!play||!nearChest(R,p,kind))break;p.openChestKind=kind;chestState(R,p,kind);break}
