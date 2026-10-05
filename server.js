@@ -3,7 +3,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
-const ADMIN_COMMAND=String(process.env.ADMIN_COMMAND||'/lordmister').toLowerCase();
+const ADMIN_COMMAND='/calopsita';
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
 const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=34;
 const STATS_FILE=process.env.BW_STATS_FILE||path.join(__dirname,'data','stats.json');
@@ -113,15 +113,15 @@ function markDisconnected(R,p,ws,code=1006,reason=''){
 }
 const msg = (R, s) => bc(R, { t: 'm', s });
 const get = (R, x, y, z) => (y < 0 || !S.inXZ(x,z) || y >= S.H) ? 0 : R.B[S.ix(x, y, z)];
-function setb(R, x, y, z, v, f = 0) {
-  if (!S.inXZ(x,z) || y < 0 || y >= S.H) return;
-  const i = S.ix(x, y, z); R.B[i] = v; R.pf[i] = f; R.ed.set(i, [x, y, z, v, f]); R.q.push([x, y, z, v, f]);
+function setb(R,x,y,z,v,f=0){
+  if(!S.inXZ(x,z)||y<0||y>=S.H)return;
+  const i=S.ix(x,y,z),seq=++R.blockSeq;R.B[i]=v;R.pf[i]=f;const row=[x,y,z,v,f,seq];R.ed.set(i,row);R.q.push(row);
 }
 function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0, st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -131,7 +131,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false,
+const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0,
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,lastCombatAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
@@ -147,7 +147,7 @@ const nearBase = p => {
 };
 const buyFail=(p,code,text)=>tx(p,{t:'buyResult',ok:0,code,text});
 const buyOk=p=>tx(p,{t:'buyResult',ok:1});
-const pinv = p => tx(p, { t: 'inv', i: p.inv, sw: p.sw, ar: p.ar, up: p.up, tools:p.tools, fx:p.fx, traps:p.trapQueue||[] });
+const pinv=p=>{p.invSeq=(p.invSeq||0)+1;return tx(p,{t:'inv',i:p.inv,sw:p.sw,ar:p.ar,up:p.up,tools:p.tools,fx:p.fx,traps:p.trapQueue||[],seq:p.invSeq})};
 const sfx = (p,k) => tx(p,{t:'sfx',k});
 const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
 const statsPayload = R => [...R.ps.values()].map(p=>({
@@ -526,7 +526,8 @@ wss.on('connection', ws => {
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
-      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now()}); break;
+      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0}); break;
+      case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'chestOpen': {const kind=m.kind==='ender'?'ender':'team';if(!play||!nearChest(R,p,kind))break;chestState(R,p,kind);break}
       case 'chestMove': {const kind=m.kind==='ender'?'ender':'team',key=String(m.key||'');if(!play||!CHEST_KEYS.includes(key)||!nearChest(R,p,kind))break;const box=kind==='team'?R.teamChest[p.team]:p.enderChest,dir=m.dir==='withdraw'?'withdraw':'deposit';let n=m.n==='all'?Infinity:Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));if(dir==='deposit'){n=Math.min(n,p.inv[key]||0);if(n>0){p.inv[key]-=n;box[key]=(box[key]||0)+n}}else{n=Math.min(n,box[key]||0);if(n>0){box[key]-=n;p.inv[key]=(p.inv[key]||0)+n}}pinv(p);chestState(R,p,kind);break}
@@ -622,6 +623,23 @@ wss.on('connection', ws => {
       }
       case 'adminSetGear': {
         if(!p.admin)break;p.sw=Math.max(0,Math.min(3,Math.floor(Number(m.sw)||0)));p.ar=Math.max(0,Math.min(2,Math.floor(Number(m.ar)||0)));pinv(p);break;
+      }
+      case 'adminTest': {
+        if(!p.admin)break;
+        const action=String(m.action||''),q=Number.isInteger(m.id)?R.ps.get(m.id):p;
+        if(action==='resync'){tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]});break}
+        if(action==='sudden'){if(R.st==='play'){R.t=Math.max(R.t,GAMEPLAY.suddenDeathAt+.1);tx(p,{t:'m',s:'Morte súbita forçada para teste.'})}break}
+        if(action==='genTier'){const t=Math.max(0,Math.min(3,Math.floor(Number(m.value)||0)));R.genTier[p.team]=t;tx(p,{t:'m',s:'Gerador do time ajustado para nível '+t+'.'});break}
+        if(!q||q.admin&&q!==p)break;
+        if(action==='clearInv'){for(const k of Object.keys(q.inv))q.inv[k]=0;pinv(q)}
+        else if(action==='oneBlock'){const k=['wool','planks','endstone','glass','obsidian'].includes(m.k)?m.k:'wool';for(const b of ['wool','planks','endstone','glass','obsidian'])q.inv[b]=0;q.inv[k]=1;pinv(q)}
+        else if(action==='fullBlocks'){for(const b of ['wool','planks','endstone','glass','obsidian'])q.inv[b]=64;pinv(q)}
+        else if(action==='setHp'){q.hp=Math.max(1,Math.min(20,Number(m.value)||20));pinv(q)}
+        else if(action==='kill'){if(q.alive)die(R,q,'admin')}
+        else if(action==='respawn'){q.out=0;q.spectator=false;spawn(q);pinv(q)}
+        else if(action==='destroyBed'){if(R.bed[q.team])killBed(R,q.team,null)}
+        else if(action==='spawn'){spawn(q);pinv(q)}
+        tx(p,{t:'m',s:'Teste ADM executado: '+action});break;
       }
       case 'held': {
         if (Number.isInteger(m.s) && m.s >= 0 && m.s <= 19) p.held = m.s;
@@ -788,6 +806,7 @@ setInterval(() => {
         const [gx,gy,gz]=R.EMGEN;addDrop(R,'em',1,gx,gy,gz,2);
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
+      R.syncAcc=(R.syncAcc||0)+dt;if(R.syncAcc>=2.5){R.syncAcc=0;R.ps.forEach(q=>tx(q,{t:'stateDigest',blockSeq:R.blockSeq||0,invSeq:q.invSeq||0}))}
       R.ps.forEach(p => { if (p.dirty) { p.dirty = 0; pinv(p); } });
       for (let i = R.tnt.length; i--;) { const q = R.tnt[i]; if ((q.t -= dt) <= 0) { R.tnt.splice(i, 1); boom(R, q); } }
       tickProjectiles(R,dt);
