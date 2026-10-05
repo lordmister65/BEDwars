@@ -1,12 +1,77 @@
 @media (pointer:coarse),(max-width:800px){
-  #look{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:auto;touch-action:none}
-  #dpad{position:absolute;left:calc(14px + env(safe-area-inset-left));bottom:calc(16px + env(safe-area-inset-bottom));width:calc(148px * var(--mobile-scale));height:calc(148px * var(--mobile-scale));z-index:6;pointer-events:none;opacity:var(--mobile-opacity);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px}
-  .move-btn{position:relative!important;width:auto!important;height:auto!important;min-width:0!important;margin:0!important;padding:0!important;display:flex!important;align-items:center;justify-content:center;text-align:center!important;pointer-events:auto!important;touch-action:none;border-radius:3px!important;color:#172117!important;background:rgba(103,124,96,.78)!important;border-top:3px solid rgba(176,198,164,.78)!important;border-left:3px solid rgba(176,198,164,.78)!important;border-right:3px solid rgba(41,58,40,.92)!important;border-bottom:3px solid rgba(41,58,40,.92)!important;box-shadow:0 0 0 2px rgba(21,31,21,.58),inset 0 0 0 1px rgba(82,104,76,.75)!important;font-family:Arial,sans-serif!important;font-size:19px!important;font-weight:900!important;text-shadow:0 1px rgba(212,230,202,.28)!important;line-height:1!important}
-  .move-btn.touch-active,.move-btn:active{transform:translateY(1px);background:rgba(142,162,132,.92)!important;border-top-color:rgba(56,76,54,.9)!important;border-left-color:rgba(56,76,54,.9)!important;border-right-color:rgba(186,207,174,.7)!important;border-bottom-color:rgba(186,207,174,.7)!important}
-  .forward-left{grid-column:1;grid-row:1}.forward{grid-column:2;grid-row:1;color:#e7f0df!important;text-shadow:1px 1px #42503d!important}.forward-right{grid-column:3;grid-row:1}.left{grid-column:1;grid-row:2}.jump-pad{grid-column:2;grid-row:2;background:rgba(94,116,89,.82)!important}.right{grid-column:3;grid-row:2}.back{grid-column:2;grid-row:3}
-  .jump-pad span{display:block;font-size:22px;transform:translateY(-1px);color:#233021;text-shadow:0 1px rgba(220,236,210,.25)}
+  /* Full-screen touch surface is invisible; only the D-pad is visible. */
+  #look{
+    position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    pointer-events:auto;touch-action:none;background:transparent!important;
+    border:0!important;box-shadow:none!important;outline:0!important
+  }
+
+  /* Compact Minecraft-style D-pad. The saved size preference may shrink it,
+     but it can no longer grow enough to cover the game on short Android screens. */
+  #dpad{
+    position:absolute;
+    left:calc(10px + env(safe-area-inset-left));
+    bottom:calc(10px + env(safe-area-inset-bottom));
+    width:min(calc(118px * var(--mobile-scale)),126px,33vw,34vh);
+    height:min(calc(118px * var(--mobile-scale)),126px,33vw,34vh);
+    min-width:92px;min-height:92px;
+    max-width:126px;max-height:126px;
+    z-index:6;pointer-events:none;opacity:var(--mobile-opacity);
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+    gap:3px;overflow:visible
+  }
+  .move-btn{
+    position:relative!important;width:auto!important;height:auto!important;
+    min-width:0!important;min-height:0!important;max-width:none!important;
+    margin:0!important;padding:0!important;display:flex!important;
+    align-items:center;justify-content:center;text-align:center!important;
+    pointer-events:auto!important;touch-action:none;border-radius:3px!important;
+    color:#172117!important;background:rgba(103,124,96,.74)!important;
+    border-top:2px solid rgba(176,198,164,.78)!important;
+    border-left:2px solid rgba(176,198,164,.78)!important;
+    border-right:2px solid rgba(41,58,40,.92)!important;
+    border-bottom:2px solid rgba(41,58,40,.92)!important;
+    box-shadow:0 0 0 1px rgba(21,31,21,.62),inset 0 0 0 1px rgba(82,104,76,.65)!important;
+    font-family:Arial,sans-serif!important;font-size:16px!important;font-weight:900!important;
+    text-shadow:0 1px rgba(212,230,202,.28)!important;line-height:1!important
+  }
+  .move-btn.touch-active,.move-btn:active{
+    transform:translateY(1px);background:rgba(142,162,132,.92)!important;
+    border-top-color:rgba(56,76,54,.9)!important;border-left-color:rgba(56,76,54,.9)!important;
+    border-right-color:rgba(186,207,174,.7)!important;border-bottom-color:rgba(186,207,174,.7)!important
+  }
+  .forward-left{grid-column:1;grid-row:1}.forward{grid-column:2;grid-row:1;color:#e7f0df!important;text-shadow:1px 1px #42503d!important}.forward-right{grid-column:3;grid-row:1}
+  .left{grid-column:1;grid-row:2}.jump-pad{grid-column:2;grid-row:2;background:rgba(94,116,89,.8)!important}.right{grid-column:3;grid-row:2}.back{grid-column:2;grid-row:3}
+  .jump-pad span{display:block;font-size:18px;transform:translateY(-1px);color:#233021;text-shadow:0 1px rgba(220,236,210,.25)}
+
+  /* Keep secondary mobile controls small and out of the gameplay view. */
+  #mobileSettingsBtn,#mobileChatBtn{
+    width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;
+    padding:0!important;font-size:13px!important;border-radius:6px!important
+  }
+  #prevItemBtn,#nextItemBtn{
+    width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;
+    padding:0!important;font-size:12px!important;border-radius:6px!important
+  }
   .hotbar-nav{z-index:6}#bar{z-index:4}#mobileSettings,#mobileSettingsBtn,#mobileChatBtn{z-index:8}
   .mobile-help{font-size:7px!important;line-height:1.5;color:#ddd!important;margin:4px 0 8px!important}
-  body.mobile-left-handed #dpad{left:auto;right:calc(14px + env(safe-area-inset-right))}
+  body.mobile-left-handed #dpad{left:auto;right:calc(10px + env(safe-area-inset-right))}
 }
-@media (pointer:coarse) and (max-height:430px){#dpad{width:126px;height:126px;gap:3px}.move-btn{font-size:16px!important;border-width:2px!important}.jump-pad span{font-size:19px}}
+
+/* Landscape phones are especially short: use an even smaller control cluster. */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:500px){
+  #dpad{
+    width:min(calc(102px * var(--mobile-scale)),110px,29vw,31vh);
+    height:min(calc(102px * var(--mobile-scale)),110px,29vw,31vh);
+    min-width:82px;min-height:82px;max-width:110px;max-height:110px;gap:2px;
+    left:calc(8px + env(safe-area-inset-left));bottom:calc(8px + env(safe-area-inset-bottom))
+  }
+  .move-btn{font-size:14px!important;border-width:2px!important}
+  .jump-pad span{font-size:16px}
+  body.mobile-left-handed #dpad{left:auto;right:calc(8px + env(safe-area-inset-right))}
+}
+
+@media (pointer:coarse) and (orientation:landscape) and (max-height:390px){
+  #dpad{width:92px;height:92px;min-width:92px;min-height:92px;max-width:92px;max-height:92px}
+  .move-btn{font-size:13px!important}.jump-pad span{font-size:15px}
+}
