@@ -1,0 +1,41 @@
+name: Apply Auto Bridge Authority Fix
+on:
+  push:
+    branches: [feature/auto-bridge-authority-fix]
+    paths:
+      - '.github/scripts/fix-auto-bridge.js'
+      - '.github/workflows/apply-auto-bridge-fix.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/auto-bridge-authority-fix
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply auto bridge fix
+        run: node .github/scripts/fix-auto-bridge.js
+      - name: Validate JavaScript
+        run: |
+          node --check public/game.js
+          node --check server.js
+          node --check public/shared.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify bridge guards
+        run: |
+          grep -q 'confirmedSupport' public/game.js
+          grep -q 'bridgeHoldY' public/game.js
+          grep -q 'auto_vertical' server.js
+          grep -q 'auto-bridge-authority-fix-20261005' public/index.html
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/game.js public/index.html server.js
+          git diff --cached --quiet || git commit -m 'Fix ghost blocks and automatic bridging'
+          git push origin HEAD:feature/auto-bridge-authority-fix
