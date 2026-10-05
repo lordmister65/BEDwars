@@ -17,6 +17,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Patch migration compatibility
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('.github/scripts/apply-security-multiplayer-polish.js')
+          s=p.read_text()
+          s=s.replace("let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){if(dropVisualDisabled||now-dropVisualAt<33)return;","let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){if(dropVisualDisabled||now-dropVisualAt<(lowEnd?66:33))return;")
+          p.write_text(s)
+          PY
       - name: Apply migration
         run: node .github/scripts/apply-security-multiplayer-polish.js
       - name: Validate syntax
