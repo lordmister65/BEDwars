@@ -3,8 +3,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=security-polish-20261005"></head><body>
+<link rel="stylesheet" href="/style.css?v=audio-volume-settings-20261005"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="killFeed"></div><div id="bar"></div>
+<button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
+<div id="audioSettingsPanel" aria-label="Configurações de áudio">
+  <b>ÁUDIO</b>
+  <label class="audio-volume-label"><span>Volume do jogo</span><strong id="audioVolumeValue">100%</strong></label>
+  <input id="audioVolume" type="range" min="0" max="150" step="5" value="100">
+  <div class="audio-settings-actions"><button id="audioMuteBtn" type="button">Silenciar</button><button id="audioTestBtn" type="button">Testar som</button></div>
+  <small>Máximo de 150% com proteção contra picos.</small>
+</div>
 <div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
@@ -37,5 +45,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=leptoks-sound-pack-20261005"></script>
+<script src="/game.js?v=audio-volume-settings-20261005"></script>
 </body></html>

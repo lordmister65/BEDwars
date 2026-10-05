@@ -349,3 +349,33 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
  #res{left:6px;bottom:150px;min-width:108px;background:rgba(0,0,0,.42)}#hp{bottom:58px;min-width:210px}.effectline{font-size:7px;max-width:70vw;margin:auto}.hearts{font-size:16px}
  #chatLog{width:58vw!important}.end-actions{grid-template-columns:1fr}
 }
+
+
+/* Global audio settings */
+#audioSettingsBtn{
+  position:fixed;top:12px;right:12px;z-index:66;width:42px;height:42px;margin:0;padding:0;
+  display:flex;align-items:center;justify-content:center;border-radius:5px;font-size:20px;text-align:center;
+  background:rgba(30,30,30,.88);border:2px solid rgba(255,255,255,.45);box-shadow:0 2px 0 #000;
+  pointer-events:auto;color:#fff;text-shadow:1px 1px #000
+}
+#audioSettingsBtn:hover{background:rgba(65,65,65,.95)}
+#audioSettingsPanel{
+  display:none;position:fixed;top:60px;right:12px;z-index:66;width:250px;padding:12px;
+  background:rgba(18,18,18,.96);border:2px solid rgba(255,255,255,.38);box-shadow:0 8px 24px rgba(0,0,0,.55);
+  color:#fff;font-size:9px;pointer-events:auto;text-shadow:1px 1px #000
+}
+#audioSettingsPanel.open{display:block}
+#audioSettingsPanel>b{display:block;color:#55ffff;font-size:11px;margin-bottom:10px}
+.audio-volume-label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px}
+#audioVolumeValue{color:#fff55c}
+#audioVolume{width:100%;margin:6px 0 10px;padding:0;outline:none;accent-color:#55ffff;background:transparent}
+.audio-settings-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.audio-settings-actions button{width:100%;margin:0;text-align:center;padding:7px 5px;font-size:8px}
+#audioSettingsPanel small{display:block;margin-top:9px;color:#bbb;font-size:7px;line-height:1.45}
+/* Give the top-right scoreboard room below the settings gear. */
+#tm{top:62px}
+@media (pointer:coarse),(max-width:800px){
+  #audioSettingsBtn{top:8px;right:8px;width:40px;height:40px;font-size:19px}
+  #audioSettingsPanel{top:54px;right:8px;width:min(260px,calc(100vw - 16px))}
+  #tm{top:58px;right:7px}
+}

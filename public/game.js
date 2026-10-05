@@ -387,8 +387,13 @@ function cycleTnt(){const owned=ownedTnts();if(owned.length<2)return;const key=a
 let roomCode='',reconnectToken='',reconnectUntil=0,reconnectTimer=null,reconnecting=false,bowCharging=false,bowChargeAt=0,lobbyExplore=false;
 let matchTime=0,respawnEnds=0,respawnFinal=false,lastScoreboardAt=0;const matchPlayers=new Map();let myMatchStats={kills:0,finalKills:0};
 const clk=[],PL=new Map(),PT=[],ownedState={};
-let AC,masterGain,lastStep=0,lastPickup=0;
-const audioInit=()=>{try{if(!AC){AC=new AudioContext();masterGain=AC.createGain();masterGain.gain.value=.55;masterGain.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}catch(e){}};
+let AC,masterGain,audioLimiter,lastStep=0,lastPickup=0;
+let gameVolume=(()=>{try{const v=Number(localStorage.getItem('bwGameVolume'));return Number.isFinite(v)&&v>=0&&v<=1.5?v:1}catch(e){return 1}})(),audioMuted=false,lastNonZeroVolume=gameVolume>0?gameVolume:1;
+const currentGain=()=>audioMuted?0:gameVolume;
+const audioInit=()=>{try{if(!AC){AC=new AudioContext();masterGain=AC.createGain();audioLimiter=AC.createDynamicsCompressor();audioLimiter.threshold.value=-10;audioLimiter.knee.value=18;audioLimiter.ratio.value=8;audioLimiter.attack.value=.003;audioLimiter.release.value=.18;masterGain.gain.value=currentGain();masterGain.connect(audioLimiter);audioLimiter.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}catch(e){}};
+function refreshAudioSettings(){const input=$('audioVolume'),value=$('audioVolumeValue'),mute=$('audioMuteBtn');if(input)input.value=String(Math.round(gameVolume*100));if(value)value.textContent=(audioMuted?'0':Math.round(gameVolume*100))+'%';if(mute)mute.textContent=audioMuted?'Ativar som':'Silenciar'}
+function applyGameVolume(v,{persist=true,unmute=true}={}){gameVolume=Math.max(0,Math.min(1.5,Number(v)||0));if(gameVolume>0)lastNonZeroVolume=gameVolume;if(unmute)audioMuted=false;try{if(persist)localStorage.setItem('bwGameVolume',String(gameVolume))}catch(e){}audioInit();if(masterGain)masterGain.gain.setTargetAtTime(currentGain(),AC.currentTime,.015);refreshAudioSettings()}
+function toggleGameMute(){audioMuted=!audioMuted;if(!audioMuted&&gameVolume<=0)gameVolume=lastNonZeroVolume||1;audioInit();if(masterGain)masterGain.gain.setTargetAtTime(currentGain(),AC.currentTime,.015);refreshAudioSettings()}
 const tone=(f,d=.1,ty='square',v=.05,slide=0)=>{try{audioInit();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=ty;o.frequency.setValueAtTime(Math.max(20,f),t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(masterGain);o.start();o.stop(t+d)}catch(e){}};
 const noise=(d=.08,v=.035,cut=1200)=>{try{audioInit();const n=Math.max(1,Math.floor(AC.sampleRate*d)),buf=AC.createBuffer(1,n,AC.sampleRate),a=buf.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const src=AC.createBufferSource(),g=AC.createGain(),lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=cut;g.gain.value=v;src.buffer=buf;src.connect(lp);lp.connect(g);g.connect(masterGain);src.start()}catch(e){}};
 const LEPTOKS_BASE='/assets/sounds/leptoks/';
@@ -409,6 +414,8 @@ function leptoksSound(group,vol=.75,rate=1){const file=leptoksFile(group);if(!fi
 function preloadLeptoks(){['random/click.ogg','dig/cloth1.ogg','dig/stone1.ogg','dig/wood1.ogg','random/eat1.ogg'].forEach(loadLeptoks)}
 addEventListener('pointerdown',()=>{audioInit();preloadLeptoks()},{once:true,passive:true});
 window.playLeptoksSound=(name,vol=.7)=>leptoksSound(name,vol,1);
+function initAudioSettingsUI(){const btn=$('audioSettingsBtn'),panel=$('audioSettingsPanel'),slider=$('audioVolume'),mute=$('audioMuteBtn'),test=$('audioTestBtn');if(!btn||!panel||!slider)return;refreshAudioSettings();btn.onclick=e=>{e.stopPropagation();panel.classList.toggle('open');if(panel.classList.contains('open')){try{document.exitPointerLock()}catch(err){}audioInit()}};panel.onclick=e=>e.stopPropagation();slider.oninput=e=>applyGameVolume(+e.target.value/100);if(mute)mute.onclick=()=>toggleGameMute();if(test)test.onclick=()=>{audioInit();if(audioMuted)toggleGameMute();leptoksSound('click',1,1.05);setTimeout(()=>leptoksSound('wood',.95,1),90)};document.addEventListener('click',e=>{if(panel.classList.contains('open')&&!panel.contains(e.target)&&e.target!==btn)panel.classList.remove('open')})}
+initAudioSettingsUI();
 
 const positionalGain=(x,y,z,r=7)=>{
   const d=Math.hypot(pl.x-x,(pl.y+1)-y,pl.z-z);
