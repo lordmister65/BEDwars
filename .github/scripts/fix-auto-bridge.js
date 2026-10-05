@@ -1,11 +1,11 @@
 const fs=require('fs');
 function once(s,a,b,label){const n=s.split(a).length-1;if(n!==1)throw new Error(`${label}: expected 1 match, got ${n}`);return s.replace(a,b)}
+function rex(s,r,b,label){if(!r.test(s))throw new Error(label+': no match');r.lastIndex=0;return s.replace(r,b)}
 let game=fs.readFileSync('public/game.js','utf8');
 let server=fs.readFileSync('server.js','utf8');
 let index=fs.readFileSync('public/index.html','utf8');
 
-game=once(game,
-"function pendingBlockCount(k){let n=0;BRIDGE_PRED.forEach(b=>{if(b.k===k&&!b.acked)n++});return n}\nfunction availableBlockCount(k){return Math.max(0,(inv[k]||0)-pendingBlockCount(k))}\nfunction rollbackPrediction(key){const b=BRIDGE_PRED.get(key);if(!b)return;BRIDGE_PRED.delete(key);if(get(b.x,b.y,b.z)&&pf[ix(b.x,b.y,b.z)]){sb(b.x,b.y,b.z,0,0);flush(lowEnd?2:4)}}\nfunction bridgeTarget(){\n const k=slotKey(cur);if(!PLACEABLE.has(k)||availableBlockCount(k)<=0)return null;\n const speed=Math.hypot(pl.vx||0,pl.vz||0),fx=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw);\n const dx=speed>.2?(pl.vx/speed):fx,dz=speed>.2?(pl.vz/speed):fz;\n const px=pl.x+dx*.58,pz=pl.z+dz*.58,y=Math.floor(pl.y-.08)-1,x=Math.floor(px),z=Math.floor(pz);\n if(!inXZ(x,z)||y<1||y>=H-2||get(x,y,z)||!safePlaceTarget(x,y,z))return null;\n const dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];\n if(!dirs.some(d=>get(x+d[0],y+d[1],z+d[2])))return null;\n return{x,y,z,k};\n}\nfunction predictPlace(p){\n if(!p||!PLACEABLE.has(p.k)||availableBlockCount(p.k)<=0||get(p.x,p.y,p.z))return false;\n const blockId=p.k==='wool'?me.team+1:p.k==='planks'?5:p.k==='endstone'?12:p.k==='glass'?7:16,key=p.x+','+p.y+','+p.z;\n BRIDGE_PRED.set(key,{x:p.x,y:p.y,z:p.z,k:p.k,at:performance.now(),acked:false});sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);\n if(!send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z})){rollbackPrediction(key);return false}\n return true\n}",
+game=rex(game,/function pendingBlockCount\(k\)[\s\S]*?function clutchTarget\(/,
 `function availableBlockCount(k){return Math.max(0,Math.floor(inv[k]||0))}
 function predictionAt(x,y,z){return BRIDGE_PRED.get(x+','+y+','+z)||null}
 function confirmedBlock(x,y,z){if(!get(x,y,z))return false;const b=predictionAt(x,y,z);return !b||!!b.acked}
@@ -29,52 +29,32 @@ function predictPlace(p){
  BRIDGE_PRED.set(key,{x:p.x,y:p.y,z:p.z,k:p.k,at:performance.now(),acked:false,reserved:true,auto:!!p.auto});sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);hud();
  if(!send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z,auto:p.auto?1:0})){rollbackPrediction(key,true);return false}
  return true
-}`,
+}
+function clutchTarget(`,
 'prediction and bridge target');
 
-game=once(game,
-"function autoBridge(now=performance.now()){\n if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<72)return;\n const p=bridgeTarget();if(!p)return;\n lastBridgeAt=now;useAnim=1;\n // Predição visual local: mostra o bloco imediatamente; o servidor continua autoritativo.\n predictPlace(p);\n}",
+game=rex(game,/function autoBridge\(now=performance\.now\(\)\)\{[\s\S]*?\n\}/,
 `function autoBridge(now=performance.now()){
  if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<95)return;
  const p=bridgeTarget();if(!p)return;
- lastBridgeAt=now;useAnim=1;
- predictPlace(p);
-}`,
-'auto bridge cadence');
+ lastBridgeAt=now;useAnim=1;predictPlace(p);
+}`,'auto bridge cadence');
 
-game=once(game,
-"const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;",
-"const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,bridgeHoldY=null,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;",
-'bridge hold state');
+game=once(game,"const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;","const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,bridgeHoldY=null,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;",'bridge hold state');
 
-game=once(game,
-"addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()}});\naddEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2)bridgeHeld=false});",
+game=rex(game,/addEventListener\('mousedown',[\s\S]*?addEventListener\('mouseup',[^\n]+\n/,
 `addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));bridgeHoldY=bridgeHeld?Math.floor(pl.y-.08)-1:null;lastBridgeAt=performance.now();secondary()}});
-addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2){bridgeHeld=false;bridgeHoldY=null}});`,
-'mouse bridge hold');
+addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2){bridgeHeld=false;bridgeHoldY=null}});
+`,'mouse bridge hold');
 
-game=once(game,
-"$('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();slotKey(cur)==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false};",
-`$('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();slotKey(cur)==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));bridgeHoldY=bridgeHeld?Math.floor(pl.y-.08)-1:null;lastBridgeAt=performance.now();secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false;bridgeHoldY=null};`,
-'mobile bridge hold');
+game=once(game,"$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false};","$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));bridgeHoldY=bridgeHeld?Math.floor(pl.y-.08)-1:null;lastBridgeAt=performance.now();secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false;bridgeHoldY=null};",'mobile bridge hold');
 
-game=once(game,
-"case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key);hud();break}",
-"case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key,false);hud();break}",
-'place result');
+game=once(game,"case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key);hud();break}","case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key,false);hud();break}",'place result');
 
-game=once(game,
-"BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>550)rollbackPrediction(key);else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});",
-"BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>650){rollbackPrediction(key,false);if(now-lastStateSyncAt>1200){lastStateSyncAt=now;send({t:'stateSync'})}}else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});",
-'timeout resync');
+game=once(game,"BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>550)rollbackPrediction(key);else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});","BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>650){rollbackPrediction(key,false);if(now-lastStateSyncAt>1200){lastStateSyncAt=now;send({t:'stateSync'})}}else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});",'prediction timeout');
 
-server=once(server,
-"        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];",
-"        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];",
-'server auto flag');
-server=once(server,
-"        if(!allow(p,'place',62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}\n        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}\n        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}\n        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}",
-`        if(!allow(p,'place',auto?90:62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
+server=once(server,"        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];","        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];",'server auto flag');
+server=once(server,"        if(!allow(p,'place',62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}\n        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}\n        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}\n        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}",`        if(!allow(p,'place',auto?90:62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
         if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}
         if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
         if(auto){
@@ -84,8 +64,7 @@ server=once(server,
           const hd=Math.hypot(x+.5-p.x,z+.5-p.z);if(hd>2.15||Math.abs((y+1.15)-p.y)>2.25){acFlag(p,'place','auto_range');placeResult(false,'too_far');break}
           p.autoBridgeAt=now;
         }
-        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}`,
-'server place validation');
+        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}`,'server validation');
 
 index=index.replace(/\/game\.js\?v=[^\"]+/, '/game.js?v=auto-bridge-authority-fix-20261005');
 fs.writeFileSync('public/game.js',game);fs.writeFileSync('server.js',server);fs.writeFileSync('public/index.html',index);
