@@ -1,0 +1,34 @@
+name: Apply Mobile D-pad Inline CSS
+on:
+  push:
+    branches: [fix/mobile-dpad-inline-critical]
+    paths:
+      - '.github/scripts/fix-mobile-dpad-inline.js'
+      - '.github/workflows/apply-mobile-dpad-inline.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-dpad-inline-critical
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply inline D-pad CSS
+        run: node .github/scripts/fix-mobile-dpad-inline.js
+      - name: Validate
+        run: |
+          grep -q 'MOBILE_DPAD_CRITICAL_V4' public/index.html
+          grep -q 'width:108px!important' public/index.html
+          test "$(grep -o 'id=\"dpad\"' public/index.html | wc -l)" -eq 1
+          node --check public/game.js
+      - name: Commit functional change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/index.html
+          git diff --cached --quiet || git commit -m 'Embed Android D-pad critical layout CSS'
+          git push origin HEAD:fix/mobile-dpad-inline-critical
