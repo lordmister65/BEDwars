@@ -1,0 +1,34 @@
+name: Finalize Security Multiplayer Polish
+on:
+  push:
+    branches: [feature/security-multiplayer-polish]
+    paths:
+      - '.github/scripts/finalize-security-multiplayer-polish.js'
+      - '.github/workflows/finalize-security-multiplayer-polish.yml'
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/security-multiplayer-polish
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply final adjustments
+        run: node .github/scripts/finalize-security-multiplayer-polish.js
+      - name: Validate syntax
+        run: |
+          node --check server.js
+          node --check public/game.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js public/game.js
+          git diff --cached --quiet || git commit -m "Finalize security multiplayer polish"
+          git push origin HEAD:feature/security-multiplayer-polish
