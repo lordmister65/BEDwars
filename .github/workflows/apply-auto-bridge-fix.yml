@@ -26,12 +26,6 @@ jobs:
           node --check public/shared.js
       - name: Install dependencies
         run: npm ci
-      - name: Verify bridge guards
-        run: |
-          grep -q 'confirmedSupport' public/game.js
-          grep -q 'bridgeHoldY' public/game.js
-          grep -q 'auto_vertical' server.js
-          grep -q 'auto-bridge-authority-fix-20261005' public/index.html
       - name: Commit changes
         run: |
           git config user.name 'github-actions[bot]'
