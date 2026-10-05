@@ -1,0 +1,64 @@
+name: Import Leptoks Sound Pack
+on:
+  push:
+    branches: [feature/leptoks-sound-pack]
+    paths:
+      - '.github/scripts/import-leptoks-sound-pack.js'
+      - '.github/workflows/import-leptoks-sound-pack.yml'
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/leptoks-sound-pack
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Download exact public copy of supplied pack
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o /tmp/leptoks.zip 'https://resourcepacks24.de/download/337475'
+          echo '5f2b5e578ee392f62794a7c743728d07d16407788fc54482672d1a6c5867ebc6  /tmp/leptoks.zip' | sha256sum -c -
+      - name: Import audio assets
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/leptoks public/assets/sounds/leptoks
+          mkdir -p /tmp/leptoks public/assets/sounds/leptoks
+          unzip -q /tmp/leptoks.zip -d /tmp/leptoks
+          cp -R /tmp/leptoks/assets/minecraft/sounds/. public/assets/sounds/leptoks/
+          find public/assets/sounds/leptoks -type f -name '*.sfk' -delete
+          cp /tmp/leptoks/pack.mcmeta public/assets/sounds/leptoks/pack.mcmeta
+          cat > public/assets/sounds/leptoks/CREDITS.txt <<'EOF'
+          Leptok's Sound Pack [Overlay]
+          Creator: Leptok
+          Source: https://resourcepacks24.de/resourcepack/337475
+          Integrated into Browser BedWars from the sound pack supplied by the project owner.
+          The creator's pack description requests proper credit when using these sounds.
+          EOF
+          find public/assets/sounds/leptoks -type f | sort
+      - name: Patch BedWars audio integration
+        run: node .github/scripts/import-leptoks-sound-pack.js
+      - name: Validate JavaScript
+        run: |
+          node --check server.js
+          node --check public/game.js
+          node --check public/shared.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify imported sound count
+        run: |
+          test "$(find public/assets/sounds/leptoks -type f -name '*.ogg' | wc -l)" -eq 24
+          test -f public/assets/sounds/leptoks/dig/cloth1.ogg
+          test -f public/assets/sounds/leptoks/random/click.ogg
+          test -f public/assets/sounds/leptoks/ambient/weather/rain1.ogg
+          test -f public/assets/sounds/leptoks/mob/wolf/bark1.ogg
+      - name: Commit imported sound pack
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.js public/game.js public/index.html public/assets/sounds/leptoks
+          git diff --cached --quiet || git commit -m 'Integrate Leptoks sound pack'
+          git push origin HEAD:feature/leptoks-sound-pack
