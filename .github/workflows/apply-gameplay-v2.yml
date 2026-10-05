@@ -41,3 +41,4 @@ jobs:
           git add server.js public/game.js public/index.html public/style.css
           git diff --cached --quiet || git commit -m 'Implement Gameplay V2 combat projectiles blocks and generators'
           git push origin HEAD:feature/gameplay-v2
+# gameplay-v2 migration trigger
