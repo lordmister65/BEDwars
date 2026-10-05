@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=gameplay-v2-20261005"></head><body>
+<link rel="stylesheet" href="/style.css?v=mobile-experience-v2-20261005"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
@@ -16,7 +16,27 @@
 <div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
-<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button><button class="mb hotbar-nav" id="prevItemBtn">◀</button><button class="mb hotbar-nav" id="nextItemBtn">▶</button><button class="mb settings-btn" id="mobileSettingsBtn">⚙</button><div id="mobileSettings"><b>CONTROLES</b><label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label><label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label><label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label><label>Opacidade<input id="mopacity" type="range" min="35" max="100" value="78"></label></div></div>
+<div id="mobile">
+  <div id="joy" aria-label="Movimento"><div id="knob"></div></div><div id="look" aria-label="Área de câmera"></div>
+  <button class="mb action-primary" id="actBtn" aria-label="Atacar ou quebrar">⚔<small>ATACAR</small></button>
+  <button class="mb action-place" id="placeBtn" aria-label="Colocar bloco">▦<small>COLOCAR</small></button>
+  <button class="mb action-jump" id="jumpBtn" aria-label="Pular">↑<small>PULAR</small></button>
+  <button class="mb action-use" id="useBtn" aria-label="Usar item">✦<small>USAR</small></button>
+  <button class="mb hotbar-nav" id="prevItemBtn" aria-label="Item anterior">◀</button><button class="mb hotbar-nav" id="nextItemBtn" aria-label="Próximo item">▶</button>
+  <button class="mb mobile-chat-btn" id="mobileChatBtn" aria-label="Abrir chat">💬</button>
+  <button class="mb settings-btn" id="mobileSettingsBtn" aria-label="Configurações mobile">⚙</button>
+  <div id="mobileSettings"><b>CONTROLES MOBILE</b>
+    <label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label>
+    <label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label>
+    <label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label>
+    <label>Opacidade<input id="mopacity" type="range" min="35" max="100" value="78"></label>
+    <label class="mobile-toggle"><span>Vibração</span><input id="mhaptic" type="checkbox" checked></label>
+    <label class="mobile-toggle"><span>Modo canhoto</span><input id="mleft" type="checkbox"></label>
+    <label class="mobile-toggle"><span>Sprint automático</span><input id="mautosprint" type="checkbox" checked></label>
+    <button type="button" id="mfullscreen">TELA CHEIA</button>
+  </div>
+  <div id="mobileOrientationHint">↻ Para melhor experiência, use o celular na horizontal</div>
+</div>
 <div class="hud" id="tm"></div><div class="hud" id="res"></div><div class="hud" id="hp"></div>
 <div id="chatLog"></div>
 <form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
@@ -45,5 +65,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=gameplay-v2-20261005"></script>
+<script src="/game.js?v=mobile-experience-v2-20261005"></script>
 </body></html>
