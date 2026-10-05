@@ -34,6 +34,12 @@ const GEN_UPGRADE_COSTS=[
   {key:'em',n:5,label:'5 esmeraldas',name:'Desbloquear diamantes'}
 ];
 const CENTRAL_GEN={diamond:24,emerald:40};
+const CENTRAL_GEN_TIERS=[
+  {at:0,diamond:24,emerald:40,label:'I'},
+  {at:6*60,diamond:18,emerald:32,label:'II'},
+  {at:12*60,diamond:12,emerald:24,label:'III'}
+];
+function centralGenCfg(R){let c=CENTRAL_GEN_TIERS[0];for(const q of CENTRAL_GEN_TIERS)if((R.t||0)>=q.at)c=q;return c}
 // Hitbox de combate centralizada. A caixa é levemente maior que a colisão física
 // para compensar interpolação e até um snapshot curto de movimento, sem aumentar o alcance.
 const COMBAT_HITBOX={radius:.36,height:1.80,feetPad:.05,historyMax:.60,meleePad:.055,meleeReach:3.80};
@@ -156,7 +162,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''},
-  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,lastCombatAt:0,comboTarget:0,comboCount:0,
+  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
 const allow = (p, key, gap) => {
@@ -173,7 +179,8 @@ const buyFail=(p,code,text)=>tx(p,{t:'buyResult',ok:0,code,text});
 const buyOk=p=>tx(p,{t:'buyResult',ok:1});
 const pinv=p=>{sanitizeInventory(p);p.invSeq=(p.invSeq||0)+1;return tx(p,{t:'inv',i:p.inv,sw:p.sw,ar:p.ar,up:p.up,tools:p.tools,fx:p.fx,traps:p.trapQueue||[],seq:p.invSeq})};
 const sfx = (p,k) => tx(p,{t:'sfx',k});
-const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
+const feed = (R, text, aTeam=-1, bTeam=-1, kind='info',parts=null) => bc(R,{t:'feed',text,aTeam,bTeam,kind,parts,at:Date.now()});
+const feedParts=(...p)=>p.filter(Boolean);
 const statsPayload = R => [...R.ps.values()].map(p=>({
   id:p.id,name:p.name,team:p.team,disconnected:!!p.disconnected,
   kills:p.stats.kills,finalKills:p.stats.finalKills,bedsDestroyed:p.stats.bedsDestroyed,
@@ -202,6 +209,14 @@ function playerHitsBlock(q,x,y,z){
     return horizontal&&vertical;
   });
 }
+function protectedPlacement(R,x,y,z){
+  for(const t of modeCfg(R).activeTeams){
+    const b=R.BD?.[t];if(b&&x===b[0]&&y===b[1]&&z===b[2])return 'bed';
+    const sh=R.SHOP?.[t];if(sh&&Math.hypot(x+.5-sh[0],z+.5-sh[2])<1.3&&Math.abs(y+.5-sh[1])<2.4)return 'shop';
+    for(const kind of ['team','ender']){const c=chestPos(R,t,kind);if(c&&Math.hypot(x+.5-c[0],z+.5-c[2])<1.05&&Math.abs(y+.5-c[1])<1.8)return 'chest'}
+  }
+  return '';
+}
 function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
@@ -227,34 +242,43 @@ function die(R, q, cause='combat') {
   if(!q.alive)return;
   q.stats.deaths++;
   q.alive = 0; q.hp = 0; q.rt = 5; q.breaking=null;q.spawnProtect=0;q.fx.blind=0;q.fx.fatigue=0;q.fx.slow=0;q.fx.milk=0; q.tools.pick=Math.max(0,q.tools.pick-1); q.tools.axe=Math.max(0,q.tools.axe-1); pinv(q); sfx(q,'death');
-  const killer = q.src && R.t - q.st < 5 && q.src!==q ? q.src : null;
+  const creditWindow=(cause==='void'||cause==='fall')?8:5;
+  const killer = q.src && R.t - q.st < creditWindow && q.src!==q ? q.src : null;
   const final = !R.bed[q.team];if(final)q.spectator=true;
   tx(q,{t:'deathState',final:final?1:0,respawn:final?0:5,cause,killer:killer?killer.name:''});
   if(killer){
     if(final) killer.stats.finalKills++; else killer.stats.kills++;
     killer.k++;
-    const verb=cause==='void'?'derrubou':cause==='explosion'?'explodiu':cause==='fall'?'fez cair':'eliminou';
-    feed(R,`${killer.name} ${verb} ${q.name}${final?' DEFINITIVAMENTE!':''}`,killer.team,q.team,final?'final':'kill');
+    let icon='⚔',middle=' matou ';
+    if(cause==='void'){icon='☠';middle=' foi jogado no vazio por ';}
+    else if(cause==='explosion'){icon='🔥';middle=' morreu para Fireball de ';}
+    else if(cause==='fall'){icon='☠';middle=' caiu por causa de ';}
+    const text=cause==='void'?`${icon} ${q.name}${middle}${killer.name}${final?' · FINAL!':''}`:cause==='explosion'?`${icon} ${q.name}${middle}${killer.name}${final?' · FINAL!':''}`:`${icon} ${killer.name}${middle}${q.name}${final?' · FINAL!':''}`;
+    const parts=cause==='void'||cause==='explosion'?feedParts({text:icon+' '},{text:q.name,team:q.team},{text:middle},{text:killer.name,team:killer.team},{text:final?' · FINAL!':''}):feedParts({text:icon+' '},{text:killer.name,team:killer.team},{text:middle},{text:q.name,team:q.team},{text:final?' · FINAL!':''});
+    feed(R,text,killer.team,q.team,final?'final':'kill',parts);
   } else {
-    feed(R,`${q.name} morreu${cause==='void'?' no vazio':cause==='explosion'?' em uma explosão':cause==='fall'?' por queda':''}`,-1,q.team,'death');
+    const icon=cause==='void'?'☠':cause==='explosion'?'🔥':cause==='fall'?'☠':'☠',middle=cause==='void'?' caiu no vazio':cause==='explosion'?' morreu em uma explosão':cause==='fall'?' morreu por queda':' morreu';
+    feed(R,icon+' '+q.name+middle,-1,q.team,'death',feedParts({text:icon+' '},{text:q.name,team:q.team},{text:middle}));
   }
   if (final) { q.out = 1; win(R); }
 }
 function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5){
   if(!q.alive||q.admin)return false;
   if(q.spawnProtect>0&&src&&src!==q)return false;
-  if(q.ih>0)return false;
-  q.ih=GAMEPLAY.damageIFrames;d*=Math.max(.2,1-.25*q.ar-.1*q.up.prot);const dealt=Math.max(0,d);q.hp-=dealt;
+  const environmental=cause==='fall'||cause==='collapse';
+  if(environmental){if((q.envIh||0)>0)return false;q.envIh=.12}else{if(q.ih>0)return false;q.ih=GAMEPLAY.damageIFrames}
+  d*=Math.max(.2,1-.25*q.ar-.1*q.up.prot);const dealt=Math.max(0,d);if(dealt<=0)return false;q.hp-=dealt;
   if(src){q.src=src;q.st=R.t;q.lastCombatAt=R.t}
-  const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.84:1,comboMul=src&&src.comboCount>=2?.92:1;
-  tx(q,{t:'kb',kx:kx*7*airMul*comboMul,kz:kz*7*airMul*comboMul,vy:kbVy*(airborne?.90:1)});sfx(q,'hurt');
+  const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.90:1,comboMul=src&&src.comboCount>=2?.96:1;
+  const horiz=7.45*airMul*comboMul,vertical=kbVy*(airborne?.95:1);
+  tx(q,{t:'kb',kx:kx*horiz,kz:kz*horiz,vy:vertical});sfx(q,'hurt');
   bc(R,{t:'fx',x:q.x,y:q.y+1,z:q.z,c:cr?0xffd23d:0xd23c3c});bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0});
   if(q.hp<=0)die(R,q,cause);return true;
 }
 function killBed(R, t, src) {
   if (!R.bed[t]) return;
   const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); R.bed[t] = 0;
-  if(src){src.stats.bedsDestroyed++;feed(R,`${src.name} destruiu a cama do Time ${S.TN[t]}!`,src.team,t,'bed');}
+  if(src){src.stats.bedsDestroyed++;feed(R,`🛏 ${src.name} destruiu a cama ${S.TN[t]}!`,src.team,t,'bed',feedParts({text:'🛏 '},{text:src.name,team:src.team},{text:' destruiu a cama '},{text:S.TN[t],team:t},{text:'!'}));}
   else feed(R,`A cama do Time ${S.TN[t]} foi destruída!`,-1,t,'bed');
   bc(R, { t:'bed', bed:R.bed, team:t, pos:R.BD[t] });
   R.ps.forEach(q=>{if(q.team===t&&!q.alive&&!q.out){q.out=1;q.spectator=true;tx(q,{t:'eliminated',reason:'Sua cama foi destruída durante o respawn.'});msg(R,q.name+' foi eliminado!')}});
@@ -347,8 +371,8 @@ function addDrop(R,k,n,x,y,z,max=64){
 }
 function genSnapshot(R){
   const base=R.g.base.map((g,i)=>{const tier=Math.max(0,Math.min(3,R.genTier?.[i]||0)),cfg=BASE_GEN_TIERS[tier];return [+(Math.max(0,cfg.iron-g.iron)).toFixed(2),cfg.gold?+(Math.max(0,cfg.gold-g.gold)).toFixed(2):-1,cfg.dia?+(Math.max(0,cfg.dia-g.dia)).toFixed(2):-1,tier]});
-  const dia=R.g.dia.map(g=>+(Math.max(0,CENTRAL_GEN.diamond-g.t)).toFixed(2));
-  return {base,dia,em:+Math.max(0,CENTRAL_GEN.emerald-R.g.em.t).toFixed(2),tiers:[...(R.genTier||[])]};
+  const cg=centralGenCfg(R),dia=R.g.dia.map(g=>+(Math.max(0,cg.diamond-g.t)).toFixed(2));
+  return {base,dia,em:+Math.max(0,cg.emerald-R.g.em.t).toFixed(2),tiers:[...(R.genTier||[])],centralTier:cg.label};
 }
 function pickupDrops(R, players){
   let changed=false;
@@ -459,7 +483,7 @@ function bridgeEggTrail(R,pr,nx,ny,nz){
   const L=Math.hypot(nx-pr.x,ny-pr.y,nz-pr.z),steps=Math.max(1,Math.ceil(L/.32));
   for(let i=1;i<=steps;i++){
     const a=i/steps,x=Math.floor(pr.x+(nx-pr.x)*a),y=Math.floor(pr.y+(ny-pr.y)*a-1.45),z=Math.floor(pr.z+(nz-pr.z)*a);
-    if(!S.inXZ(x,z)||y<1||y>=S.H-2||get(R,x,y,z))continue;
+    if(!S.inXZ(x,z)||y<1||y>=S.H-2||get(R,x,y,z)||protectedPlacement(R,x,y,z))continue;
     if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z)))continue;
     setb(R,x,y,z,pr.team+1,1);
   }
@@ -484,18 +508,19 @@ function safePearlPos(R,pr,x,y,z){
  return null
 }
 function projectileImpact(R,pr,x,y,z,target){
-  const owner=R.ps.get(pr.o);
-  if(pr.k==='arrow'&&target)hurt(R,target,4+5*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.12,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.12,owner);
-  else if(pr.k==='snowball'&&target)hurt(R,target,2.5,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.45,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.45,owner);
+  const owner=R.ps.get(pr.o);let dealt=false;
+  if(pr.k==='arrow'&&target)dealt=hurt(R,target,4+5*pr.charge,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.18,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.18,owner,false,'projectile',4.0);
+  else if(pr.k==='snowball'&&target)dealt=hurt(R,target,1.5,pr.vx/(Math.hypot(pr.vx,pr.vz)||1)*1.62,pr.vz/(Math.hypot(pr.vx,pr.vz)||1)*1.62,owner,false,'projectile',3.2);
   else if(pr.k==='fireball')fireballBoom(R,x,y,z,owner);
   else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(pr.k))throwableTntBoom(R,pr.k,x,y,z,owner);
   else if(pr.k==='pearl'&&owner&&owner.alive){const pos=safePearlPos(R,pr,x,y,z);if(pos){owner.x=pos[0];owner.y=pos[1];owner.z=pos[2];owner.hp=Math.max(1,owner.hp-2);owner.px=owner.x;owner.py=owner.y;owner.pz=owner.z;tx(owner,{t:'tp',x:owner.x,y:owner.y,z:owner.z,hard:1})}else tx(owner,{t:'m',s:'A pérola não encontrou um local seguro.'});}
-  bc(R,{t:'projHit',id:pr.id,k:pr.k,x,y,z});
+  if(dealt&&owner)tx(owner,{t:'projectileHit',k:pr.k,id:target?.id||0});
+  bc(R,{t:'projHit',id:pr.id,k:pr.k,x,y,z,target:target?.id||0,vx:pr.vx,vy:pr.vy,vz:pr.vz});
 }
 function tickProjectiles(R,dt){
   for(let i=R.projectiles.length-1;i>=0;i--){
     const pr=R.projectiles[i];pr.age+=dt;
-    const grav=pr.k==='fireball'?0:pr.k==='bridgeEgg'?1.8:pr.k==='arrow'?7.2:pr.k==='pearl'?6.2:pr.k.startsWith('tnt')?9.2:7.5;
+    const grav=pr.k==='fireball'?.35:pr.k==='bridgeEgg'?3.0:pr.k==='arrow'?8.2:pr.k==='pearl'?7.4:pr.k.startsWith('tnt')?10.2:8.8;
     pr.vy-=grav*dt;
     const nx=pr.x+pr.vx*dt,ny=pr.y+pr.vy*dt,nz=pr.z+pr.vz*dt;
     if(pr.k==='bridgeEgg')bridgeEggTrail(R,pr,nx,ny,nz);
@@ -647,7 +672,7 @@ wss.on('connection', ws => {
         const d=Math.hypot(m.x-p.x,m.z-p.z),maxH=(p.admin||spectating)?dt*24+3:dt*12+1.5,maxV=(p.admin||spectating)?dt*24+3:dt*11+1.2;
         if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite)||d>maxH||Math.abs(m.y-p.y)>maxV||m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30){if(!p.admin&&!spectating)acFlag(p,'movement','d='+d.toFixed(2)+' dy='+Math.abs(Number(m.y)-p.y).toFixed(2));tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0});break}
         const oldY=p.y,newDy=(m.y-p.y)/dt;p.hspeed=Math.min(20,d/dt);p.dy=newDy;p.px=p.x;p.py=p.y;p.pz=p.z;p.x=m.x;p.y=m.y;p.z=m.z;p.yaw=m.yaw;p.pitch=m.pitch;
-        if(!spectating&&!p.admin){const below=get(R,Math.floor(p.x),Math.floor(p.y-.08),Math.floor(p.z))||get(R,Math.floor(p.x+.25),Math.floor(p.y-.08),Math.floor(p.z));p.wasGrounded=p.grounded;p.grounded=!!below;if(newDy<p.fallVyMin)p.fallVyMin=newDy;if(p.grounded&&!p.wasGrounded){const impact=Math.abs(Math.min(0,p.fallVyMin));if(impact>10.8)hurt(R,p,Math.min(12,(impact-10.8)*.78),0,0,null,false,'fall',0);p.fallVyMin=0}else if(p.grounded)p.fallVyMin=0}
+        if(!spectating&&!p.admin){const fy=Math.floor(p.y-.09),feet=[[0,0],[.28,0],[-.28,0],[0,.28],[0,-.28],[.22,.22],[-.22,.22],[.22,-.22],[-.22,-.22]],below=feet.some(([ox,oz])=>get(R,Math.floor(p.x+ox),fy,Math.floor(p.z+oz)));p.wasGrounded=p.grounded;p.grounded=!!below;if(!p.grounded&&newDy<p.fallVyMin)p.fallVyMin=newDy;if(p.grounded&&!p.wasGrounded){const impact=Math.abs(Math.min(0,p.fallVyMin));if(impact>10.2)hurt(R,p,Math.min(14,(impact-10.2)*.82),0,0,null,false,'fall',0);p.fallVyMin=0}else if(p.grounded&&Math.abs(newDy)<1.5)p.fallVyMin=0}
         break;
       }
       case 'adminPlace': {
@@ -697,9 +722,10 @@ wss.on('connection', ws => {
         const rawDist=Math.hypot(q.x-p.x,(q.y+1)-(p.y+1),q.z-p.z);if(rawDist>4.35){acFlag(p,'reach',rawDist.toFixed(2));break}
         const hit=meleeRayHit(R,p,q,m.yaw,m.pitch);if(!hit)break;
         const hk=heldKey(p),stick=hk==='knockbackStick'&&(p.inv.knockbackStick||0)>0;if(hk!=='sword'&&!stick){acFlag(p,'item','hit with '+hk);break}
-        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t;if(p.comboTarget===q.id&&now-p.lastCombatAt<1.05)p.comboCount=Math.min(8,p.comboCount+1);else p.comboCount=1;p.comboTarget=q.id;p.lastCombatAt=now;
-        const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.12:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
+        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t,nextCombo=p.comboTarget===q.id&&now-p.lastCombatAt<1.05?Math.min(8,p.comboCount+1):1;
+        const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.14:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
         if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr))break;
+        p.comboCount=nextCombo;p.comboTarget=q.id;p.lastCombatAt=now;
         tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});break
       }
       case 'place': {
@@ -708,7 +734,7 @@ wss.on('connection', ws => {
         if(!play){placeResult(false,'not_playing');break}if(!item||!k){acFlag(p,'item','place '+String(m.k||'')+' held='+held);placeResult(false,'wrong_item');break}
         if(m.k&&m.k!==item){acFlag(p,'item','place declared '+m.k+' held='+item);placeResult(false,'wrong_item');break}
         if(![x,y,z].every(Number.isInteger)||y<1||y>=S.H-2){placeResult(false,'invalid_pos');break}
-        if(!allow(p,'place',auto?90:62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
+        const placeGap=auto?(p.hspeed>5.2?82:p.hspeed>3?90:105):64;if(!allow(p,'place',placeGap)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
         if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}
         if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
         if(auto){
@@ -719,6 +745,7 @@ wss.on('connection', ws => {
           p.autoBridgeAt=now;
         }
         if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
+        const protectedKind=protectedPlacement(R,x,y,z);if(protectedKind){sfx(p,'blocked');placeResult(false,'protected_'+protectedKind);break}
         if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,x+.5,y+.5,z+.5,6);break
       }
@@ -802,7 +829,7 @@ setInterval(() => {
     if (R.st === 'play') {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
-        p.ih=Math.max(0,p.ih-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
+        p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);p.fx.blind=Math.max(0,(p.fx.blind||0)-dt);p.fx.milk=Math.max(0,(p.fx.milk||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);
@@ -838,15 +865,16 @@ setInterval(() => {
         if(cfg.gold&&g.gold>=cfg.gold){g.gold-=cfg.gold;addDrop(R,'gold',1,gx+1,gy+.2,gz,10)}
         if(cfg.dia&&g.dia>=cfg.dia){g.dia-=cfg.dia;addDrop(R,'dia',1,gx-1,gy+.2,gz,4)}
       });
+      const centralCfg=centralGenCfg(R);
       R.g.dia.forEach((g, i) => {
         g.t += dt;
-        if(g.t<CENTRAL_GEN.diamond)return;
-        g.t-=CENTRAL_GEN.diamond;
+        if(g.t<centralCfg.diamond)return;
+        g.t-=centralCfg.diamond;
         const [gx,gy,gz]=R.DIGEN[i];addDrop(R,'dia',1,gx,gy,gz,4);
       });
       R.g.em.t += dt;
-      if(R.g.em.t>=CENTRAL_GEN.emerald){
-        R.g.em.t-=CENTRAL_GEN.emerald;
+      if(R.g.em.t>=centralCfg.emerald){
+        R.g.em.t-=centralCfg.emerald;
         const [gx,gy,gz]=R.EMGEN;addDrop(R,'em',1,gx,gy,gz,2);
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}

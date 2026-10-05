@@ -379,3 +379,13 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
   #audioSettingsPanel{top:54px;right:8px;width:min(260px,calc(100vw - 16px))}
   #tm{top:58px;right:7px}
 }
+
+
+/* Gameplay V2 */
+#comboHud{position:fixed;left:50%;top:56%;transform:translate(-50%,-50%) scale(.82);z-index:15;pointer-events:none;opacity:0;color:#fff55c;font-size:15px;font-weight:700;text-shadow:2px 2px #000;transition:opacity .08s,transform .08s}
+#comboHud.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#bowTrajectory{display:none;position:fixed;inset:0;z-index:12;pointer-events:none}
+#bowTrajectory.show{display:block}
+#bowTrajectory i{position:absolute;width:5px;height:5px;margin:-2px;border-radius:50%;background:#fff;box-shadow:0 0 4px #fff,1px 1px #000}
+.feed-item span{white-space:pre-wrap}
+@media(pointer:coarse),(max-width:800px){#comboHud{top:52%;font-size:12px}#bowTrajectory i{width:4px;height:4px}}
