@@ -1,0 +1,6 @@
+Leptok's Sound Pack [Overlay]
+Creator: Leptok
+Source: official Leptok release / Resourcepacks24
+Resource page: https://resourcepacks24.de/resourcepack/337475
+Integrated into Browser BedWars from the sound pack supplied by the project owner.
+The creator's pack description requests proper credit when using these sounds.

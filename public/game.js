@@ -391,6 +391,25 @@ let AC,masterGain,lastStep=0,lastPickup=0;
 const audioInit=()=>{try{if(!AC){AC=new AudioContext();masterGain=AC.createGain();masterGain.gain.value=.55;masterGain.connect(AC.destination)}if(AC.state==='suspended')AC.resume()}catch(e){}};
 const tone=(f,d=.1,ty='square',v=.05,slide=0)=>{try{audioInit();const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=ty;o.frequency.setValueAtTime(Math.max(20,f),t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(masterGain);o.start();o.stop(t+d)}catch(e){}};
 const noise=(d=.08,v=.035,cut=1200)=>{try{audioInit();const n=Math.max(1,Math.floor(AC.sampleRate*d)),buf=AC.createBuffer(1,n,AC.sampleRate),a=buf.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const src=AC.createBufferSource(),g=AC.createGain(),lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=cut;g.gain.value=v;src.buffer=buf;src.connect(lp);lp.connect(g);g.connect(masterGain);src.start()}catch(e){}};
+const LEPTOKS_BASE='/assets/sounds/leptoks/';
+const LEPTOKS_SOUND={
+ cloth:['dig/cloth1.ogg','dig/cloth2.ogg','dig/cloth3.ogg','dig/cloth4.ogg'],
+ stone:['dig/stone1.ogg','dig/stone2.ogg','dig/stone3.ogg','dig/stone4.ogg'],
+ wood:['dig/wood1.ogg','dig/wood2.ogg','dig/wood3.ogg','dig/wood4.ogg'],
+ eat:['random/eat1.ogg','random/eat2.ogg','random/eat3.ogg'],
+ click:['random/click.ogg'],
+ rain:['ambient/weather/rain1.ogg','ambient/weather/rain2.ogg','ambient/weather/rain3.ogg','ambient/weather/rain4.ogg'],
+ wolf:['mob/wolf/bark1.ogg','mob/wolf/bark2.ogg','mob/wolf/bark3.ogg'],
+ wolfPant:['mob/wolf/panting.ogg']
+};
+const LEPTOKS_BUFFERS=new Map(),LEPTOKS_LOADING=new Map();
+function leptoksFile(group){const a=LEPTOKS_SOUND[group]||[];return a.length?a[(Math.random()*a.length)|0]:''}
+async function loadLeptoks(file){if(!file)return null;if(LEPTOKS_BUFFERS.has(file))return LEPTOKS_BUFFERS.get(file);if(LEPTOKS_LOADING.has(file))return LEPTOKS_LOADING.get(file);const p=(async()=>{try{audioInit();const r=await fetch(LEPTOKS_BASE+file,{cache:'force-cache'});if(!r.ok)throw new Error('HTTP '+r.status);const ab=await r.arrayBuffer(),buf=await AC.decodeAudioData(ab.slice(0));LEPTOKS_BUFFERS.set(file,buf);return buf}catch(e){console.warn('Falha ao carregar som Leptoks',file,e);return null}finally{LEPTOKS_LOADING.delete(file)}})();LEPTOKS_LOADING.set(file,p);return p}
+function leptoksSound(group,vol=.75,rate=1){const file=leptoksFile(group);if(!file)return false;loadLeptoks(file).then(buf=>{if(!buf)return;try{audioInit();const src=AC.createBufferSource(),g=AC.createGain();src.buffer=buf;src.playbackRate.value=rate;g.gain.value=Math.max(0,Math.min(1,vol));src.connect(g);g.connect(masterGain);src.start()}catch(e){}});return true}
+function preloadLeptoks(){['random/click.ogg','dig/cloth1.ogg','dig/stone1.ogg','dig/wood1.ogg','random/eat1.ogg'].forEach(loadLeptoks)}
+addEventListener('pointerdown',()=>{audioInit();preloadLeptoks()},{once:true,passive:true});
+window.playLeptoksSound=(name,vol=.7)=>leptoksSound(name,vol,1);
+
 const positionalGain=(x,y,z,r=7)=>{
   const d=Math.hypot(pl.x-x,(pl.y+1)-y,pl.z-z);
   if(d>=r)return 0;
@@ -398,10 +417,15 @@ const positionalGain=(x,y,z,r=7)=>{
   return Math.max(0,Math.min(1,t*t));
 };
 const sfx=k=>{
-  if(k==='place'){noise(.045,.025,900);tone(165,.045,'square',.022,-35)}
-  else if(k==='break'){noise(.09,.04,1450);tone(110,.06,'triangle',.025,-45)}
-  else if(k==='blocked'){tone(95,.06,'square',.035,-15)}
-  else if(k==='buy'){tone(660,.055,'square',.035,220);setTimeout(()=>tone(880,.065,'square',.025,120),45)}
+  if(k==='place'||k==='place_cloth'){leptoksSound('cloth',.72,1.03)}
+  else if(k==='place_wood'){leptoksSound('wood',.72,1.03)}
+  else if(k==='place_stone'){leptoksSound('stone',.72,1.03)}
+  else if(k==='break'||k==='break_stone'){leptoksSound('stone',.82,.96)}
+  else if(k==='break_wood'){leptoksSound('wood',.82,.96)}
+  else if(k==='break_cloth'){leptoksSound('cloth',.82,.96)}
+  else if(k==='eat'){leptoksSound('eat',.88,1)}
+  else if(k==='blocked'){leptoksSound('click',.5,.78);tone(95,.06,'square',.028,-15)}
+  else if(k==='buy'){leptoksSound('click',.72,1.08);tone(660,.05,'square',.022,220)}
   else if(k==='pickup'){const n=performance.now();if(n-lastPickup<65)return;lastPickup=n;tone(780,.04,'sine',.025,180)}
   else if(k==='hurt'){noise(.05,.03,700);tone(130,.08,'sawtooth',.045,-55)}
   else if(k==='death'){tone(180,.12,'sawtooth',.05,-100);setTimeout(()=>tone(90,.22,'sawtooth',.04,-40),80)}
@@ -699,7 +723,7 @@ case'buyResult':{const el=$('shop');el.classList.remove('purchase-ok','purchase-
 case'bed':bed=m.bed;removeBedVisual(m.team);sfx('bed');bedBurst(m.team,m.pos);hud();renderScoreboard(true);break;
 case'm':msg(m.s);break;
 case'sfx':sfx(m.k);break;
-case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0){if(String(m.k).startsWith('resource_')||String(m.k).startsWith('pickup_'))resourceSfx(m.k,g);else if(m.k==='place'){noise(.04,.02*g,900);tone(165,.04,'square',.018*g,-30)}else if(m.k==='break'){noise(.08,.03*g,1400)}else if(m.k==='fireball'){tone(85,.14,'sawtooth',.05*g,-40);noise(.1,.03*g,500)}else sfx(m.k)}break}
+case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0){if(String(m.k).startsWith('resource_')||String(m.k).startsWith('pickup_'))resourceSfx(m.k,g);else if(m.k==='place'||m.k==='place_cloth'){leptoksSound('cloth',.72*g,1.03)}else if(m.k==='place_wood'){leptoksSound('wood',.72*g,1.03)}else if(m.k==='place_stone'){leptoksSound('stone',.72*g,1.03)}else if(m.k==='break'||m.k==='break_stone'){leptoksSound('stone',.82*g,.96)}else if(m.k==='break_wood'){leptoksSound('wood',.82*g,.96)}else if(m.k==='break_cloth'){leptoksSound('cloth',.82*g,.96)}else if(m.k==='fireball'){tone(85,.14,'sawtooth',.05*g,-40);noise(.1,.03*g,500)}else sfx(m.k)}break;}
 case'fx':fx(m.x,m.y,m.z,m.c);if(m.c===0xff8a2a||m.c===0xff6a00)sfx('fireball');break;
 case'err':$('er').textContent=m.s;scr('menu');break;
 case'end':{

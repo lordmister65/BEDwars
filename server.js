@@ -81,11 +81,14 @@ let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
 const STATIC = {};
-for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));
+const cacheStaticFile=f=>{const abs=path.join(__dirname,'public',f);if(fs.existsSync(abs)&&fs.statSync(abs).isFile())STATIC[f]=fs.readFileSync(abs)};
+for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) cacheStaticFile(f);
+function cacheStaticDir(rel){const abs=path.join(__dirname,'public',rel);if(!fs.existsSync(abs))return;for(const ent of fs.readdirSync(abs,{withFileTypes:true})){const child=(rel+'/'+ent.name).replace(/\\/g,'/');if(ent.isDirectory())cacheStaticDir(child);else cacheStaticFile(child)}}
+cacheStaticDir('assets/sounds');
 const srv = http.createServer((q, r) => {
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
   if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
-  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.png')?'image/png':'text/html; charset=utf-8';
+  const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.png')?'image/png':f.endsWith('.ogg')?'audio/ogg':f.endsWith('.txt')?'text/plain; charset=utf-8':f.endsWith('.mcmeta')?'application/json; charset=utf-8':'text/html; charset=utf-8';
   r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
   r.end(STATIC[f]);
 });
@@ -710,7 +713,7 @@ wss.on('connection', ws => {
         if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
         if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
         if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
-        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,x+.5,y+.5,z+.5,6);break
       }
       case 'breakStart': {
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
@@ -773,7 +776,7 @@ wss.on('connection', ws => {
         else if(k==='popupTower'&&p.inv.popupTower>0&&buildPopupTower(R,p,Math.floor(m.x),Math.floor(m.y),Math.floor(m.z))){p.inv.popupTower--;pinv(p);sfx(p,'place')}
         break
       }
-      case 'apple': if(play&&heldAllows(p,'apple')&&allow(p,'apple',250)&&p.inv.apple>0&&p.hp<20){p.inv.apple--;p.hp=Math.min(20,p.hp+10);pinv(p)}else if(play&&!heldAllows(p,'apple'))acFlag(p,'item','apple held='+heldKey(p));break;
+      case 'apple': if(play&&heldAllows(p,'apple')&&allow(p,'apple',250)&&p.inv.apple>0&&p.hp<20){p.inv.apple--;p.hp=Math.min(20,p.hp+10);pinv(p);sfx(p,'eat')}else if(play&&!heldAllows(p,'apple'))acFlag(p,'item','apple held='+heldKey(p));break;
     }
     }catch(err){console.error('Erro isolado em mensagem WebSocket',err);try{tx(p||{ws},{t:'err',s:'Ação ignorada por segurança. Tente novamente.'})}catch(e){}}
   });
@@ -809,7 +812,7 @@ setInterval(() => {
             const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
             const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
-            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');sfxAt(R,'break',br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;}
+            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){const breakSfx=br.b>=1&&br.b<=4?'break_cloth':br.b===5?'break_wood':'break_stone';setb(R,br.x,br.y,br.z,0);sfxAt(R,breakSfx,br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;}
           }
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
