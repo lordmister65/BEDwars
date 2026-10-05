@@ -20,7 +20,21 @@ jobs:
       - name: Download exact public copy of supplied pack
         run: |
           set -euo pipefail
-          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o /tmp/leptoks.zip 'https://resourcepacks24.de/download/337475'
+          PAGE='https://www.mediafire.com/file/digqfj1fl3yn2d5/%21_%C2%A72Leptoks_Sound_Pack_%5BOverlay%5D.zip/file'
+          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o /tmp/mediafire.html "$PAGE"
+          DIRECT=$(python - <<'PY'
+          import re,html
+          s=open('/tmp/mediafire.html',encoding='utf-8',errors='ignore').read()
+          pats=[r'id="downloadButton"[^>]+href="([^"]+)"',r'href="([^"]+)"[^>]+id="downloadButton"']
+          u=''
+          for p in pats:
+              m=re.search(p,s,re.I)
+              if m: u=html.unescape(m.group(1));break
+          if not u: raise SystemExit('MediaFire direct download link not found')
+          print(u)
+          PY
+          )
+          curl -L --fail --retry 3 -A 'Mozilla/5.0' -o /tmp/leptoks.zip "$DIRECT"
           echo '5f2b5e578ee392f62794a7c743728d07d16407788fc54482672d1a6c5867ebc6  /tmp/leptoks.zip' | sha256sum -c -
       - name: Import audio assets
         run: |
@@ -34,7 +48,8 @@ jobs:
           cat > public/assets/sounds/leptoks/CREDITS.txt <<'EOF'
           Leptok's Sound Pack [Overlay]
           Creator: Leptok
-          Source: https://resourcepacks24.de/resourcepack/337475
+          Source: official Leptok release / Resourcepacks24
+          Resource page: https://resourcepacks24.de/resourcepack/337475
           Integrated into Browser BedWars from the sound pack supplied by the project owner.
           The creator's pack description requests proper credit when using these sounds.
           EOF
