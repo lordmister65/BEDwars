@@ -639,14 +639,19 @@ wss.on('connection', ws => {
         break;
       }
       case 'place': {
+        const item=String(m.k||''),{x,y,z}=m,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
+        const placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item,x,y,z,remaining:Number(p.inv[item]||0)});
+        if(!play){placeResult(false,'not_playing');break}
+        if(!k){placeResult(false,'invalid_item');break}
+        if(![x,y,z].every(Number.isInteger)||y<1||y>=S.H-2){placeResult(false,'invalid_pos');break}
+        if(!allow(p,'place',62)){placeResult(false,'cooldown');break}
+        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}
+        if(get(R,x,y,z)){placeResult(false,'occupied');break}
+        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){placeResult(false,'too_far');break}
+        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
+        if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!allow(p, 'place', 62)) break;
-        const k = { wool: p.team + 1, planks: 5, endstone:12, glass:7, obsidian:16 }[m.k], { x, y, z } = m;
-        if (!play || !k || !(p.inv[m.k] > 0) || ![x, y, z].every(Number.isInteger) || y < 1 || y >= S.H-2 || get(R, x, y, z)) break;
-        if (Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45) break;
-        if (![[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(d => get(R, x + d[0], y + d[1], z + d[2]))) break;
-        if ([...R.ps.values()].some(q => playerHitsBlock(q,x,y,z))) { sfx(p,'blocked'); break; }
-        setb(R,x,y,z,k,1);p.inv[m.k]--;pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break;
+        setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break;
       }
       case 'breakStart': {
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
