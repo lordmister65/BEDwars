@@ -38,6 +38,27 @@ const CENTRAL_GEN={diamond:24,emerald:40};
 // para compensar interpolação e até um snapshot curto de movimento, sem aumentar o alcance.
 const COMBAT_HITBOX={radius:.36,height:1.80,feetPad:.05,historyMax:.60,meleePad:.055,meleeReach:3.80};
 const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:12*60,collapseAt:15*60,collapseEvery:5};
+const HELD_KEYS=[null,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
+const TNT_KEYS=new Set(['tnt','tntImpulse','tntSlow','tntDamage']);
+function heldKey(p){if(p.held===0)return'sword';return HELD_KEYS[p.held]||null}
+function heldAllows(p,k){const h=heldKey(p);if(k==='sword')return h==='sword';if(TNT_KEYS.has(k))return h==='tnt'&&(p.inv[k]||0)>0;return h===k}
+function acFlag(p,type,detail=''){
+ if(!p||p.admin)return false;
+ p.ac=p.ac||{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''};
+ p.ac.total++;p.ac[type]=(p.ac[type]||0)+1;p.ac.last=type+(detail?': '+String(detail).slice(0,70):'');p.acAt=Date.now();
+ console.warn('[AC]',p.name,p.roomCode,type,detail);
+ try{tx(p,{t:'ac',type,total:p.ac.total,last:p.ac.last})}catch(e){}
+ return true
+}
+function sanitizeInventory(p){
+ for(const k of Object.keys(p.inv||{})){
+  let v=Number(p.inv[k]);
+  if(!Number.isFinite(v)||v<0||v>9999){acFlag(p,'resource',k+'='+v);v=Math.max(0,Math.min(9999,Number.isFinite(v)?Math.floor(v):0))}
+  p.inv[k]=Math.floor(v)
+ }
+ if(p.inv.bow>1)p.inv.bow=1
+}
+
 function rebalanceForMode(R,mc){
   const players=[...R.ps.values()];
   if(mc.solo){
@@ -131,7 +152,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0,
+const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''},
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,lastCombatAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
@@ -147,7 +168,7 @@ const nearBase = p => {
 };
 const buyFail=(p,code,text)=>tx(p,{t:'buyResult',ok:0,code,text});
 const buyOk=p=>tx(p,{t:'buyResult',ok:1});
-const pinv=p=>{p.invSeq=(p.invSeq||0)+1;return tx(p,{t:'inv',i:p.inv,sw:p.sw,ar:p.ar,up:p.up,tools:p.tools,fx:p.fx,traps:p.trapQueue||[],seq:p.invSeq})};
+const pinv=p=>{sanitizeInventory(p);p.invSeq=(p.invSeq||0)+1;return tx(p,{t:'inv',i:p.inv,sw:p.sw,ar:p.ar,up:p.up,tools:p.tools,fx:p.fx,traps:p.trapQueue||[],seq:p.invSeq})};
 const sfx = (p,k) => tx(p,{t:'sfx',k});
 const feed = (R, text, aTeam=-1, bTeam=-1, kind='info') => bc(R,{t:'feed',text,aTeam,bTeam,kind,at:Date.now()});
 const statsPayload = R => [...R.ps.values()].map(p=>({
@@ -195,7 +216,7 @@ function win(R) {
     const progress=finalizeProfiles(R,winnerTeam,winnerId);
     R.final={t:'end',winnerTeam,winnerId,winnerName,modeId:R.modeId,stats:statsPayload(R),time:+R.t.toFixed(1),progress,ranking:rankingPayload()};
     bc(R,R.final);
-    setTimeout(() => { if (rooms.get(R.code) === R) rooms.delete(R.code); }, 90000);
+    setTimeout(() => { if (rooms.get(R.code) === R && R.st==='ended') rooms.delete(R.code); }, 90000);
   }
 }
 function cancelSpawnProtection(p){if(p&&p.spawnProtect>0){p.spawnProtect=0;tx(p,{t:'spawnProtect',v:0})}}
@@ -316,7 +337,7 @@ function breakTime(p, b) {
   return Math.max(.14,m.hard*mult*haste*fatigue);
 }
 function addDrop(R,k,n,x,y,z,max=64){
-  let d=R.drops.find(e=>e.k===k&&Math.hypot(e.x-x,e.z-z)<1.2&&e.n<max);
+  max=Math.max(max,128);let d=R.drops.find(e=>e.k===k&&Math.hypot(e.x-x,e.z-z)<2.0&&e.n<max);
   if(d){d.n=Math.min(max,d.n+n);} else {d={id:++R.dropSeq,k,n:Math.min(max,n),x,y,z};R.drops.push(d);}
   if(['iron','gold','dia','em'].includes(k)) sfxAt(R,'resource_'+k,x,y,z,k==='iron'?4.5:6);
   bc(R,{t:'drops',l:R.drops});
@@ -373,6 +394,8 @@ function generatorUpgradeInfo(R,t){
   return{tier,next:next?{key:next.key,n:next.n,label:next.label,name:next.name}:null,current:BASE_GEN_TIERS[tier].name};
 }
 function chestState(R,p,kind){const items=kind==='team'?R.teamChest[p.team]:p.enderChest,gi=kind==='team'?generatorUpgradeInfo(R,p.team):null;tx(p,{t:'chestState',kind,items,genTier:gi?.tier??0,genNext:gi?.next||null,genCurrent:gi?.current||''})}
+function broadcastTeamChest(R,t){teamPlayers(R,t).forEach(q=>{if(q.openChestKind==='team'&&nearChest(R,q,'team'))chestState(R,q,'team')})}
+
 function projectileDir(yaw,pitch){const c=Math.cos(pitch);return{x:-Math.sin(yaw)*c,y:Math.sin(pitch),z:-Math.cos(yaw)*c};}
 function spawnProjectile(R,p,k,yaw,pitch,speed,charge=1){
   const d=projectileDir(yaw,pitch), id=++R.projSeq;
@@ -526,11 +549,25 @@ wss.on('connection', ws => {
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
-      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0}); break;
+      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
-      case 'chestOpen': {const kind=m.kind==='ender'?'ender':'team';if(!play||!nearChest(R,p,kind))break;chestState(R,p,kind);break}
-      case 'chestMove': {const kind=m.kind==='ender'?'ender':'team',key=String(m.key||'');if(!play||!CHEST_KEYS.includes(key)||!nearChest(R,p,kind))break;const box=kind==='team'?R.teamChest[p.team]:p.enderChest,dir=m.dir==='withdraw'?'withdraw':'deposit';let n=m.n==='all'?Infinity:Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));if(dir==='deposit'){n=Math.min(n,p.inv[key]||0);if(n>0){p.inv[key]-=n;box[key]=(box[key]||0)+n}}else{n=Math.min(n,box[key]||0);if(n>0){box[key]-=n;p.inv[key]=(p.inv[key]||0)+n}}pinv(p);chestState(R,p,kind);break}
+      case 'replay': {
+        if(R.st!=='ended')break;
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;
+        R.ps.forEach((q,i)=>{q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i);tx(q,{t:'replay'})});
+        bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});lobby(R);break
+      }
+      case 'chestOpen': {const kind=m.kind==='ender'?'ender':'team';if(!play||!nearChest(R,p,kind))break;p.openChestKind=kind;chestState(R,p,kind);break}
+      case 'chestClose': p.openChestKind='';break;
+      case 'chestMove': {
+        const kind=m.kind==='ender'?'ender':'team',key=String(m.key||'');if(!play||!CHEST_KEYS.includes(key)||!nearChest(R,p,kind))break;
+        p.openChestKind=kind;const box=kind==='team'?R.teamChest[p.team]:p.enderChest,dir=m.dir==='withdraw'?'withdraw':'deposit';
+        let n=m.n==='all'?Infinity:Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));
+        if(dir==='deposit'){n=Math.min(n,p.inv[key]||0);if(n>0){p.inv[key]-=n;box[key]=(box[key]||0)+n}}
+        else{n=Math.min(n,box[key]||0);if(n>0){box[key]-=n;p.inv[key]=(p.inv[key]||0)+n}}
+        pinv(p);if(kind==='team')broadcastTeamChest(R,p.team);else chestState(R,p,kind);break
+      }
       case 'genUpgrade': {
         if(!play||!nearChest(R,p,'team'))break;
         const tier=Math.max(0,Math.min(3,R.genTier?.[p.team]||0)),cost=GEN_UPGRADE_COSTS[tier],box=R.teamChest[p.team];
@@ -539,7 +576,7 @@ wss.on('connection', ws => {
         box[cost.key]-=cost.n;R.genTier[p.team]=tier+1;
         const bg=R.g.base[p.team];if(bg){if(tier===0)bg.gold=0;if(tier===2)bg.dia=0}
         teamPlayers(R,p.team).forEach(q=>tx(q,{t:'feed',text:'⚙ Gerador da base evoluiu para Nível '+(tier+1)+' — '+BASE_GEN_TIERS[tier+1].name+'.',aTeam:p.team,bTeam:-1,kind:'upgrade'}));
-        chestState(R,p,'team');break;
+        broadcastTeamChest(R,p.team);break;
       }
       case 'team': {
         const mc=modeCfg(R);
@@ -601,7 +638,7 @@ wss.on('connection', ws => {
         const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
         const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n;
         const d=Math.hypot(m.x-p.x,m.z-p.z),maxH=(p.admin||spectating)?dt*24+3:dt*12+1.5,maxV=(p.admin||spectating)?dt*24+3:dt*11+1.2;
-        if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite)||d>maxH||Math.abs(m.y-p.y)>maxV||m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30){tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0});break}
+        if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite)||d>maxH||Math.abs(m.y-p.y)>maxV||m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30){if(!p.admin&&!spectating)acFlag(p,'movement','d='+d.toFixed(2)+' dy='+Math.abs(Number(m.y)-p.y).toFixed(2));tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0});break}
         const oldY=p.y,newDy=(m.y-p.y)/dt;p.hspeed=Math.min(20,d/dt);p.dy=newDy;p.px=p.x;p.py=p.y;p.pz=p.z;p.x=m.x;p.y=m.y;p.z=m.z;p.yaw=m.yaw;p.pitch=m.pitch;
         if(!spectating&&!p.admin){const below=get(R,Math.floor(p.x),Math.floor(p.y-.08),Math.floor(p.z))||get(R,Math.floor(p.x+.25),Math.floor(p.y-.08),Math.floor(p.z));p.wasGrounded=p.grounded;p.grounded=!!below;if(newDy<p.fallVyMin)p.fallVyMin=newDy;if(p.grounded&&!p.wasGrounded){const impact=Math.abs(Math.min(0,p.fallVyMin));if(impact>10.8)hurt(R,p,Math.min(12,(impact-10.8)*.78),0,0,null,false,'fall',0);p.fallVyMin=0}else if(p.grounded)p.fallVyMin=0}
         break;
@@ -642,34 +679,34 @@ wss.on('connection', ws => {
         tx(p,{t:'m',s:'Teste ADM executado: '+action});break;
       }
       case 'held': {
-        if (Number.isInteger(m.s) && m.s >= 0 && m.s <= 19) p.held = m.s;
+        if(Number.isInteger(m.s)&&m.s>=0&&m.s<=19)p.held=m.s;else acFlag(p,'item','held='+m.s);
         break;
       }
       case 'hit': {
         if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!play || !allow(p, 'hit', GAMEPLAY.hitCooldownMs) || !Number.isInteger(m.id) || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;cancelSpawnProtection(p);
-        const q = R.ps.get(m.id);
-        if (!q || q === p || !q.alive || q.team === p.team || q.admin) break;
+        if(!play||!Number.isInteger(m.id)||!Number.isFinite(m.yaw)||!Number.isFinite(m.pitch))break;
+        if(!allow(p,'hit',GAMEPLAY.hitCooldownMs)){acFlag(p,'rate','hit');break}cancelSpawnProtection(p);
+        const q=R.ps.get(m.id);if(!q||q===p||!q.alive||q.team===p.team||q.admin)break;
+        const rawDist=Math.hypot(q.x-p.x,(q.y+1)-(p.y+1),q.z-p.z);if(rawDist>4.35){acFlag(p,'reach',rawDist.toFixed(2));break}
         const hit=meleeRayHit(R,p,q,m.yaw,m.pitch);if(!hit)break;
-        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t;if(p.comboTarget===q.id&&now-p.lastCombatAt<1.05)p.comboCount=Math.min(8,p.comboCount+1);else p.comboCount=1;p.comboTarget=q.id;p.lastCombatAt=now;const stick=m.k==='knockbackStick'&&(p.inv.knockbackStick||0)>0,cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.12:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
+        const hk=heldKey(p),stick=hk==='knockbackStick'&&(p.inv.knockbackStick||0)>0;if(hk!=='sword'&&!stick){acFlag(p,'item','hit with '+hk);break}
+        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t;if(p.comboTarget===q.id&&now-p.lastCombatAt<1.05)p.comboCount=Math.min(8,p.comboCount+1);else p.comboCount=1;p.comboTarget=q.id;p.lastCombatAt=now;
+        const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.12:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
         if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr))break;
-        tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});
-        break;
+        tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});break
       }
       case 'place': {
-        const item=String(m.k||''),{x,y,z}=m,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
-        const placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item,x,y,z,remaining:Number(p.inv[item]||0)});
-        if(!play){placeResult(false,'not_playing');break}
-        if(!k){placeResult(false,'invalid_item');break}
+        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
+        const placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item||String(m.k||''),x,y,z,remaining:Number(p.inv[item]||0)});
+        if(!play){placeResult(false,'not_playing');break}if(!item||!k){acFlag(p,'item','place '+String(m.k||'')+' held='+held);placeResult(false,'wrong_item');break}
+        if(m.k&&m.k!==item){acFlag(p,'item','place declared '+m.k+' held='+item);placeResult(false,'wrong_item');break}
         if(![x,y,z].every(Number.isInteger)||y<1||y>=S.H-2){placeResult(false,'invalid_pos');break}
-        if(!allow(p,'place',62)){placeResult(false,'cooldown');break}
-        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}
-        if(get(R,x,y,z)){placeResult(false,'occupied');break}
-        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){placeResult(false,'too_far');break}
+        if(!allow(p,'place',62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
+        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}
+        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
         if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
         if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
-        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break;
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);sfx(p,'place');sfxAt(R,'place',x+.5,y+.5,z+.5,6);break
       }
       case 'breakStart': {
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
@@ -709,37 +746,30 @@ wss.on('connection', ws => {
         break;
       }
       case 'shoot': {
-        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if (!play || !Number.isFinite(m.yaw) || !Number.isFinite(m.pitch)) break;
-        const kind=m.k, charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
-        const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:kind.startsWith('tnt')?650:999999;
-        if(!allow(p,'shoot_'+kind,gap))break;
-        bc(R,{t:'anim',id:p.id,k:'attack'});
-        if(kind==='bow'){
-          if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,22+22*charge,charge);pinv(p);
-        }else if(kind==='fireball'){
-          if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,21,1);pinv(p);
-        }else if(kind==='snowball'){
-          if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,26,1);pinv(p);
-        }else if(['tnt','tntImpulse','tntSlow','tntDamage'].includes(kind)){
-          if((p.inv[kind]||0)<1)break;p.inv[kind]--;spawnProjectile(R,p,kind,m.yaw,m.pitch,13.5,1);pinv(p);
-        }
-        break;
+        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}if(!play||!Number.isFinite(m.yaw)||!Number.isFinite(m.pitch))break;
+        const kind=String(m.k||''),charge=Math.max(.2,Math.min(1,Number(m.charge)||1));
+        if(!heldAllows(p,kind)){acFlag(p,'item','shoot '+kind+' held='+heldKey(p));break}
+        const gap=kind==='bow'?220:kind==='fireball'?900:kind==='snowball'?300:TNT_KEYS.has(kind)?650:999999;
+        if(!allow(p,'shoot_'+kind,gap)){acFlag(p,'projectile',kind);break}bc(R,{t:'anim',id:p.id,k:'attack'});
+        if(kind==='bow'){if(p.inv.bow<1||p.inv.arrow<1)break;p.inv.arrow--;spawnProjectile(R,p,'arrow',m.yaw,m.pitch,22+22*charge,charge);pinv(p)}
+        else if(kind==='fireball'){if(p.inv.fireball<1)break;p.inv.fireball--;spawnProjectile(R,p,'fireball',m.yaw,m.pitch,21,1);pinv(p)}
+        else if(kind==='snowball'){if(p.inv.snowball<1)break;p.inv.snowball--;spawnProjectile(R,p,'snowball',m.yaw,m.pitch,26,1);pinv(p)}
+        else if(TNT_KEYS.has(kind)){if((p.inv[kind]||0)<1)break;p.inv[kind]--;spawnProjectile(R,p,kind,m.yaw,m.pitch,13.5,1);pinv(p)}
+        break
       }
       case 'use': {
-        cancelSpawnProtection(p);if(!play||!allow(p,'use',300))break;
-        const k=m.k;
-        if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){
-          p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,24,1);pinv(p);
-        } else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p);}
-        else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p);}
-        else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p);}
-        else if(k==='magicMilk'&&p.inv.magicMilk>0){p.inv.magicMilk--;p.fx.milk=60;pinv(p);sfx(p,'buy');}
-        else if(k==='bridgeEgg'&&p.inv.bridgeEgg>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){p.inv.bridgeEgg--;spawnProjectile(R,p,'bridgeEgg',m.yaw,m.pitch,21,1);pinv(p);}
-        else if(k==='popupTower'&&p.inv.popupTower>0&&buildPopupTower(R,p,Math.floor(m.x),Math.floor(m.y),Math.floor(m.z))){p.inv.popupTower--;pinv(p);sfx(p,'place');}
-        break;
+        cancelSpawnProtection(p);if(!play)break;if(!allow(p,'use',300)){acFlag(p,'rate','use');break}
+        const k=String(m.k||'');if(!heldAllows(p,k)){acFlag(p,'item','use '+k+' held='+heldKey(p));break}
+        if(k==='pearl'&&p.inv.pearl>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){p.inv.pearl--;spawnProjectile(R,p,'pearl',m.yaw,m.pitch,24,1);pinv(p)}
+        else if(k==='speedPotion'&&p.inv.speedPotion>0){p.inv.speedPotion--;p.fx.speed=45;pinv(p)}
+        else if(k==='jumpPotion'&&p.inv.jumpPotion>0){p.inv.jumpPotion--;p.fx.jump=45;pinv(p)}
+        else if(k==='invisPotion'&&p.inv.invisPotion>0){p.inv.invisPotion--;p.fx.invis=30;pinv(p)}
+        else if(k==='magicMilk'&&p.inv.magicMilk>0){p.inv.magicMilk--;p.fx.milk=60;pinv(p);sfx(p,'buy')}
+        else if(k==='bridgeEgg'&&p.inv.bridgeEgg>0&&Number.isFinite(m.yaw)&&Number.isFinite(m.pitch)){p.inv.bridgeEgg--;spawnProjectile(R,p,'bridgeEgg',m.yaw,m.pitch,21,1);pinv(p)}
+        else if(k==='popupTower'&&p.inv.popupTower>0&&buildPopupTower(R,p,Math.floor(m.x),Math.floor(m.y),Math.floor(m.z))){p.inv.popupTower--;pinv(p);sfx(p,'place')}
+        break
       }
-      case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;
+      case 'apple': if(play&&heldAllows(p,'apple')&&allow(p,'apple',250)&&p.inv.apple>0&&p.hp<20){p.inv.apple--;p.hp=Math.min(20,p.hp+10);pinv(p)}else if(play&&!heldAllows(p,'apple'))acFlag(p,'item','apple held='+heldKey(p));break;
     }
     }catch(err){console.error('Erro isolado em mensagem WebSocket',err);try{tx(p||{ws},{t:'err',s:'Ação ignorada por segurança. Tente novamente.'})}catch(e){}}
   });

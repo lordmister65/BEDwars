@@ -3,12 +3,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=chat-top-left-20261005"></head><body>
+<link rel="stylesheet" href="/style.css?v=security-polish-20261005"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="killFeed"></div><div id="bar"></div>
 <div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
-<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button><button class="mb settings-btn" id="mobileSettingsBtn">⚙</button><div id="mobileSettings"><b>CONTROLES</b><label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label><label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label><label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label><label>Opacidade<input id="mopacity" type="range" min="35" max="100" value="78"></label></div></div>
+<div id="mobile"><div id="joy"><div id="knob"></div></div><div id="look"></div><button class="mb" id="jumpBtn">PULAR</button><button class="mb" id="actBtn">ATACAR</button><button class="mb" id="useBtn">USAR</button><button class="mb" id="placeBtn">COLOCAR</button><button class="mb hotbar-nav" id="prevItemBtn">◀</button><button class="mb hotbar-nav" id="nextItemBtn">▶</button><button class="mb settings-btn" id="mobileSettingsBtn">⚙</button><div id="mobileSettings"><b>CONTROLES</b><label>Sens. horizontal<input id="msx" type="range" min="3" max="10" value="6"></label><label>Sens. vertical<input id="msy" type="range" min="3" max="10" value="6"></label><label>Tamanho<input id="msize" type="range" min="80" max="135" value="100"></label><label>Opacidade<input id="mopacity" type="range" min="35" max="100" value="78"></label></div></div>
 <div class="hud" id="tm"></div><div class="hud" id="res"></div><div class="hud" id="hp"></div>
 <div id="chatLog"></div>
 <form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
@@ -32,10 +32,10 @@
 <div class="ov" id="ranking"><div class="meta-panel ranking-panel"><h1>RANKING</h1><div id="rankingBody"></div><button onclick="scr('lobby')">Voltar</button></div></div>
 <div class="ov" id="hotbarEditor"><div class="meta-panel hotbar-editor-panel"><h1>EDITOR DA HOTBAR</h1><p>Selecione um slot e depois outro para trocar de posição. Os 9 primeiros respondem às teclas 1–9.</p><div id="hotbarEditorGrid"></div><div class="meta-actions"><button onclick="resetHotbarEditor()">Restaurar padrão</button><button onclick="scr('lobby')">Concluir</button></div></div></div>
 <div id="blindOverlay"></div><div id="compassHud"></div>
-<div class="ov" id="end"><div class="end-panel"><h1 id="et"></h1><p id="endSub"></p><div id="endStats"></div><button onclick="leaveToLobby()">Voltar ao lobby / nova sala</button></div></div>
+<div class="ov" id="end"><div class="end-panel"><h1 id="et"></h1><p id="endSub"></p><div id="endStats"></div><div class="end-actions"><button onclick="replaySameRoom()">Jogar novamente</button><button onclick="leaveToLobby()">Sair da sala</button></div></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=stability-performance-pack-final-20261004"></script>
+<script src="/game.js?v=security-polish-20261005"></script>
 </body></html>
