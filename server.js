@@ -703,14 +703,21 @@ wss.on('connection', ws => {
         tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});break
       }
       case 'place': {
-        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
+        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
         const placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item||String(m.k||''),x,y,z,remaining:Number(p.inv[item]||0)});
         if(!play){placeResult(false,'not_playing');break}if(!item||!k){acFlag(p,'item','place '+String(m.k||'')+' held='+held);placeResult(false,'wrong_item');break}
         if(m.k&&m.k!==item){acFlag(p,'item','place declared '+m.k+' held='+item);placeResult(false,'wrong_item');break}
         if(![x,y,z].every(Number.isInteger)||y<1||y>=S.H-2){placeResult(false,'invalid_pos');break}
-        if(!allow(p,'place',62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
+        if(!allow(p,'place',auto?90:62)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
         if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}
         if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
+        if(auto){
+          const now=Date.now(),idle=now-(p.autoBridgeAt||0);if(idle>500)p.autoBridgeY=y;
+          if(p.hspeed<.35){placeResult(false,'auto_stationary');break}
+          if(p.autoBridgeY!==y){acFlag(p,'place','auto_vertical');placeResult(false,'auto_vertical');break}
+          const hd=Math.hypot(x+.5-p.x,z+.5-p.z);if(hd>2.15||Math.abs((y+1.15)-p.y)>2.25){acFlag(p,'place','auto_range');placeResult(false,'too_far');break}
+          p.autoBridgeAt=now;
+        }
         if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
         if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,x+.5,y+.5,z+.5,6);break

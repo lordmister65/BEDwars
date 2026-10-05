@@ -703,7 +703,7 @@ case's':{syncProjectiles(m.pr||[]);if(m.time!=null)matchTime=m.time;if(m.bed)bed
 let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id);matchPlayers.delete(id)}});renderScoreboard();break}
 case'bb':m.l.forEach(a=>{if(applyServerBlock(a))BRIDGE_PRED.delete(a[0]+','+a[1]+','+a[2])});unstick();break;
-case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key);hud();break}
+case'placeResult':{const key=m.x+','+m.y+','+m.z,b=BRIDGE_PRED.get(key);if(PLACEABLE.has(m.k)&&Number.isFinite(m.remaining))inv[m.k]=Math.max(0,Math.floor(m.remaining));if(m.ok){if(b)b.acked=true}else if(b)rollbackPrediction(key,false);hud();break}
 case'breakp':breakDur=m.d;breakAt=performance.now();$('breakBox').style.display='block';break;
 case'breakCancel':breaking=null;breakDur=0;miningTool=null;lastHeldSig='';$('breakBox').style.display='none';crackBox.visible=false;refreshHeld();break;
 case'drops':syncDrops(m.l);break;
@@ -743,7 +743,7 @@ case'end':{
  scr('end');break
 }}}
 // entrada
-const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;const BRIDGE_PRED=new Map();let mobileCfg=(()=>{try{return Object.assign({sx:.006,sy:.006,size:1,opacity:.78},JSON.parse(localStorage.getItem('bwMobileCfg')||'{}'))}catch(e){return{sx:.006,sy:.006,size:1,opacity:.78}}})();function applyMobileCfg(){document.documentElement.style.setProperty('--mobile-scale',mobileCfg.size);document.documentElement.style.setProperty('--mobile-opacity',mobileCfg.opacity)}function saveMobileCfg(){try{localStorage.setItem('bwMobileCfg',JSON.stringify(mobileCfg))}catch(e){}applyMobileCfg()}applyMobileCfg();
+const touchMode=matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<900;let mx=0,my=0,mLook=null,mJoy=null,lastWTap=0,doubleSprint=false,bridgeHeld=false,bridgeHoldY=null,lastBridgeAt=0,dragLook=false,lastDragX=0,lastDragY=0;const BRIDGE_PRED=new Map();let mobileCfg=(()=>{try{return Object.assign({sx:.006,sy:.006,size:1,opacity:.78},JSON.parse(localStorage.getItem('bwMobileCfg')||'{}'))}catch(e){return{sx:.006,sy:.006,size:1,opacity:.78}}})();function applyMobileCfg(){document.documentElement.style.setProperty('--mobile-scale',mobileCfg.size);document.documentElement.style.setProperty('--mobile-opacity',mobileCfg.opacity)}function saveMobileCfg(){try{localStorage.setItem('bwMobileCfg',JSON.stringify(mobileCfg))}catch(e){}applyMobileCfg()}applyMobileCfg();
 addEventListener('keydown',e=>{if(document.activeElement===$('chatInput')){if(e.code==='Escape'){e.preventDefault();toggleChat(false)}return}if(e.code==='KeyT'||e.code==='Enter'){e.preventDefault();toggleChat(true);return}
 if(e.code==='KeyW'&&!e.repeat){const n=performance.now();if(n-lastWTap<=280)doubleSprint=true;lastWTap=n}
 K[e.code]=1;if(e.code==='F3'){e.preventDefault();diag.show=!diag.show;updateDiag(performance.now())}if(e.code==='F4'){e.preventDefault();cycleQuality()}if(e.code>='Digit1'&&e.code<='Digit9')pick(+e.code[5]-1);
@@ -796,38 +796,40 @@ function stopBreak(){if(breaking){breaking=null;send({t:'breakStop'});$('breakBo
 function beginBow(){if(!started||!me.alive||!inv.bow||inv.arrow<1)return;bowCharging=true;bowChargeAt=performance.now();$('bowCharge').style.display='block';$('bowChargeFill').style.width='0%'}
 function releaseBow(){if(!bowCharging)return;bowCharging=false;const ratio=Math.max(.2,Math.min(1,(performance.now()-bowChargeAt)/1200));$('bowCharge').style.display='none';useAnim=1;send({t:'shoot',k:'bow',yaw:pl.yaw,pitch:pl.pitch,charge:ratio})}
 const PLACEABLE=new Set(['wool','planks','endstone','glass','obsidian']);
-function pendingBlockCount(k){let n=0;BRIDGE_PRED.forEach(b=>{if(b.k===k&&!b.acked)n++});return n}
-function availableBlockCount(k){return Math.max(0,(inv[k]||0)-pendingBlockCount(k))}
-function rollbackPrediction(key){const b=BRIDGE_PRED.get(key);if(!b)return;BRIDGE_PRED.delete(key);if(get(b.x,b.y,b.z)&&pf[ix(b.x,b.y,b.z)]){sb(b.x,b.y,b.z,0,0);flush(lowEnd?2:4)}}
+function availableBlockCount(k){return Math.max(0,Math.floor(inv[k]||0))}
+function predictionAt(x,y,z){return BRIDGE_PRED.get(x+','+y+','+z)||null}
+function confirmedBlock(x,y,z){if(!get(x,y,z))return false;const b=predictionAt(x,y,z);return !b||!!b.acked}
+function confirmedSupport(x,y,z){return [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>confirmedBlock(x+d[0],y+d[1],z+d[2]))}
+function rollbackPrediction(key,restore=false){const b=BRIDGE_PRED.get(key);if(!b)return;BRIDGE_PRED.delete(key);if(get(b.x,b.y,b.z)&&pf[ix(b.x,b.y,b.z)]){sb(b.x,b.y,b.z,0,0);flush(lowEnd?2:4)}if(restore&&b.reserved){inv[b.k]=(inv[b.k]||0)+1;hud()}}
 function bridgeTarget(){
- const k=slotKey(cur);if(!PLACEABLE.has(k)||availableBlockCount(k)<=0)return null;
- const speed=Math.hypot(pl.vx||0,pl.vz||0),fx=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw);
- const dx=speed>.2?(pl.vx/speed):fx,dz=speed>.2?(pl.vz/speed):fz;
- // Posição levemente à frente dos pés: ideal para speed bridge sem colocar dentro do jogador.
- const px=pl.x+dx*.58,pz=pl.z+dz*.58,y=Math.floor(pl.y-.08)-1,x=Math.floor(px),z=Math.floor(pz);
+ const k=slotKey(cur);if(!PLACEABLE.has(k)||availableBlockCount(k)<=0||bridgeHoldY==null)return null;
+ const speed=Math.hypot(pl.vx||0,pl.vz||0);if(speed<.55)return null;
+ const dx=pl.vx/speed,dz=pl.vz/speed,currentY=Math.floor(pl.y-.08)-1;
+ if(Math.abs(currentY-bridgeHoldY)>1)return null;
+ const px=pl.x+dx*.62,pz=pl.z+dz*.62,y=bridgeHoldY,x=Math.floor(px),z=Math.floor(pz);
  if(!inXZ(x,z)||y<1||y>=H-2||get(x,y,z)||!safePlaceTarget(x,y,z))return null;
- const dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
- if(!dirs.some(d=>get(x+d[0],y+d[1],z+d[2])))return null;
- return{x,y,z,k};
+ const forward=(x+.5-pl.x)*dx+(z+.5-pl.z)*dz;if(forward<-.12||forward>1.55)return null;
+ if(!confirmedSupport(x,y,z))return null;
+ return{x,y,z,k,auto:1};
 }
 function predictPlace(p){
  if(!p||!PLACEABLE.has(p.k)||availableBlockCount(p.k)<=0||get(p.x,p.y,p.z))return false;
  const blockId=p.k==='wool'?me.team+1:p.k==='planks'?5:p.k==='endstone'?12:p.k==='glass'?7:16,key=p.x+','+p.y+','+p.z;
- BRIDGE_PRED.set(key,{x:p.x,y:p.y,z:p.z,k:p.k,at:performance.now(),acked:false});sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);
- if(!send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z})){rollbackPrediction(key);return false}
+ inv[p.k]=Math.max(0,(inv[p.k]||0)-1);
+ BRIDGE_PRED.set(key,{x:p.x,y:p.y,z:p.z,k:p.k,at:performance.now(),acked:false,reserved:true,auto:!!p.auto});
+ sb(p.x,p.y,p.z,blockId,1);flush(lowEnd?2:4);hud();
+ if(!send({t:'place',k:p.k,x:p.x,y:p.y,z:p.z,auto:p.auto?1:0})){rollbackPrediction(key,true);return false}
  return true
 }
 function clutchTarget(){const k=slotKey(cur);if(!PLACEABLE.has(k)||availableBlockCount(k)<=0)return null;const y=Math.floor(pl.y-.05)-1,cands=[];for(let ox=-1;ox<=1;ox++)for(let oz=-1;oz<=1;oz++){const x=Math.floor(pl.x+ox*.55),z=Math.floor(pl.z+oz*.55);if(!inXZ(x,z)||get(x,y,z)||!safePlaceTarget(x,y,z))continue;const adj=[[1,0,0],[-1,0,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(x+d[0],y+d[1],z+d[2]));if(adj)cands.push({x,y,z,k,d:Math.hypot(x+.5-pl.x,z+.5-pl.z)})}return cands.sort((a,b)=>a.d-b.d)[0]||null}
 function autoBridge(now=performance.now()){
- if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<72)return;
+ if(!bridgeHeld||!started||!me.alive||now-lastBridgeAt<95)return;
  const p=bridgeTarget();if(!p)return;
- lastBridgeAt=now;useAnim=1;
- // Predição visual local: mostra o bloco imediatamente; o servidor continua autoritativo.
- predictPlace(p);
+ lastBridgeAt=now;useAnim=1;predictPlace(p);
 }
 function secondary(){if(!started||!me.alive)return;audioInit();useAnim=1;if(ADMIN.on&&ADMIN.build){const r=ray();if(r){const f=r.f||[0,1,0],x=r.h[0]+f[0],y=r.h[1]+f[1],z=r.h[2]+f[2];send({t:'adminPlace',x,y,z,b:ADMIN.block})}return}const k=slotKey(cur);if(k==='bow')return;if(k==='apple')send({t:'apple'});else if(k==='fireball'||k==='snowball'||['tnt','tntImpulse','tntSlow','tntDamage'].includes(k))send({t:'shoot',k,yaw:pl.yaw,pitch:pl.pitch});else if(['pearl','speedPotion','jumpPotion','invisPotion','magicMilk','bridgeEgg'].includes(k))send({t:'use',k,yaw:pl.yaw,pitch:pl.pitch});else if(k==='popupTower'){if(tg&&tg.p){const[x,y,z]=tg.p;send({t:'use',k,x,y,z})}else{msg('Mire no chão para colocar a Pop-up Tower');sfx('blocked')}}else if(PLACEABLE.has(k)){if(availableBlockCount(k)<=0){sfx('blocked');msg('Você não possui mais '+slotName(cur)+'.');return}const p=tg&&tg.p?{x:tg.p[0],y:tg.p[1],z:tg.p[2],k}:clutchTarget();if(!p){sfx('blocked');return}if(!safePlaceTarget(p.x,p.y,p.z)){sfx('blocked');msg('Não é possível colocar um bloco dentro do jogador');return}predictPlace(p)}}
-addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()}});
-addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2)bridgeHeld=false});
+addEventListener('mousedown',e=>{if(!(document.pointerLockElement||touchMode))return;if(e.button===0){if(slotKey(cur)==='bow')beginBow();else primary()}else if(e.button===2){bridgeHeld=PLACEABLE.has(slotKey(cur));bridgeHoldY=bridgeHeld?Math.floor(pl.y-.08)-1:null;lastBridgeAt=performance.now();secondary()}});
+addEventListener('mouseup',e=>{if(e.button===0){if(bowCharging)releaseBow();else stopBreak()}if(e.button===2){bridgeHeld=false;bridgeHoldY=null}});
 if(touchMode){
  const joy=$('joy'),kn=$('knob'),look=$('look');
  const mobileStep=dir=>{for(let n=1;n<=SL.length;n++){const i=(cur+dir*n+SL.length)%SL.length,key=slotKey(i),ci=canonicalSlot(i),owned=ci===0||(ci===8?inv.bow>0:(inv[key]||0)>0);if(owned){pick(i);const el=$('bar').children[i];if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});break}}};
@@ -836,7 +838,7 @@ $('msx').value=Math.round(mobileCfg.sx*1000);$('msy').value=Math.round(mobileCfg
  const jmove=e=>{const t=[...e.touches].find(t=>t.identifier===mJoy);if(!t)return;const r=joy.getBoundingClientRect(),dx=t.clientX-(r.left+r.width/2),dy=t.clientY-(r.top+r.height/2),L=Math.max(1,Math.hypot(dx,dy)),k=Math.min(1,50/L);mx=dx/50*k;my=-dy/50*k;kn.style.transform=`translate(${mx*36}px,${-my*36}px)`};
  joy.addEventListener('touchstart',e=>{mJoy=e.changedTouches[0].identifier;jmove(e)},{passive:false});joy.addEventListener('touchmove',e=>{e.preventDefault();jmove(e)},{passive:false});joy.addEventListener('touchend',()=>{mx=my=0;mJoy=null;kn.style.transform=''},{passive:false});
  look.addEventListener('touchstart',e=>{const t=e.changedTouches[0];mLook={id:t.identifier,x:t.clientX,y:t.clientY}},{passive:false});look.addEventListener('touchmove',e=>{e.preventDefault();const t=[...e.touches].find(t=>mLook&&t.identifier===mLook.id);if(!t)return;pl.yaw-=(t.clientX-mLook.x)*mobileCfg.sx;pl.pitch=Math.max(-1.55,Math.min(1.55,pl.pitch-(t.clientY-mLook.y)*mobileCfg.sy));mLook.x=t.clientX;mLook.y=t.clientY},{passive:false});
- $('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();slotKey(cur)==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false};
+ $('jumpBtn').ontouchstart=e=>{e.preventDefault();audioInit();if(pl.g){pl.vy=fxs.jump>0?10.5:8.2;pl.g=false;sfx('jump')}};$('actBtn').ontouchstart=e=>{e.preventDefault();slotKey(cur)==='bow'?beginBow():primary()};$('actBtn').ontouchend=e=>{e.preventDefault();bowCharging?releaseBow():stopBreak()};$('useBtn').ontouchstart=e=>{e.preventDefault();secondary()};$('placeBtn').ontouchstart=e=>{e.preventDefault();bridgeHeld=PLACEABLE.has(slotKey(cur));bridgeHoldY=bridgeHeld?Math.floor(pl.y-.08)-1:null;lastBridgeAt=performance.now();secondary()};$('placeBtn').ontouchend=e=>{e.preventDefault();bridgeHeld=false;bridgeHoldY=null};
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70,lastRenderAt=0;hud();
@@ -861,7 +863,7 @@ r.limbs.la.rotation.x=air?.55:-phase*amp*.8;r.limbs.ra.rotation.x=air?.55:phase*
 if(r.action>now){r.limbs.ra.rotation.x=-1.35+Math.sin(now/45)*.18;r.held.rotation.x=-.7}else r.held.rotation.x=.1;if(moving&&r.al&&now-(r.lastStepSound||0)>(run?280:370)){r.lastStepSound=now;const g=positionalGain(p.x,p.y,p.z,8);if(g>.035)noise(.028,.012*g,700)}if(r.flashUntil&&now>r.flashUntil){r.flashUntil=0;r.m.traverse(o=>{if(o.material&&o.material.color&&o.userData.baseColor!=null)o.material.color.setHex(o.userData.baseColor)})}});
 for(let i=PT.length;i--;){const p=PT[i];p.t-=dt;p.vy-=20*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;if(p.t<=0){p.m.visible=false;PT_POOL.push(p.m);PT.splice(i,1)}}
 for(let i=BEDFX.length;i--;){const b=BEDFX[i];b.t-=dt;b.m.material.opacity=Math.max(0,b.t/1.35);if(b.t<=0){sc.remove(b.m);b.m.material.dispose();BEDFX.splice(i,1)}}
-BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>550)rollbackPrediction(key);else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});
+BRIDGE_PRED.forEach((b,key)=>{const age=now-b.at;if(!b.acked&&age>650){rollbackPrediction(key,false);if(now-lastStateSyncAt>1200){lastStateSyncAt=now;send({t:'stateSync'})}}else if(b.acked&&age>1800)BRIDGE_PRED.delete(key)});
 PROJ.forEach(p=>{const ahead=Math.min(.09,(performance.now()-p.snapAt)/1000),a=Math.min(1,dt*28),x=p.tx+p.vx*ahead,y=p.ty+p.vy*ahead,z=p.tz+p.vz*ahead;p.m.position.x+=(x-p.m.position.x)*a;p.m.position.y+=(y-p.m.position.y)*a;p.m.position.z+=(z-p.m.position.z)*a})
 // Drops 3D sao animados exclusivamente por updateDropVisuals(); nao usar material de Sprite aqui.
 refreshHeld();swing=Math.max(0,swing-dt*5);useAnim=Math.max(0,useAnim-dt*4);
