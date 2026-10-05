@@ -5,7 +5,6 @@ let server=fs.readFileSync('server.js','utf8');
 let game=fs.readFileSync('public/game.js','utf8');
 let index=fs.readFileSync('public/index.html','utf8');
 
-// Serve imported OGG assets from the existing in-memory static cache.
 server=once(server,
 "const STATIC = {};\nfor (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) STATIC[f]=fs.readFileSync(path.join(__dirname,'public',f));",
 `const STATIC = {};
@@ -19,24 +18,20 @@ server=once(server,
 "const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.png')?'image/png':f.endsWith('.ogg')?'audio/ogg':f.endsWith('.txt')?'text/plain; charset=utf-8':f.endsWith('.mcmeta')?'application/json; charset=utf-8':'text/html; charset=utf-8';",
 'ogg mime');
 
-// Material-aware placement sounds.
 server=rex(server,/setb\(R,x,y,z,k,1\);p\.inv\[item\]--;placeResult\(true\);pinv\(p\);sfx\(p,'place'\);sfxAt\(R,'place',x\+\.5,y\+\.5,z\+\.5,6\);break/,
 "setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,x+.5,y+.5,z+.5,6);break",
 'place sound mapping');
 
-// Material-aware break sounds based on the block that was actually removed.
 server=once(server,
 "else if(R.pf[S.ix(br.x,br.y,br.z)]){setb(R,br.x,br.y,br.z,0);sfx(p,'break');sfxAt(R,'break',br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;",
 "else if(R.pf[S.ix(br.x,br.y,br.z)]){const breakSfx=br.b>=1&&br.b<=4?'break_cloth':br.b===5?'break_wood':'break_stone';setb(R,br.x,br.y,br.z,0);sfxAt(R,breakSfx,br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;",
 'break sound mapping');
 
-// Eating uses the custom pack too.
 server=once(server,
-"case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); } break;",
-"case 'apple': if (play && allow(p, 'apple', 250) && p.inv.apple > 0 && p.hp < 20) { p.inv.apple--; p.hp = Math.min(20, p.hp + 10); pinv(p); sfx(p,'eat'); } break;",
+"case 'apple': if(play&&heldAllows(p,'apple')&&allow(p,'apple',250)&&p.inv.apple>0&&p.hp<20){p.inv.apple--;p.hp=Math.min(20,p.hp+10);pinv(p)}else if(play&&!heldAllows(p,'apple'))acFlag(p,'item','apple held='+heldKey(p));break;",
+"case 'apple': if(play&&heldAllows(p,'apple')&&allow(p,'apple',250)&&p.inv.apple>0&&p.hp<20){p.inv.apple--;p.hp=Math.min(20,p.hp+10);pinv(p);sfx(p,'eat')}else if(play&&!heldAllows(p,'apple'))acFlag(p,'item','apple held='+heldKey(p));break;",
 'apple sound');
 
-// Client-side sound pack loader. Buffers are lazy-loaded and played through the existing master gain.
 const audioAnchor="const noise=(d=.08,v=.035,cut=1200)=>{try{audioInit();const n=Math.max(1,Math.floor(AC.sampleRate*d)),buf=AC.createBuffer(1,n,AC.sampleRate),a=buf.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const src=AC.createBufferSource(),g=AC.createGain(),lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=cut;g.gain.value=v;src.buffer=buf;src.connect(lp);lp.connect(g);g.connect(masterGain);src.start()}catch(e){}};";
 const packCode=`\nconst LEPTOKS_BASE='/assets/sounds/leptoks/';
 const LEPTOKS_SOUND={
@@ -59,7 +54,6 @@ window.playLeptoksSound=(name,vol=.7)=>leptoksSound(name,vol,1);
 `;
 game=once(game,audioAnchor,audioAnchor+packCode,'sound loader');
 
-// Replace matching procedural sounds while retaining procedural feedback as fallback/accent.
 game=rex(game,/const sfx=k=>\{[\s\S]*?\n\};\nconst resourceSfx=/,
 `const sfx=k=>{
   if(k==='place'||k==='place_cloth'){leptoksSound('cloth',.72,1.03)}
@@ -88,7 +82,6 @@ game=rex(game,/const sfx=k=>\{[\s\S]*?\n\};\nconst resourceSfx=/,
 const resourceSfx=`,
 'sfx mapping');
 
-// Positional server events now route material-specific block sounds through the pack.
 game=rex(game,/case'sfx3d':\{const g=positionalGain\(m\.x,m\.y,m\.z,m\.r\|\|7\);if\(g>0\)\{[\s\S]*?\}\}break;/,
 `case'sfx3d':{const g=positionalGain(m.x,m.y,m.z,m.r||7);if(g>0){if(String(m.k).startsWith('resource_')||String(m.k).startsWith('pickup_'))resourceSfx(m.k,g);else if(m.k==='place'||m.k==='place_cloth'){leptoksSound('cloth',.72*g,1.03)}else if(m.k==='place_wood'){leptoksSound('wood',.72*g,1.03)}else if(m.k==='place_stone'){leptoksSound('stone',.72*g,1.03)}else if(m.k==='break'||m.k==='break_stone'){leptoksSound('stone',.82*g,.96)}else if(m.k==='break_wood'){leptoksSound('wood',.82*g,.96)}else if(m.k==='break_cloth'){leptoksSound('cloth',.82*g,.96)}else if(m.k==='fireball'){tone(85,.14,'sawtooth',.05*g,-40);noise(.1,.03*g,500)}else sfx(m.k)}break;`,
 '3d sound mapping');
