@@ -12,8 +12,9 @@ let PROFILE_DB={};
 try{PROFILE_DB=JSON.parse(fs.readFileSync(STATS_FILE,'utf8'))||{}}catch(e){PROFILE_DB={}}
 function saveProfiles(){try{fs.mkdirSync(path.dirname(STATS_FILE),{recursive:true});const tmp=STATS_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(PROFILE_DB,null,2));fs.renameSync(tmp,STATS_FILE)}catch(e){console.warn('[STATS] não foi possível salvar',e.message)}}
 const profileLevel=xp=>1+Math.floor(Math.max(0,Number(xp)||0)/500);
-function ensureProfile(id,name='Jogador'){const k=String(id||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');let p=PROFILE_DB[k];if(!p)p=PROFILE_DB[k]={id:k,name:String(name||'Jogador').slice(0,14),xp:0,matches:0,wins:0,losses:0,kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};p.name=String(name||p.name||'Jogador').slice(0,14);return p}
-function publicProfile(p){return{name:p.name,xp:p.xp||0,level:profileLevel(p.xp),matches:p.matches||0,wins:p.wins||0,losses:p.losses||0,kills:p.kills||0,finalKills:p.finalKills||0,bedsDestroyed:p.bedsDestroyed||0,deaths:p.deaths||0,resourcesCollected:p.resourcesCollected||0}}
+const safePlayerName=v=>{const s=String(v||'Jogador').replace(/[<>\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,14);return s||'Jogador'};
+function ensureProfile(id,name='Jogador'){const k=String(id||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');let p=PROFILE_DB[k];if(!p)p=PROFILE_DB[k]={id:k,name:safePlayerName(name),xp:0,matches:0,wins:0,losses:0,kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};p.name=safePlayerName(name||p.name);return p}
+function publicProfile(p){return{name:safePlayerName(p.name),xp:p.xp||0,level:profileLevel(p.xp),matches:p.matches||0,wins:p.wins||0,losses:p.losses||0,kills:p.kills||0,finalKills:p.finalKills||0,bedsDestroyed:p.bedsDestroyed||0,deaths:p.deaths||0,resourcesCollected:p.resourcesCollected||0}}
 function rankingPayload(limit=20){return Object.values(PROFILE_DB).sort((a,b)=>(b.xp||0)-(a.xp||0)||(b.wins||0)-(a.wins||0)||(b.finalKills||0)-(a.finalKills||0)).slice(0,limit).map(publicProfile)}
 function emptyChest(){return Object.fromEntries(CHEST_KEYS.map(k=>[k,0]))}
 const MODES={
@@ -86,17 +87,24 @@ const HEARTBEAT_TIMEOUT_MS = 70000;
 let uid = 0;
 
 // Arquivos pequenos ficam em memória para evitar fs.readFile a cada acesso.
-const STATIC = {};
-const cacheStaticFile=f=>{const abs=path.join(__dirname,'public',f);if(fs.existsSync(abs)&&fs.statSync(abs).isFile())STATIC[f]=fs.readFileSync(abs)};
-for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) cacheStaticFile(f);
+const STATIC = {}, PUBLIC_ROOT=path.join(__dirname,'public');
+const cacheStaticFile=f=>{const abs=path.join(PUBLIC_ROOT,f);if(fs.existsSync(abs)&&fs.statSync(abs).isFile())STATIC[f]=fs.readFileSync(abs)};
+function getStaticFile(f){
+  if(STATIC[f])return STATIC[f];
+  const abs=path.resolve(PUBLIC_ROOT,f);
+  if(abs!==PUBLIC_ROOT&&!abs.startsWith(PUBLIC_ROOT+path.sep))return null;
+  try{if(fs.statSync(abs).isFile()){const data=fs.readFileSync(abs);STATIC[f]=data;return data}}catch(e){}
+  return null;
+}
+for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','mobile-minecraft-controls.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) cacheStaticFile(f);
 function cacheStaticDir(rel){const abs=path.join(__dirname,'public',rel);if(!fs.existsSync(abs))return;for(const ent of fs.readdirSync(abs,{withFileTypes:true})){const child=(rel+'/'+ent.name).replace(/\\/g,'/');if(ent.isDirectory())cacheStaticDir(child);else cacheStaticFile(child)}}
 cacheStaticDir('assets/sounds');
 const srv = http.createServer((q, r) => {
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
-  if(!STATIC[f]){r.writeHead(404);return r.end('não encontrado')}
+  const data=getStaticFile(f);if(!data){r.writeHead(404);return r.end('não encontrado')}
   const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.png')?'image/png':f.endsWith('.ogg')?'audio/ogg':f.endsWith('.txt')?'text/plain; charset=utf-8':f.endsWith('.mcmeta')?'application/json; charset=utf-8':'text/html; charset=utf-8';
   r.writeHead(200, {'Content-Type':type,'Cache-Control':f==='index.html'?'no-cache':'public, max-age=300'});
-  r.end(STATIC[f]);
+  r.end(data);
 });
 const wss = new WebSocketServer({ server: srv, perMessageDeflate: false });
 const netReason = v => String(v||'').slice(0,120);
@@ -570,7 +578,7 @@ wss.on('connection', ws => {
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
       if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os dois times estão cheios.'});
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
-      p = mkp(ws, (String(m.name || 'Jogador').trim()||'Jogador').slice(0,14), team, safeProfile); p.id = ++uid;p.roomCode=R.code;ws.playerId=p.id;ensureProfile(safeProfile,p.name);
+      p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
       tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
     }
@@ -645,7 +653,7 @@ wss.on('connection', ws => {
         if(!allow(p,'chat',650))break;
         const text=rawText.replace(/[<>]/g,'').slice(0,120);if(!text)break;
         const mc=modeCfg(R),scope=(m.scope==='team'&&!mc.solo)?'team':'global',payload={t:'chat',scope,id:p.id,name:p.name,team:p.team,text};
-        if(scope==='team'){const data=JSON.stringify(payload);R.ps.forEach(q=>{if(q.team===p.team&&canSend(q.ws))q.ws.send(data)})}else bc(R,payload);
+        if(scope==='team'){const data=JSON.stringify(payload);R.ps.forEach(q=>{if(q.team===p.team)sendSocket(q.ws,data)})}else bc(R,payload);
         break;
       }
       case 'start':
