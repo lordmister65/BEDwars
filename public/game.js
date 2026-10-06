@@ -471,7 +471,8 @@ function addFeed(m){
 }
 function addChat(m){
  const el=document.createElement('div');el.className='chat-line '+(m.scope==='team'?'team':'');
- el.innerHTML='<b style="color:#'+hex(TC[m.team]||0xffffff)+'">'+m.name+':</b> '+m.text;
+ const name=document.createElement('b');name.style.color='#'+hex(TC[m.team]||0xffffff);name.textContent=String(m.name||'Jogador')+':';
+ el.append(name,document.createTextNode(' '+String(m.text||'')));
  $('chatLog').appendChild(el);while($('chatLog').children.length>8)$('chatLog').firstChild.remove();
  setTimeout(()=>{if(el.parentNode)el.remove()},10000);
 }
