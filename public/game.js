@@ -687,7 +687,7 @@ case'reconnected':
  syncBedVisuals(worldMeta,bed);inv=m.inv||inv;sw=m.sw??sw;ar=m.ar??ar;tools=m.tools||tools;up=m.up||up;fxs=m.fx||fxs;trapQueue=m.traps||trapQueue;started=m.st==='play';over=m.st==='ended';if(m.admin)setAdminMode(true,m.adminPlayers||[]);hud();scr(started?null:'lobby');break;
 case'replay':over=0;started=0;clearRespawn();scr('lobby');break;
 case'reconnectFail':{reconnectFailCount++;if(reconnecting&&Date.now()<reconnectUntil&&reconnectFailCount<3){setReconnectBanner('Servidor ainda não confirmou a sessão. Nova tentativa...');try{if(ws&&ws.readyState<=1)ws.close(4004,'retry reconnect')}catch(e){}break}reconnecting=false;clearTimeout(reconnectTimer);setReconnectBanner('Sessão expirada.');clearReconnect();setTimeout(()=>location.reload(),1000);break}
-case'netPong':lastNetMessageAt=Date.now();diag.ping=Math.max(0,Date.now()-(Number(m.at)||Date.now()));diag.serverBuffer=Number(m.buffer)||0;if(m.ac)diag.ac=m.ac;break;
+case'netPong':{const recv=Date.now(),sent=Number(m.at)||recv,rtt=Math.max(0,recv-sent),serverAt=Number(m.serverAt);lastNetMessageAt=recv;diag.ping=rtt;combatNetRttMs=combatNetRttMs?combatNetRttMs*.8+rtt*.2:rtt;if(Number.isFinite(serverAt)){const off=serverAt-(sent+recv)/2;combatClockOffsetMs=combatClockSynced?combatClockOffsetMs*.8+off*.2:off;combatClockSynced=true}diag.serverBuffer=Number(m.buffer)||0;if(m.ac)diag.ac=m.ac;break}
 case'ac':diag.ac=diag.ac||{};diag.ac.total=m.total||diag.ac.total||0;diag.ac.last=m.last||m.type||'';console.warn('[AC blocked]',m.type,m.last||'');break;
 case'profileUpdate':myProfile=m.profile||myProfile;drawProfile();if(m.xpGain)msg('+'+m.xpGain+' XP');break;
 case'ranking':rankingData=m.ranking||[];if(m.profile)myProfile=m.profile;drawProfile();drawRanking();break;
@@ -792,9 +792,9 @@ function playerTarget(){
  if(best!==null&&viewBlocked(bd,d))return null;
  return best;
 }
-const ATTACK_BATCH_MS=20,ATTACK_BATCH_MAX=6;let attackSequence=0,attackFlushTimer=0,pendingAttacks=[];
+const ATTACK_BATCH_MS=20,ATTACK_BATCH_MAX=6;let attackSequence=0,attackFlushTimer=0,pendingAttacks=[],combatNetRttMs=0,combatClockOffsetMs=0,combatClockSynced=false;
 function flushAttackBatch(){clearTimeout(attackFlushTimer);attackFlushTimer=0;if(!pendingAttacks.length)return;const attacks=pendingAttacks.splice(0,ATTACK_BATCH_MAX);send({t:'attackBatch',attacks});if(pendingAttacks.length)attackFlushTimer=setTimeout(flushAttackBatch,ATTACK_BATCH_MS)}
-function queueMeleeAttack(id){const now=performance.now();pendingAttacks.push({seq:++attackSequence,id,clientTime:+now.toFixed(2),yaw:pl.yaw,pitch:pl.pitch});if(pendingAttacks.length>=ATTACK_BATCH_MAX)flushAttackBatch();else if(!attackFlushTimer)attackFlushTimer=setTimeout(flushAttackBatch,ATTACK_BATCH_MS)}
+function queueMeleeAttack(id){const now=Date.now();pendingAttacks.push({seq:++attackSequence,id,clientTime:now,serverTimeEstimate:combatClockSynced?+(now+combatClockOffsetMs).toFixed(2):NaN,rtt:+combatNetRttMs.toFixed(1),yaw:pl.yaw,pitch:pl.pitch});if(pendingAttacks.length>=ATTACK_BATCH_MAX)flushAttackBatch();else if(!attackFlushTimer)attackFlushTimer=setTimeout(flushAttackBatch,ATTACK_BATCH_MS)}
 let breaking=null,breakAt=0,breakDur=0;
 function bestToolForBlock(b){const want=BLOCKS[b]?.tool;if(!want||!(tools[want]>0))return null;return want}
 function primary(){if(!started||!me.alive)return;audioInit();if(ADMIN.on&&ADMIN.build){const r=ray();if(r)send({t:'adminBreak',x:r.h[0],y:r.h[1],z:r.h[2]});return}
