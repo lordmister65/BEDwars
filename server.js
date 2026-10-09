@@ -5,7 +5,7 @@ const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND='/calopsita';
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
-const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=34;
+const ADMIN_BLOCK_MIN=1,ADMIN_BLOCK_MAX=42;
 const STATS_FILE=process.env.BW_STATS_FILE||path.join(__dirname,'data','stats.json');
 const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
 let PROFILE_DB={};
