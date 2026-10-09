@@ -716,7 +716,7 @@ case'tp':{const d=Math.hypot(m.x-pl.x,m.y-pl.y,m.z-pl.z);if(!m.hard&&d<3&&me.ali
 case'kb':pl.kx+=m.kx;pl.kz+=m.kz;pl.vy=Math.max(pl.vy,m.vy);sfx('hurt');break;
 case'hitok':$('cross').style.transform='scale(1.9)';$('cross').classList.add('hit');setTimeout(()=>{$('cross').style.transform='';$('cross').classList.remove('hit')},85);camShake=Math.max(camShake,m.cr?.10:.055);sfx(m.cr?'crit':'hit');{const r=PL.get(m.id);if(r){r.flashUntil=performance.now()+(m.cr?145:105);r.m.traverse(o=>{if(o.material&&o.material.color){o.userData.baseColor=o.userData.baseColor??o.material.color.getHex();o.material.color.setHex(m.cr?0xfff2a8:0xffffff)}})}}{const c=$('comboHud');if(m.combo>1){c.textContent='COMBO x'+m.combo;c.classList.add('show');comboHudUntil=performance.now()+900}else{c.classList.remove('show');comboHudUntil=0}}break;
 case'hitfx':combatBurst(m);break;
-case'hurtPulse':screenHurt(!!m.cr);break;
+case'hurtPulse':if(m.breakCombo){const c=$('comboHud');c.classList.remove('show');c.textContent='';comboHudUntil=0}screenHurt(!!m.cr);break;
 case'deathState':setRespawn(!!m.final,m.respawn||0,m.final?'Você foi eliminado.':'');if(m.final){spectator=true;me.out=true;setTimeout(()=>msg('Modo espectador · Q/E troca alvo · F voo livre'),250)}break;
 case'eliminated':setRespawn(true,0,m.reason||'Você foi eliminado.');spectator=true;me.out=true;break;
 case'respawn':spectator=false;me.out=false;lastRespawnBeep=-1;clearRespawn();break;

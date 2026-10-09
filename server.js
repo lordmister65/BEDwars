@@ -49,7 +49,9 @@ const COMBAT_CONFIG={
   MAX_USEFUL_CPS:15,USEFUL_BUCKET_CAPACITY:2,
   MELEE_IFRAME_SEC:.22,MAX_ATTACK_BATCH:6,MAX_ATTACK_QUEUE:8,MAX_ATTACK_AGE_MS:300,
   HISTORY_BUFFER_MS:600,MAX_REWIND_MS:250,NOMINAL_REACH:3.55,HARD_REACH_LIMIT:4.00,
-  COMBO_TIMEOUT_MS:1000
+  KB_HORIZONTAL:7.40,KB_VERTICAL:4.00,AIR_KB_MULTIPLIER_H:.92,AIR_KB_MULTIPLIER_V:.95,
+  SPRINT_KB_MULTIPLIER:1.10,STICK_KB_MULTIPLIER:1.90,STICK_VERTICAL_MULTIPLIER:1.05,
+  COMBO_TIMEOUT_MS:1000,COMBO_MAX:8,COMBO_KB_DECAY:.025,COMBO_KB_MIN:.90
 };
 const GAMEPLAY={spawnProtect:1.25,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
 const HELD_KEYS=[null,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
@@ -178,7 +180,7 @@ function room(code) {
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''},
   attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],
-  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,comboTarget:0,comboCount:0,
+  token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,lastComboHitAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
 const allow = (p, key, gap) => {
@@ -226,8 +228,18 @@ function rewoundMeleeTarget(R,p,a){
   }
   return best;
 }
+function resetComboState(p){if(!p)return;p.comboTarget=0;p.comboCount=0;p.lastComboHitAt=0}
 function resetCombatInput(p){
-  const n=Date.now();p.attackQueue=[];p.attackNetTokens=COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY;p.attackNetAt=n;p.attackUsefulTokens=COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY;p.attackUsefulAt=n;p.combatHistory=[];recordCombatHistory(p,n);
+  const n=Date.now();p.attackQueue=[];p.attackNetTokens=COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY;p.attackNetAt=n;p.attackUsefulTokens=COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY;p.attackUsefulAt=n;p.combatHistory=[];resetComboState(p);recordCombatHistory(p,n);
+}
+function meleeKnockbackV2(attacker,target,resolved,nextCombo,stick){
+  const a=resolved.attackerState,t=resolved.targetState,hit=resolved.hit,dx=t.x-a.x,dz=t.z-a.z,L=Math.hypot(dx,dz),fallbackL=Math.hypot(hit.dir.x,hit.dir.z)||1,nx=L>.001?dx/L:hit.dir.x/fallbackL,nz=L>.001?dz/L:hit.dir.z/fallbackL;
+  const airborne=!target.grounded||target.dy>1.2;let horizontal=COMBAT_CONFIG.KB_HORIZONTAL,vertical=COMBAT_CONFIG.KB_VERTICAL;
+  if(attacker.hspeed>5.15)horizontal*=COMBAT_CONFIG.SPRINT_KB_MULTIPLIER;
+  if(stick){horizontal*=COMBAT_CONFIG.STICK_KB_MULTIPLIER;vertical*=COMBAT_CONFIG.STICK_VERTICAL_MULTIPLIER}
+  if(airborne){horizontal*=COMBAT_CONFIG.AIR_KB_MULTIPLIER_H;vertical*=COMBAT_CONFIG.AIR_KB_MULTIPLIER_V}
+  const comboScale=Math.max(COMBAT_CONFIG.COMBO_KB_MIN,1-Math.max(0,nextCombo-1)*COMBAT_CONFIG.COMBO_KB_DECAY);horizontal*=comboScale;
+  return{kx:nx*horizontal,kz:nz*horizontal,vy:vertical,h:horizontal,v:vertical,airborne,comboScale};
 }
 function enqueueMeleeAttack(R,p,a,arrivalTime=Date.now()){
   if(R.st!=='play'||!p.alive)return false;
@@ -242,11 +254,11 @@ function enqueueMeleeAttack(R,p,a,arrivalTime=Date.now()){
 function evaluateQueuedMeleeAttack(R,p,a){
   const resolved=rewoundMeleeTarget(R,p,a);if(!resolved)return false;const q=resolved.q,hit=resolved.hit;
   const hk=heldKey(p),stick=hk==='knockbackStick'&&(p.inv.knockbackStick||0)>0;if(hk!=='sword'&&!stick){acFlag(p,'item','hit with '+hk);return false}
-  const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t,nextCombo=p.comboTarget===q.id&&(now-p.lastCombatAt)*1000<COMBAT_CONFIG.COMBO_TIMEOUT_MS?Math.min(8,p.comboCount+1):1;
-  const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.14:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
-  if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr,'combat',4.5,COMBAT_CONFIG.MELEE_IFRAME_SEC))return false;
-  p.comboCount=nextCombo;p.comboTarget=q.id;p.lastCombatAt=now;
-  tx(p,{t:'hitok',seq:a.seq,id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount,rw:Math.round(resolved.rewindMs),dist:+hit.dist.toFixed(2)});bc(R,{t:'anim',id:p.id,k:'attack'});return true;
+  const now=R.t,sameTarget=p.comboTarget===q.id,withinWindow=(now-(p.lastComboHitAt||0))*1000<COMBAT_CONFIG.COMBO_TIMEOUT_MS,nextCombo=sameTarget&&withinWindow?Math.min(COMBAT_CONFIG.COMBO_MAX,p.comboCount+1):1;
+  const cr=!stick&&p.dy<-1,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1),impulse=meleeKnockbackV2(p,q,resolved,nextCombo,stick);
+  if(!hurt(R,q,damage,impulse.kx,impulse.kz,p,cr,'melee',impulse.vy,COMBAT_CONFIG.MELEE_IFRAME_SEC,'direct'))return false;
+  p.comboCount=nextCombo;p.comboTarget=q.id;p.lastComboHitAt=now;p.lastCombatAt=now;
+  tx(p,{t:'hitok',seq:a.seq,id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount,rw:Math.round(resolved.rewindMs),dist:+hit.dist.toFixed(2),kbh:+impulse.h.toFixed(2),kbv:+impulse.v.toFixed(2)});bc(R,{t:'anim',id:p.id,k:'attack'});return true;
 }
 function processMeleeAttackQueue(R,p,now=Date.now()){
   while(p.attackQueue&&p.attackQueue.length){
@@ -347,17 +359,20 @@ function die(R, q, cause='combat') {
   }
   if (final) { q.out = 1; win(R); }
 }
-function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5,iframeSec=GAMEPLAY.damageIFrames){
+function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5,iframeSec=GAMEPLAY.damageIFrames,kbMode='scaled'){
   if(!q.alive||q.admin)return false;
   if(q.spawnProtect>0&&src&&src!==q)return false;
   const environmental=cause==='fall'||cause==='collapse';
   if(environmental){if((q.envIh||0)>0)return false;q.envIh=.12}else{if(q.ih>0)return false;q.ih=iframeSec}
   d*=Math.max(.2,1-.25*q.ar-.1*q.up.prot);const dealt=Math.max(0,d);if(dealt<=0)return false;q.hp-=dealt;
   if(src){q.src=src;q.st=R.t;q.lastCombatAt=R.t}
-  const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.90:1,comboMul=src&&src.comboCount>=2?.96:1;
-  const horiz=7.45*airMul*comboMul,vertical=kbVy*(airborne?.95:1);
-  tx(q,{t:'kb',kx:kx*horiz,kz:kz*horiz,vy:vertical});sfx(q,'hurt');
-  bc(R,{t:'fx',x:q.x,y:q.y+1,z:q.z,c:cr?0xffd23d:0xd23c3c});bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0});
+  const melee=cause==='melee'&&!!src;if(melee)resetComboState(q);
+  let outKx=kx,outKz=kz,vertical=kbVy;
+  if(kbMode!=='direct'){
+    const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.90:1,horiz=7.45*airMul;outKx=kx*horiz;outKz=kz*horiz;vertical=kbVy*(airborne?.95:1);
+  }
+  tx(q,{t:'kb',kx:outKx,kz:outKz,vy:vertical,mode:melee?'melee':'generic'});sfx(q,'hurt');
+  bc(R,{t:'fx',x:q.x,y:q.y+1,z:q.z,c:cr?0xffd23d:0xd23c3c});bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0,breakCombo:melee?1:0});
   if(q.hp<=0)die(R,q,cause);return true;
 }
 function killBed(R, t, src) {
