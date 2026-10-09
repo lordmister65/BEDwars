@@ -55,6 +55,10 @@ const COMBAT_CONFIG={
   CLICK_SAMPLE_MAX:120,CLICK_ANALYZE_MIN:50,CLICK_ANALYZE_EVERY:10,CLICK_FLAG_SCORE:12,CLICK_FLAG_COOLDOWN_MS:15000
 };
 const GAMEPLAY={spawnProtect:1.25,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
+const SERVER_TICK_HZ=30,SERVER_TICK_MS=1000/SERVER_TICK_HZ,SERVER_TICK_SEC=1/SERVER_TICK_HZ,SNAPSHOT_HZ=15,SNAPSHOT_SEC=1/SNAPSHOT_HZ;
+const MOVEMENT_CONFIG={WALK_SPEED:4.3,SPRINT_SPEED:5.7,SNEAK_SPEED:1.3,SPEED_MULTIPLIER:1.28,SLOW_MULTIPLIER:.55,GROUND_ACCEL:36,AIR_ACCEL:15,POSITION_GRACE:.55,HARD_POSITION_FACTOR:1.65,MAX_UP_SPEED:13.5,MAX_DOWN_SPEED:42,KB_GRACE_MS:500,SOFT_FLAG_SCORE:6,FLAG_COOLDOWN_MS:2500};
+const SERVER_METRICS={tickHz:SERVER_TICK_HZ,lastTickMs:0,avgTickMs:0,maxTickMs:0,lastWallMs:SERVER_TICK_MS,overruns:0,ticks:0,snapshots:0,sentPackets:0,sentBytes:0,droppedPackets:0,rooms:0,players:0};
+function serverMetricsSnapshot(p){const mem=process.memoryUsage(),mv=p&&p.moveV2?p.moveV2:null;return{tickHz:SERVER_METRICS.tickHz,lastTickMs:+SERVER_METRICS.lastTickMs.toFixed(2),avgTickMs:+SERVER_METRICS.avgTickMs.toFixed(2),maxTickMs:+SERVER_METRICS.maxTickMs.toFixed(2),wallMs:+SERVER_METRICS.lastWallMs.toFixed(2),overruns:SERVER_METRICS.overruns,ticks:SERVER_METRICS.ticks,snapshots:SERVER_METRICS.snapshots,rooms:SERVER_METRICS.rooms,players:SERVER_METRICS.players,sentPackets:SERVER_METRICS.sentPackets,droppedPackets:SERVER_METRICS.droppedPackets,rssMB:+(mem.rss/1048576).toFixed(1),heapMB:+(mem.heapUsed/1048576).toFixed(1),move:mv?{corrections:mv.corrections||0,suspicion:+(mv.suspicion||0).toFixed(1),speed:+(mv.speed||0).toFixed(2),clientError:+(mv.clientError||0).toFixed(2)}:null}};
 const HELD_KEYS=[null,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
 const TNT_KEYS=new Set(['tnt','tntImpulse','tntSlow','tntDamage']);
 function heldKey(p){if(p.held===0)return'sword';return HELD_KEYS[p.held]||null}
@@ -132,8 +136,8 @@ function sendSocket(ws,data,{droppable=false}={}){
   if(ws.bufferedAmount>=HARD_SOCKET_BUFFER){
     console.warn('[NET] buffer crítico; encerrando socket',ws.bufferedAmount);terminateSocket(ws,'buffer_overflow');return false;
   }
-  if(droppable&&ws.bufferedAmount>=SOFT_SOCKET_BUFFER)return false;
-  try{ws.send(data);return true}catch(err){console.warn('[NET] falha ao enviar pacote',err?.message||err);terminateSocket(ws,'send_error');return false}
+  if(droppable&&ws.bufferedAmount>=SOFT_SOCKET_BUFFER){SERVER_METRICS.droppedPackets++;return false}
+  try{ws.send(data);SERVER_METRICS.sentPackets++;SERVER_METRICS.sentBytes+=Buffer.byteLength(String(data));return true}catch(err){console.warn('[NET] falha ao enviar pacote',err?.message||err);terminateSocket(ws,'send_error');return false}
 }
 const tx = (p,o) => {
   let data;try{data=JSON.stringify(o)}catch(e){console.warn('Falha ao serializar pacote',e);return false}
@@ -169,7 +173,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null,
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -180,7 +184,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
-  attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},
+  attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},moveV2:{vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0},
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,lastComboHitAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
@@ -195,6 +199,26 @@ function consumeAttackBucket(p,kind,rate,capacity,now=Date.now()){
   p[tokenKey]=Math.min(capacity,prevTokens+Math.max(0,now-prevTime)*rate/1000);p[timeKey]=now;
   if(p[tokenKey]<1)return false;p[tokenKey]-=1;return true;
 }
+function ensureMoveV2(p){return p.moveV2||(p.moveV2={vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0})}
+function noteServerKnockback(p,kx,kz,vy){if(!p)return;const s=ensureMoveV2(p),h=Math.hypot(Number(kx)||0,Number(kz)||0);s.kbUntil=Date.now()+MOVEMENT_CONFIG.KB_GRACE_MS;s.kbH=Math.max(s.kbH||0,h);s.kbV=Math.max(s.kbV||0,Math.max(0,Number(vy)||0))}
+function sendKnockback(p,kx,kz,vy,mode='generic'){noteServerKnockback(p,kx,kz,vy);return tx(p,{t:'kb',kx,kz,vy,mode})}
+function movementSpeedLimit(p,m){let base=m&&m.sn?MOVEMENT_CONFIG.SNEAK_SPEED:(m&&m.sp===0?MOVEMENT_CONFIG.WALK_SPEED:MOVEMENT_CONFIG.SPRINT_SPEED);if(p.fx&&p.fx.speed>0)base*=MOVEMENT_CONFIG.SPEED_MULTIPLIER;if(p.fx&&p.fx.slow>0)base*=MOVEMENT_CONFIG.SLOW_MULTIPLIER;return base}
+function inspectMovementPacket(p,m,dt,now,spectating){
+  const s=ensureMoveV2(p);if(Number.isInteger(m.seq)){if(m.seq<=s.lastSeq)return{drop:true};s.lastSeq=m.seq}
+  if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite))return{ok:false,detail:'nonfinite'};
+  if(m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30)return{ok:false,detail:'bounds'};
+  const dx=m.x-p.x,dy=m.y-p.y,dz=m.z-p.z,h=Math.hypot(dx,dz),obsVx=dx/dt,obsVz=dz/dt,obsVy=dy/dt,speed=Math.hypot(obsVx,obsVz);
+  if(p.admin||spectating)return{ok:true,obsVx,obsVz,obsVy,speed};
+  const kb=now<=(s.kbUntil||0),base=movementSpeedLimit(p,m),kbBonus=kb?Math.min(18,(s.kbH||0)*1.15):0,envelope=base+kbBonus+1.1,posCap=envelope*dt+MOVEMENT_CONFIG.POSITION_GRACE;
+  const upCap=kb?Math.max(MOVEMENT_CONFIG.MAX_UP_SPEED,(s.kbV||0)+4):MOVEMENT_CONFIG.MAX_UP_SPEED,hardH=h>posCap*MOVEMENT_CONFIG.HARD_POSITION_FACTOR,hardV=obsVy>upCap||obsVy<-MOVEMENT_CONFIG.MAX_DOWN_SPEED;
+  const accel=Math.hypot(obsVx-(s.vx||0),obsVz-(s.vz||0))/Math.max(.02,dt),accelCap=(p.grounded?MOVEMENT_CONFIG.GROUND_ACCEL:MOVEMENT_CONFIG.AIR_ACCEL)+(kb?90:0),soft=h>posCap||(speed>base+1.4&&accel>accelCap);
+  if(soft)s.suspicion=Math.min(20,(s.suspicion||0)+1);else s.suspicion=Math.max(0,(s.suspicion||0)-.35);
+  if(soft&&s.suspicion>=MOVEMENT_CONFIG.SOFT_FLAG_SCORE&&now-(s.lastFlagAt||0)>=MOVEMENT_CONFIG.FLAG_COOLDOWN_MS){s.lastFlagAt=now;acFlag(p,'movement','v2 soft speed='+speed.toFixed(2)+' accel='+accel.toFixed(1))}
+  if(Number.isFinite(m.vx)&&Number.isFinite(m.vz))s.clientError=Math.hypot(m.vx-obsVx,m.vz-obsVz);
+  return{ok:!hardH&&!hardV,detail:hardH?'speed='+speed.toFixed(2):hardV?'vy='+obsVy.toFixed(2):'',obsVx,obsVz,obsVy,speed};
+}
+function acceptMovementState(p,r,now){const s=ensureMoveV2(p);s.vx=r.obsVx||0;s.vy=r.obsVy||0;s.vz=r.obsVz||0;s.speed=r.speed||0;s.lastAt=now;if(now>(s.kbUntil||0)){s.kbH=0;s.kbV=0}}
+function resetMovementV2(p){const s=ensureMoveV2(p);s.vx=s.vy=s.vz=s.speed=0;s.suspicion=0;s.kbUntil=0;s.kbH=s.kbV=0;s.clientError=0;s.lastAt=Date.now()}
 function combatSnapshot(p,t=Date.now()){return{t,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch}}
 function recordCombatHistory(p,t=Date.now()){
   if(!p)return;const h=p.combatHistory||(p.combatHistory=[]),snap=combatSnapshot(p,t),last=h[h.length-1];
@@ -337,7 +361,7 @@ function protectedPlacement(R,x,y,z){
   }
   return '';
 }
-function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
+function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p);resetMovementV2(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
 
@@ -394,7 +418,7 @@ function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5,iframeSec=GAMEPLAY.dama
   if(kbMode!=='direct'){
     const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.90:1,horiz=7.45*airMul;outKx=kx*horiz;outKz=kz*horiz;vertical=kbVy*(airborne?.95:1);
   }
-  tx(q,{t:'kb',kx:outKx,kz:outKz,vy:vertical,mode:melee?'melee':'generic'});sfx(q,'hurt');
+  sendKnockback(q,outKx,outKz,vertical,melee?'melee':'generic');sfx(q,'hurt');
   bc(R,{t:'fx',x:q.x,y:q.y+1,z:q.z,c:cr?0xffd23d:0xd23c3c});bc(R,{t:'hitfx',x:q.x,y:q.y+1,z:q.z,cr:cr?1:0,d:+dealt.toFixed(1),target:q.id,src:src?src.id:0});tx(q,{t:'hurtPulse',d:+dealt.toFixed(1),cr:cr?1:0,breakCombo:melee?1:0});
   if(q.hp<=0)die(R,q,cause);return true;
 }
@@ -468,7 +492,7 @@ function throwableTntBoom(R,kind,x,y,z,owner){
     if(L>=cfg.radius)return;
     const f=1-L/cfg.radius,nx=dx/(L||1),nz=dz/(L||1);
     if(kind==='tntImpulse'){
-      tx(q,{t:'kb',kx:nx*cfg.knock*f,kz:nz*cfg.knock*f,vy:Math.max(5.5,10.5*f)});
+      sendKnockback(q,nx*cfg.knock*f,nz*cfg.knock*f,Math.max(5.5,10.5*f),'tntImpulse');
       if(q!==owner)hurt(R,q,cfg.damage*f,nx*.45,nz*.45,owner,false,'explosion');
     }else{
       hurt(R,q,cfg.damage*f,nx*(cfg.knock/7),nz*(cfg.knock/7),owner,false,'explosion');
@@ -700,7 +724,7 @@ wss.on('connection', ws => {
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
-      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null}); break;
+      case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
@@ -791,10 +815,9 @@ wss.on('connection', ws => {
         R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks }); break;
       case 'mv': {
         const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
-        const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n;
-        const d=Math.hypot(m.x-p.x,m.z-p.z),maxH=(p.admin||spectating)?dt*24+3:dt*12+1.5,maxV=(p.admin||spectating)?dt*24+3:dt*11+1.2;
-        if(![m.x,m.y,m.z,m.yaw,m.pitch].every(Number.isFinite)||d>maxH||Math.abs(m.y-p.y)>maxV||m.x<S.MIN_X-8||m.x>S.MAX_X+8||m.z<S.MIN_Z-8||m.z>S.MAX_Z+8||m.y>S.H+20||m.y<-30){if(!p.admin&&!spectating)acFlag(p,'movement','d='+d.toFixed(2)+' dy='+Math.abs(Number(m.y)-p.y).toFixed(2));tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0});break}
-        const oldY=p.y,newDy=(m.y-p.y)/dt;p.hspeed=Math.min(20,d/dt);p.dy=newDy;p.px=p.x;p.py=p.y;p.pz=p.z;p.x=m.x;p.y=m.y;p.z=m.z;p.yaw=m.yaw;p.pitch=m.pitch;recordCombatHistory(p,n);
+        const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n,check=inspectMovementPacket(p,m,dt,n,spectating);if(check.drop)break;
+        if(!check.ok){const ms=ensureMoveV2(p);ms.corrections++;if(!p.admin&&!spectating&&n-(ms.lastFlagAt||0)>=MOVEMENT_CONFIG.FLAG_COOLDOWN_MS){ms.lastFlagAt=n;acFlag(p,'movement','v2 hard '+check.detail)}tx(p,{t:'tp',x:p.x,y:p.y,z:p.z,hard:0,reason:'movement'});break}
+        const oldY=p.y,newDy=(m.y-p.y)/dt;p.hspeed=Math.min(24,check.speed||0);p.dy=newDy;p.px=p.x;p.py=p.y;p.pz=p.z;p.x=m.x;p.y=m.y;p.z=m.z;p.yaw=m.yaw;p.pitch=m.pitch;acceptMovementState(p,check,n);recordCombatHistory(p,n);
         if(!spectating&&!p.admin){const fy=Math.floor(p.y-.09),feet=[[0,0],[.28,0],[-.28,0],[0,.28],[0,-.28],[.22,.22],[-.22,.22],[.22,-.22],[-.22,-.22]],below=feet.some(([ox,oz])=>get(R,Math.floor(p.x+ox),fy,Math.floor(p.z+oz)));p.wasGrounded=p.grounded;p.grounded=!!below;if(!p.grounded&&newDy<p.fallVyMin)p.fallVyMin=newDy;if(p.grounded&&!p.wasGrounded){const impact=Math.abs(Math.min(0,p.fallVyMin));if(impact>10.2)hurt(R,p,Math.min(14,(impact-10.2)*.82),0,0,null,false,'fall',0);p.fallVyMin=0}else if(p.grounded&&Math.abs(newDy)<1.5)p.fallVyMin=0}
         break;
       }
@@ -939,8 +962,9 @@ wss.on('connection', ws => {
   });
 });
 
+let lastServerTickAt=performance.now();
 setInterval(() => {
-  const dt = .05;
+  const tickStarted=performance.now(),wallMs=Math.max(1,tickStarted-lastServerTickAt);lastServerTickAt=tickStarted;const dt=Math.max(.005,Math.min(.10,wallMs/1000));SERVER_METRICS.lastWallMs=wallMs;
   rooms.forEach(R => {
     try{
     R.t += dt;
@@ -1003,10 +1027,11 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=.10){R.snapAcc=0;bc(R,{t:'s',time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=SNAPSHOT_SEC){R.snapAcc%=SNAPSHOT_SEC;SERVER_METRICS.snapshots++;bc(R,{t:'s',seq:++R.netSeq,serverAt:Date.now(),time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
     }catch(err){console.error(`[TICK] erro isolado na sala ${R.code}`,err);}
   });
-}, 50);
+  const tickCost=performance.now()-tickStarted;SERVER_METRICS.ticks++;SERVER_METRICS.lastTickMs=tickCost;SERVER_METRICS.avgTickMs=SERVER_METRICS.avgTickMs?SERVER_METRICS.avgTickMs*.92+tickCost*.08:tickCost;SERVER_METRICS.maxTickMs=Math.max(tickCost,SERVER_METRICS.maxTickMs*.995);if(tickCost>SERVER_TICK_MS)SERVER_METRICS.overruns++;SERVER_METRICS.rooms=rooms.size;let playerCount=0;rooms.forEach(R=>playerCount+=R.ps.size);SERVER_METRICS.players=playerCount;
+}, SERVER_TICK_MS);
 
 const heartbeat = setInterval(() => {
   const now=Date.now();
