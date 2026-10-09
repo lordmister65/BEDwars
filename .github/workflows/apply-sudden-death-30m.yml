@@ -1,0 +1,34 @@
+name: Apply Sudden Death 30m
+on:
+  push:
+    branches: [fix/sudden-death-30m]
+    paths:
+      - '.github/scripts/set-sudden-death-30m.js'
+      - '.github/workflows/apply-sudden-death-30m.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/sudden-death-30m
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply timing change
+        run: node .github/scripts/set-sudden-death-30m.js
+      - name: Validate server syntax
+        run: node --check server.js
+      - name: Validate timing
+        run: |
+          grep -q 'suddenDeathAt:30\*60' server.js
+          grep -q 'collapseAt:33\*60' server.js
+      - name: Commit change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.js
+          git diff --cached --quiet || git commit -m 'Set sudden death to 30 minutes'
+          git push origin HEAD:fix/sudden-death-30m
