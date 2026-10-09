@@ -82,7 +82,8 @@
 <div class="ov" id="menu" style="display:flex"><div><h1>Bed Wars Online</h1>
 <p>Seu nome</p><input id="nm" maxlength="14" value="Jogador">
 <p>Código da sala (todos digitam o mesmo)</p><input id="rm" maxlength="12" value="sala1">
-<button id="go" style="text-align:center;margin-top:12px">Entrar</button><p id="er"></p></div></div>
+<button id="go" style="text-align:center;margin-top:12px">Entrar na sala</button>
+<hr><p><b>PARTIDA RÁPIDA</b></p><select id="quickMode"><option value="2v2">2v2</option><option value="4v4">4v4</option><option value="solo">Solo</option></select><input id="partyCode" maxlength="8" placeholder="Código da Party (opcional)"><div class="meta-actions"><button type="button" onclick="quickPlay()">Jogar agora</button><button type="button" onclick="createPartyCode()">Criar Party</button></div><p id="er"></p></div></div>
 <div class="ov" id="lobby"><div class="lobby-panel"><h1>Sala <span id="rc"></span></h1>
 <div class="lobby-grid">
   <section><h2>Jogadores</h2><div id="pl"></div></section>
@@ -104,5 +105,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=core-v2-block-b-20261009"></script>
+<script src="/game.js?v=core-v2-block-c-20261009"></script>
 </body></html>
