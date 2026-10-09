@@ -76,7 +76,7 @@ const COMBAT_CONFIG={
 const GAMEPLAY={spawnProtect:1.25,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
 const SERVER_TICK_HZ=30,SERVER_TICK_MS=1000/SERVER_TICK_HZ,SERVER_TICK_SEC=1/SERVER_TICK_HZ,SNAPSHOT_HZ=15,SNAPSHOT_SEC=1/SNAPSHOT_HZ;
 const MOVEMENT_CONFIG={WALK_SPEED:4.3,SPRINT_SPEED:5.7,SNEAK_SPEED:1.3,SPEED_MULTIPLIER:1.28,SLOW_MULTIPLIER:.55,GROUND_ACCEL:36,AIR_ACCEL:15,POSITION_GRACE:.55,HARD_POSITION_FACTOR:1.65,MAX_UP_SPEED:13.5,MAX_DOWN_SPEED:42,KB_GRACE_MS:500,SOFT_FLAG_SCORE:6,FLAG_COOLDOWN_MS:2500};
-const BLOCKS_V4={MAX_PENDING_PER_PLAYER:16,RESULT_SEQ_TTL_MS:2500};
+const PLACEMENT_V5={NETWORK_CPS:30,NETWORK_CAPACITY:8,USEFUL_CPS:16,USEFUL_CAPACITY:4,BATCH_MAX:6,QUEUE_MAX:24,MAX_AGE_MS:350,HISTORY_MS:600,MAX_REWIND_MS:200,MAX_REACH:6.00,HARD_REACH:6.35,AUTO_HORIZONTAL:2.35,AUTO_VERTICAL:2.35,ALLOW_INTERSECTION_OFFSET:.12,BLOCK_AABB_SHRINK:.03,RESULT_TTL_MS:2500,MAX_PROCESS_PER_TICK:6};
 const PROJECTILE_V2={MAX_LAG_COMP_MS:180,DECAY_MS:220};
 const SERVER_METRICS={tickHz:SERVER_TICK_HZ,lastTickMs:0,avgTickMs:0,maxTickMs:0,lastWallMs:SERVER_TICK_MS,overruns:0,ticks:0,snapshots:0,sentPackets:0,sentBytes:0,droppedPackets:0,rooms:0,players:0};
 function serverMetricsSnapshot(p){const mem=process.memoryUsage(),mv=p&&p.moveV2?p.moveV2:null;return{tickHz:SERVER_METRICS.tickHz,lastTickMs:+SERVER_METRICS.lastTickMs.toFixed(2),avgTickMs:+SERVER_METRICS.avgTickMs.toFixed(2),maxTickMs:+SERVER_METRICS.maxTickMs.toFixed(2),wallMs:+SERVER_METRICS.lastWallMs.toFixed(2),overruns:SERVER_METRICS.overruns,ticks:SERVER_METRICS.ticks,snapshots:SERVER_METRICS.snapshots,rooms:SERVER_METRICS.rooms,players:SERVER_METRICS.players,sentPackets:SERVER_METRICS.sentPackets,droppedPackets:SERVER_METRICS.droppedPackets,rssMB:+(mem.rss/1048576).toFixed(1),heapMB:+(mem.heapUsed/1048576).toFixed(1),move:mv?{corrections:mv.corrections||0,suspicion:+(mv.suspicion||0).toFixed(1),speed:+(mv.speed||0).toFixed(2),clientError:+(mv.clientError||0).toFixed(2)}:null}};
@@ -208,7 +208,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
-  attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},moveV2:{vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0},blockV4:{lastOpSeq:0,pending:new Map()},
+  attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},moveV2:{vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0},blockV5:{lastOpSeq:0,pending:new Map(),queue:[],recentResults:new Map(),networkTokens:PLACEMENT_V5.NETWORK_CAPACITY,networkAt:Date.now(),usefulTokens:PLACEMENT_V5.USEFUL_CAPACITY,usefulAt:Date.now(),autoY:null,autoAt:0,metrics:{accepted:0,rejected:0,lastReason:'',lastRewind:0,lastDist:0}},
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', partyId:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,lastComboHitAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
@@ -261,6 +261,55 @@ function validatedAttackTime(a){
   if(Number.isFinite(claimed)&&Math.abs(claimed-arrival)<=1000)return Math.max(min,Math.min(arrival,claimed));
   return Math.max(min,arrival-Math.min(COMBAT_CONFIG.MAX_REWIND_MS,rtt*.5));
 }
+const PLACEABLE_KEYS=new Set(['wool','planks','endstone','glass','obsidian']);
+const PLACE_FACES=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+function ensurePlacementV5(p){return p.blockV5||(p.blockV5={lastOpSeq:0,pending:new Map(),queue:[],recentResults:new Map(),networkTokens:PLACEMENT_V5.NETWORK_CAPACITY,networkAt:Date.now(),usefulTokens:PLACEMENT_V5.USEFUL_CAPACITY,usefulAt:Date.now(),autoY:null,autoAt:0,metrics:{accepted:0,rejected:0,lastReason:'',lastRewind:0,lastDist:0}})}
+function resetPlacementInput(p){const s=ensurePlacementV5(p);s.queue.length=0;s.pending.clear();s.recentResults.clear();s.networkTokens=PLACEMENT_V5.NETWORK_CAPACITY;s.usefulTokens=PLACEMENT_V5.USEFUL_CAPACITY;s.networkAt=s.usefulAt=Date.now();s.autoY=null;s.autoAt=0}
+function consumePlacementBucket(s,kind,rate,capacity,now){const tk=kind==='network'?'networkTokens':'usefulTokens',ak=kind==='network'?'networkAt':'usefulAt',prev=Number.isFinite(s[ak])?s[ak]:now,tokens=Number.isFinite(s[tk])?s[tk]:capacity;s[tk]=Math.min(capacity,tokens+Math.max(0,now-prev)*rate/1000);s[ak]=now;if(s[tk]<1)return false;s[tk]-=1;return true}
+function placementTime(c){const arrival=c.arrivalTime||Date.now(),min=arrival-PLACEMENT_V5.MAX_REWIND_MS,claimed=Number(c.serverTimeEstimate),rtt=Math.max(0,Math.min(450,Number(c.rtt)||0));if(Number.isFinite(claimed)&&Math.abs(claimed-arrival)<=800)return Math.max(min,Math.min(arrival,claimed));return Math.max(min,arrival-Math.min(PLACEMENT_V5.MAX_REWIND_MS,rtt*.5))}
+function placementFaceValid(fx,fy,fz){return [fx,fy,fz].every(Number.isInteger)&&Math.abs(fx)+Math.abs(fy)+Math.abs(fz)===1}
+function supportFacePoint(sx,sy,sz,fx,fy,fz){return{x:sx+.5+fx*.499,y:sy+.5+fy*.499,z:sz+.5+fz*.499}}
+function firstSolidPlacementBlock(R,ox,oy,oz,ex,ey,ez){const L=Math.hypot(ex-ox,ey-oy,ez-oz),steps=Math.max(1,Math.ceil(L/.08));let last='';for(let i=1;i<=steps;i++){const a=i/steps,x=ox+(ex-ox)*a,y=oy+(ey-oy)*a,z=oz+(ez-oz)*a,X=Math.floor(x),Y=Math.floor(y),Z=Math.floor(z),key=X+','+Y+','+Z;if(key===last)continue;last=key;if(get(R,X,Y,Z))return{x:X,y:Y,z:Z}}return null}
+function placementBlockAabb(x,y,z,shrink=PLACEMENT_V5.BLOCK_AABB_SHRINK){return{minX:x+shrink,maxX:x+1-shrink,minY:y,maxY:y+1,minZ:z+shrink,maxZ:z+1-shrink}}
+function placementPlayerAabb(pose){const r=.34;return{minX:pose.x-r,maxX:pose.x+r,minY:pose.y+.03,maxY:pose.y+1.77,minZ:pose.z-r,maxZ:pose.z+r}}
+function aabbOverlapDepth(a,b){return{x:Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX),y:Math.min(a.maxY,b.maxY)-Math.max(a.minY,b.minY),z:Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ)}}
+function placementPoseHitsBlock(pose,x,y,z,feetTolerance=0){const pa=placementPlayerAabb(pose),ba=placementBlockAabb(x,y,z),o=aabbOverlapDepth(pa,ba);if(o.x<=0||o.y<=0||o.z<=0)return false;if(feetTolerance>0&&ba.maxY<=pa.minY+feetTolerance)return false;return true}
+function placementOtherPlayerHits(q,x,y,z){if(!q||!q.alive||q.out||q.admin||q.disconnected)return false;return placementPoseHitsBlock({x:q.x,y:q.y,z:q.z},x,y,z,.035)}
+function placementResultObject(R,p,c,ok,reason='',extra={}){const item=c.item||String(c.k||''),r={opSeq:c.opSeq||0,ok:ok?1:0,reason,k:item,x:c.x,y:c.y,z:c.z,remaining:Number(p.inv[item]||0),blockSeq:R.blockSeq||0};if(Number.isFinite(extra.blockId))r.blockId=extra.blockId;if(Number.isFinite(extra.rw))r.rw=Math.round(extra.rw);if(Number.isFinite(extra.dist))r.dist=+extra.dist.toFixed(2);return r}
+function cachePlacementResult(p,c,result){const s=ensurePlacementV5(p),now=Date.now();s.pending.delete(c.opSeq);if(c.opSeq)s.recentResults.set(c.opSeq,{at:now,result});for(const[seq,row]of s.recentResults)if(now-row.at>PLACEMENT_V5.RESULT_TTL_MS)s.recentResults.delete(seq);if(result.ok)s.metrics.accepted++;else{s.metrics.rejected++;s.metrics.lastReason=result.reason||'rejected'}if(Number.isFinite(result.rw))s.metrics.lastRewind=result.rw;if(Number.isFinite(result.dist))s.metrics.lastDist=result.dist}
+function immediatePlacementResult(R,p,c,reason){const r=placementResultObject(R,p,c,false,reason);cachePlacementResult(p,c,r);return r}
+function legacyPlacementSupport(R,x,y,z){for(const d of PLACE_FACES){const sx=x-d[0],sy=y-d[1],sz=z-d[2];if(get(R,sx,sy,sz))return{sx,sy,sz,fx:d[0],fy:d[1],fz:d[2]}}return null}
+function validatePlacementCommand(R,p,c,now){
+  const s=ensurePlacementV5(p);if(R.st!=='play'||!p.alive)return placementResultObject(R,p,c,false,'not_playing');
+  if(now-c.arrivalTime>PLACEMENT_V5.MAX_AGE_MS)return placementResultObject(R,p,c,false,'expired');
+  const item=c.item,k={wool:teamWoolBlock(p.team),planks:5,endstone:12,glass:7,obsidian:16}[item];if(!item||!k)return placementResultObject(R,p,c,false,'wrong_item');
+  if(![c.x,c.y,c.z].every(Number.isInteger)||c.y<1||c.y>=S.H-2)return placementResultObject(R,p,c,false,'invalid_pos');
+  if(!(p.inv[item]>0))return placementResultObject(R,p,c,false,'no_item');if(get(R,c.x,c.y,c.z))return placementResultObject(R,p,c,false,'occupied');
+  let sx=c.sx,sy=c.sy,sz=c.sz,fx=c.fx,fy=c.fy,fz=c.fz;if(c.legacyTarget){const sup=legacyPlacementSupport(R,c.x,c.y,c.z);if(!sup)return placementResultObject(R,p,c,false,'no_support');({sx,sy,sz,fx,fy,fz}=sup)}
+  if(![sx,sy,sz].every(Number.isInteger)||!placementFaceValid(fx,fy,fz)||sx+fx!==c.x||sy+fy!==c.y||sz+fz!==c.z)return placementResultObject(R,p,c,false,'target_mismatch');
+  if(!get(R,sx,sy,sz))return placementResultObject(R,p,c,false,'no_support');
+  if(c.dep){const dep=s.recentResults.get(c.dep);if(dep&&!dep.result.ok)return placementResultObject(R,p,c,false,'dependency_rejected');if(!dep&&c.dep>=c.opSeq)return placementResultObject(R,p,c,false,'bad_dependency')}
+  const protectedKind=protectedPlacement(R,c.x,c.y,c.z);if(protectedKind)return placementResultObject(R,p,c,false,'protected_'+protectedKind);
+  const targetTime=placementTime(c),pose=interpolatedCombatState(p,targetTime),rw=Math.max(0,(c.arrivalTime||now)-targetTime),eye={x:pose.x,y:pose.y+1.62,z:pose.z},fp=supportFacePoint(sx,sy,sz,fx,fy,fz),dist=Math.hypot(fp.x-eye.x,fp.y-eye.y,fp.z-eye.z);
+  if(c.auto){if(now-(s.autoAt||0)>500)s.autoY=c.y;if(s.autoY!==c.y)return placementResultObject(R,p,c,false,'auto_vertical',{rw,dist});const hd=Math.hypot(c.x+.5-pose.x,c.z+.5-pose.z),vd=Math.abs((c.y+1.15)-pose.y);if(hd>PLACEMENT_V5.AUTO_HORIZONTAL||vd>PLACEMENT_V5.AUTO_VERTICAL)return placementResultObject(R,p,c,false,'too_far',{rw,dist});s.autoAt=now}
+  else{if(dist>PLACEMENT_V5.HARD_REACH){acFlag(p,'reach','place='+dist.toFixed(2));return placementResultObject(R,p,c,false,'too_far',{rw,dist})}if(dist>PLACEMENT_V5.MAX_REACH)return placementResultObject(R,p,c,false,'too_far',{rw,dist});const first=firstSolidPlacementBlock(R,eye.x,eye.y,eye.z,fp.x,fp.y,fp.z);if(!first||first.x!==sx||first.y!==sy||first.z!==sz)return placementResultObject(R,p,c,false,'occluded',{rw,dist})}
+  if(placementPoseHitsBlock(pose,c.x,c.y,c.z,PLACEMENT_V5.ALLOW_INTERSECTION_OFFSET))return placementResultObject(R,p,c,false,'player_collision',{rw,dist});
+  for(const q of R.ps.values())if(q!==p&&placementOtherPlayerHits(q,c.x,c.y,c.z))return placementResultObject(R,p,c,false,'player_collision',{rw,dist});
+  cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,c.x,c.y,c.z,k,1);p.inv[item]--;pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,c.x+.5,c.y+.5,c.z+.5,6);return placementResultObject(R,p,c,true,'',{blockId:k,rw,dist});
+}
+function enqueuePlacement(R,p,a,arrivalTime=Date.now(),legacy=false){
+  const s=ensurePlacementV5(p),declared=String(a.k||''),held=heldKey(p),seq=Number.isInteger(a.opSeq)&&a.opSeq>0?a.opSeq:s.lastOpSeq+1,c={opSeq:seq,k:declared,item:declared,x:a.x,y:a.y,z:a.z,sx:a.sx,sy:a.sy,sz:a.sz,fx:a.fx,fy:a.fy,fz:a.fz,dep:Number.isInteger(a.dep)&&a.dep>0?a.dep:0,auto:a.auto===1,clientTime:Number(a.clientTime)||0,serverTimeEstimate:Number(a.serverTimeEstimate),rtt:Number(a.rtt)||0,yaw:Number(a.yaw)||0,pitch:Number(a.pitch)||0,arrivalTime,legacy,legacyTarget:legacy&&!placementFaceValid(a.fx,a.fy,a.fz)};
+  const cached=s.recentResults.get(seq);if(cached)return{immediate:cached.result,legacy};if(s.pending.has(seq))return{queued:true};if(seq<=s.lastOpSeq){return{immediate:placementResultObject(R,p,c,false,'stale_op'),legacy}}s.lastOpSeq=seq;
+  if(!PLACEABLE_KEYS.has(declared)||held!==declared){acFlag(p,'item','place '+declared+' held='+held);const r=immediatePlacementResult(R,p,c,'wrong_item');return{immediate:r,legacy}}
+  if(!consumePlacementBucket(s,'network',PLACEMENT_V5.NETWORK_CPS,PLACEMENT_V5.NETWORK_CAPACITY,arrivalTime)){acFlag(p,'place','network_rate');const r=immediatePlacementResult(R,p,c,'network_rate');return{immediate:r,legacy}}
+  if(s.queue.length>=PLACEMENT_V5.QUEUE_MAX){const r=immediatePlacementResult(R,p,c,'queue_full');return{immediate:r,legacy}}s.pending.set(seq,arrivalTime);s.queue.push(c);return{queued:true};
+}
+function processPlacementQueue(R,p,now=Date.now()){
+  const s=ensurePlacementV5(p),batch=[];let processed=0;
+  while(s.queue.length&&processed<PLACEMENT_V5.MAX_PROCESS_PER_TICK){const c=s.queue[0];if(now-c.arrivalTime>PLACEMENT_V5.MAX_AGE_MS){s.queue.shift();const r=placementResultObject(R,p,c,false,'expired');cachePlacementResult(p,c,r);if(c.legacy)tx(p,{t:'placeResult',...r});else batch.push(r);processed++;continue}if(!consumePlacementBucket(s,'useful',PLACEMENT_V5.USEFUL_CPS,PLACEMENT_V5.USEFUL_CAPACITY,now))break;s.queue.shift();const r=validatePlacementCommand(R,p,c,now);cachePlacementResult(p,c,r);if(c.legacy)tx(p,{t:'placeResult',...r});else batch.push(r);processed++}
+  if(batch.length)tx(p,{t:'placeBatchResult',results:batch});
+}
+
 function clickPatternEntropy(iats,binMs=4){
   if(!iats.length)return 0;const bins=new Map();for(const v of iats){const k=Math.round(v/binMs);bins.set(k,(bins.get(k)||0)+1)}let h=0;for(const n of bins.values()){const p=n/iats.length;h-=p*Math.log2(p)}return h;
 }
@@ -385,7 +434,7 @@ function protectedPlacement(R,x,y,z){
   }
   return '';
 }
-function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p);resetMovementV2(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
+function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p);resetMovementV2(p);resetPlacementInput(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 function mapVoteSummary(R){const votes=R.mapVotes||(R.mapVotes=new Map()),counts={};for(const [id,mapId] of votes){if(!R.ps.has(id)||!S.MAPS[mapId])continue;counts[mapId]=(counts[mapId]||0)+1}return counts}
 function resolveMapVote(R){const counts=mapVoteSummary(R),ids=Object.keys(S.MAPS),top=Math.max(0,...ids.map(id=>counts[id]||0));if(top<=0)return S.MAPS[R.mapId]?R.mapId:ids[0];const tied=ids.filter(id=>(counts[id]||0)===top),hostVote=R.mapVotes?.get(R.host);if(hostVote&&tied.includes(hostVote))return hostVote;if(tied.includes(R.mapId))return R.mapId;return tied[0]}
@@ -746,8 +795,8 @@ wss.on('connection', ws => {
       const code=String(m.room||'').slice(0,12).toLowerCase(), rr=rooms.get(code);
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
-      R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();resetMovementV2(p);recordCombatHistory(p,Date.now());ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();resetMovementV2(p);resetPlacementInput(p);recordCombatHistory(p,Date.now());ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,placeOpSeq:p.blockV5?.lastOpSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
@@ -769,7 +818,7 @@ wss.on('connection', ws => {
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
       p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, party:p.partyId||'', quick:m.quick?1:0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
@@ -912,26 +961,11 @@ wss.on('connection', ws => {
         if(!play)break;const seq=Number.isInteger(m.seq)&&m.seq>0?m.seq:++p.legacyAttackSeq;
         enqueueMeleeAttack(R,p,{seq,id:m.id,yaw:m.yaw,pitch:m.pitch,clientTime:Number(m.clientTime)||0,serverTimeEstimate:Number(m.serverTimeEstimate),rtt:Number(m.rtt)||0},Date.now());break;
       }
+      case 'placeBatch': {
+        if(!Array.isArray(m.placements))break;if(m.placements.length>PLACEMENT_V5.BATCH_MAX){acFlag(p,'place','batch='+m.placements.length);break}const arrival=Date.now(),immediate=[];for(const a of m.placements){const q=enqueuePlacement(R,p,a,arrival,false);if(q.immediate)immediate.push(q.immediate)}if(immediate.length)tx(p,{t:'placeBatchResult',results:immediate});break;
+      }
       case 'place': {
-        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:teamWoolBlock(p.team),planks:5,endstone:12,glass:7,obsidian:16}[item];
-        const opSeq=Number.isInteger(m.opSeq)&&m.opSeq>0?m.opSeq:0,bv=p.blockV4||(p.blockV4={lastOpSeq:0,pending:new Map()}),placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item||String(m.k||''),x,y,z,remaining:Number(p.inv[item]||0),opSeq,blockSeq:R.blockSeq||0});if(opSeq&&opSeq<=bv.lastOpSeq){placeResult(false,'stale_op');break}if(opSeq){bv.lastOpSeq=opSeq;bv.pending.set(opSeq,Date.now());while(bv.pending.size>BLOCKS_V4.MAX_PENDING_PER_PLAYER)bv.pending.delete(bv.pending.keys().next().value)}
-        if(!play){placeResult(false,'not_playing');break}if(!item||!k){acFlag(p,'item','place '+String(m.k||'')+' held='+held);placeResult(false,'wrong_item');break}
-        if(m.k&&m.k!==item){acFlag(p,'item','place declared '+m.k+' held='+item);placeResult(false,'wrong_item');break}
-        if(![x,y,z].every(Number.isInteger)||y<1||y>=S.H-2){placeResult(false,'invalid_pos');break}
-        const placeGap=auto?(p.hspeed>5.2?82:p.hspeed>3?90:105):64;if(!allow(p,'place',placeGap)){acFlag(p,'place','rate');placeResult(false,'cooldown');break}
-        if(!(p.inv[item]>0)){placeResult(false,'no_item');break}if(get(R,x,y,z)){placeResult(false,'occupied');break}
-        if(Math.hypot(x+.5-p.x,y+.5-p.y-1.45,z+.5-p.z)>6.45){acFlag(p,'reach','place');placeResult(false,'too_far');break}
-        if(auto){
-          const now=Date.now(),idle=now-(p.autoBridgeAt||0);if(idle>500)p.autoBridgeY=y;
-          if(p.hspeed<.35){placeResult(false,'auto_stationary');break}
-          if(p.autoBridgeY!==y){acFlag(p,'place','auto_vertical');placeResult(false,'auto_vertical');break}
-          const hd=Math.hypot(x+.5-p.x,z+.5-p.z);if(hd>2.15||Math.abs((y+1.15)-p.y)>2.25){acFlag(p,'place','auto_range');placeResult(false,'too_far');break}
-          p.autoBridgeAt=now;
-        }
-        if(![[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].some(d=>get(R,x+d[0],y+d[1],z+d[2]))){placeResult(false,'no_support');break}
-        const protectedKind=protectedPlacement(R,x,y,z);if(protectedKind){sfx(p,'blocked');placeResult(false,'protected_'+protectedKind);break}
-        if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z))){sfx(p,'blocked');placeResult(false,'player_collision');break}
-        cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}setb(R,x,y,z,k,1);p.inv[item]--;placeResult(true);pinv(p);const placeSfx=item==='wool'?'place_cloth':item==='planks'?'place_wood':'place_stone';sfxAt(R,placeSfx,x+.5,y+.5,z+.5,6);break
+        const q=enqueuePlacement(R,p,m,Date.now(),true);if(q.immediate)tx(p,{t:'placeResult',...q.immediate});break;
       }
       case 'breakStart': {
         cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
@@ -1016,7 +1050,7 @@ setInterval(() => {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
-        if(p.alive&&!p.disconnected){const combatNow=Date.now();recordCombatHistory(p,combatNow);processMeleeAttackQueue(R,p,combatNow);}
+        if(p.alive&&!p.disconnected){const combatNow=Date.now();recordCombatHistory(p,combatNow);processMeleeAttackQueue(R,p,combatNow);processPlacementQueue(R,p,combatNow);}
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);p.fx.blind=Math.max(0,(p.fx.blind||0)-dt);p.fx.milk=Math.max(0,(p.fx.milk||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);
