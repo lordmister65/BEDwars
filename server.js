@@ -44,7 +44,7 @@ function centralGenCfg(R){let c=CENTRAL_GEN_TIERS[0];for(const q of CENTRAL_GEN_
 // Hitbox de combate centralizada. A caixa é levemente maior que a colisão física
 // para compensar interpolação e até um snapshot curto de movimento, sem aumentar o alcance.
 const COMBAT_HITBOX={radius:.36,height:1.80,feetPad:.05,historyMax:.60,meleePad:.055,meleeReach:3.80};
-const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:12*60,collapseAt:15*60,collapseEvery:5};
+const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
 const HELD_KEYS=[null,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
 const TNT_KEYS=new Set(['tnt','tntImpulse','tntSlow','tntDamage']);
 function heldKey(p){if(p.held===0)return'sword';return HELD_KEYS[p.held]||null}
