@@ -1,0 +1,10 @@
+const fs=require('fs');
+const path='server.js';
+let s=fs.readFileSync(path,'utf8');
+const from="const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:12*60,collapseAt:15*60,collapseEvery:5};";
+const to="const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};";
+const n=s.split(from).length-1;
+if(n!==1)throw new Error('GAMEPLAY timing signature not found exactly once: '+n);
+s=s.replace(from,to);
+fs.writeFileSync(path,s);
+console.log('Sudden death changed from 12 to 30 minutes.');
