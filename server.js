@@ -44,7 +44,13 @@ function centralGenCfg(R){let c=CENTRAL_GEN_TIERS[0];for(const q of CENTRAL_GEN_
 // Hitbox de combate centralizada. A caixa é levemente maior que a colisão física
 // para compensar interpolação e até um snapshot curto de movimento, sem aumentar o alcance.
 const COMBAT_HITBOX={radius:.36,height:1.80,feetPad:.05,historyMax:.60,meleePad:.055,meleeReach:3.80};
-const GAMEPLAY={spawnProtect:1.25,hitCooldownMs:135,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
+const COMBAT_CONFIG={
+  MAX_NETWORK_CPS:25,NETWORK_BUCKET_CAPACITY:8,
+  MAX_USEFUL_CPS:15,USEFUL_BUCKET_CAPACITY:2,
+  MELEE_IFRAME_SEC:.22,MAX_ATTACK_BATCH:6,MAX_ATTACK_QUEUE:8,MAX_ATTACK_AGE_MS:300,
+  COMBO_TIMEOUT_MS:1000
+};
+const GAMEPLAY={spawnProtect:1.25,damageIFrames:.26,suddenDeathAt:30*60,collapseAt:33*60,collapseEvery:5};
 const HELD_KEYS=[null,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];
 const TNT_KEYS=new Set(['tnt','tntImpulse','tntSlow','tntDamage']);
 function heldKey(p){if(p.held===0)return'sword';return HELD_KEYS[p.held]||null}
@@ -170,6 +176,7 @@ function room(code) {
   return R;
 }
 const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,last:''},
+  attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
   rl: Object.create(null), breaking: null, trapQueue:[], enderChest:emptyChest(), tools: { pick:0, axe:0, shears:0 }, fx:{speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0}, up: { sharp:0, prot:0, forge:0, haste:0, regen:0, trap:0, trapMiner:0, trapSlow:0, trapCounter:0 }, inv: { wool:24, planks:0, endstone:0, glass:0, obsidian:0, tnt:0, tntImpulse:0, tntSlow:0, tntDamage:0, apple:0, bow:0, arrow:0, fireball:0, snowball:0, pearl:0, speedPotion:0, jumpPotion:0, invisPotion:0, compass:0, magicMilk:0, bridgeEgg:0, popupTower:0, knockbackStick:0, iron:0, gold:0, dia:0, em:0 } });
@@ -178,6 +185,43 @@ const allow = (p, key, gap) => {
   if (n - last < gap) return false;
   p.rl[key] = n; return true;
 };
+function consumeAttackBucket(p,kind,rate,capacity,now=Date.now()){
+  const tokenKey=kind==='network'?'attackNetTokens':'attackUsefulTokens',timeKey=kind==='network'?'attackNetAt':'attackUsefulAt';
+  const prevTime=Number.isFinite(p[timeKey])?p[timeKey]:now,prevTokens=Number.isFinite(p[tokenKey])?p[tokenKey]:capacity;
+  p[tokenKey]=Math.min(capacity,prevTokens+Math.max(0,now-prevTime)*rate/1000);p[timeKey]=now;
+  if(p[tokenKey]<1)return false;p[tokenKey]-=1;return true;
+}
+function resetCombatInput(p){
+  p.attackQueue=[];p.attackNetTokens=COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY;p.attackNetAt=Date.now();p.attackUsefulTokens=COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY;p.attackUsefulAt=Date.now();
+}
+function enqueueMeleeAttack(R,p,a,arrivalTime=Date.now()){
+  if(R.st!=='play'||!p.alive)return false;
+  if(!a||!Number.isInteger(a.seq)||a.seq<=0||a.seq>2147483647||!Number.isInteger(a.id)||!Number.isFinite(a.yaw)||!Number.isFinite(a.pitch))return false;
+  if(a.seq<=p.lastAttackSeq)return false;p.lastAttackSeq=a.seq;
+  if(!consumeAttackBucket(p,'network',COMBAT_CONFIG.MAX_NETWORK_CPS,COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,arrivalTime)){acFlag(p,'rate','attack_network');return false}
+  if(p.attackQueue.length>=COMBAT_CONFIG.MAX_ATTACK_QUEUE){p.attackQueue.shift();acFlag(p,'rate','attack_queue')}
+  p.attackQueue.push({seq:a.seq,id:a.id,yaw:a.yaw,pitch:a.pitch,clientTime:Number.isFinite(a.clientTime)?a.clientTime:0,arrivalTime});
+  cancelSpawnProtection(p);if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
+  return true;
+}
+function evaluateQueuedMeleeAttack(R,p,a){
+  const q=R.ps.get(a.id);if(!q||q===p||!q.alive||q.team===p.team||q.admin)return false;
+  const rawDist=Math.hypot(q.x-p.x,(q.y+1)-(p.y+1),q.z-p.z);if(rawDist>4.35){acFlag(p,'reach',rawDist.toFixed(2));return false}
+  const hit=meleeRayHit(R,p,q,a.yaw,a.pitch);if(!hit)return false;
+  const hk=heldKey(p),stick=hk==='knockbackStick'&&(p.inv.knockbackStick||0)>0;if(hk!=='sword'&&!stick){acFlag(p,'item','hit with '+hk);return false}
+  const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t,nextCombo=p.comboTarget===q.id&&(now-p.lastCombatAt)*1000<COMBAT_CONFIG.COMBO_TIMEOUT_MS?Math.min(8,p.comboCount+1):1;
+  const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.14:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
+  if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr,'combat',4.5,COMBAT_CONFIG.MELEE_IFRAME_SEC))return false;
+  p.comboCount=nextCombo;p.comboTarget=q.id;p.lastCombatAt=now;
+  tx(p,{t:'hitok',seq:a.seq,id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});return true;
+}
+function processMeleeAttackQueue(R,p,now=Date.now()){
+  while(p.attackQueue&&p.attackQueue.length){
+    const a=p.attackQueue.shift();if(now-a.arrivalTime>COMBAT_CONFIG.MAX_ATTACK_AGE_MS)continue;
+    if(!consumeAttackBucket(p,'useful',COMBAT_CONFIG.MAX_USEFUL_CPS,COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,now))continue;
+    evaluateQueuedMeleeAttack(R,p,a);
+  }
+}
 const SHOP_RADIUS=10;
 const nearBase = p => {
   const q=p.roomShop||null, x=q?q[0]:S.IS[p.team][0]+.5, y=q?q[1]:S.BASE_Y+2, z=q?q[2]:S.IS[p.team][1]+.5;
@@ -225,7 +269,7 @@ function protectedPlacement(R,x,y,z){
   }
   return '';
 }
-function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now(); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
+function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
 
@@ -270,11 +314,11 @@ function die(R, q, cause='combat') {
   }
   if (final) { q.out = 1; win(R); }
 }
-function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5){
+function hurt(R,q,d,kx,kz,src,cr,cause='combat',kbVy=4.5,iframeSec=GAMEPLAY.damageIFrames){
   if(!q.alive||q.admin)return false;
   if(q.spawnProtect>0&&src&&src!==q)return false;
   const environmental=cause==='fall'||cause==='collapse';
-  if(environmental){if((q.envIh||0)>0)return false;q.envIh=.12}else{if(q.ih>0)return false;q.ih=GAMEPLAY.damageIFrames}
+  if(environmental){if((q.envIh||0)>0)return false;q.envIh=.12}else{if(q.ih>0)return false;q.ih=iframeSec}
   d*=Math.max(.2,1-.25*q.ar-.1*q.up.prot);const dealt=Math.max(0,d);if(dealt<=0)return false;q.hp-=dealt;
   if(src){q.src=src;q.st=R.t;q.lastCombatAt=R.t}
   const airborne=!q.grounded||q.dy>1.2,airMul=airborne?.90:1,comboMul=src&&src.comboCount>=2?.96:1;
@@ -722,19 +766,14 @@ wss.on('connection', ws => {
         if(Number.isInteger(m.s)&&m.s>=0&&m.s<=19)p.held=m.s;else acFlag(p,'item','held='+m.s);
         break;
       }
+      case 'attackBatch': {
+        if(!play||!Array.isArray(m.attacks))break;
+        if(m.attacks.length>COMBAT_CONFIG.MAX_ATTACK_BATCH){acFlag(p,'rate','attack_batch='+m.attacks.length);break}
+        const arrival=Date.now();for(const a of m.attacks)enqueueMeleeAttack(R,p,a,arrival);break;
+      }
       case 'hit': {
-        if(p.fx.invis>0){p.fx.invis=0;pinv(p)}
-        if(!play||!Number.isInteger(m.id)||!Number.isFinite(m.yaw)||!Number.isFinite(m.pitch))break;
-        if(!allow(p,'hit',GAMEPLAY.hitCooldownMs)){acFlag(p,'rate','hit');break}cancelSpawnProtection(p);
-        const q=R.ps.get(m.id);if(!q||q===p||!q.alive||q.team===p.team||q.admin)break;
-        const rawDist=Math.hypot(q.x-p.x,(q.y+1)-(p.y+1),q.z-p.z);if(rawDist>4.35){acFlag(p,'reach',rawDist.toFixed(2));break}
-        const hit=meleeRayHit(R,p,q,m.yaw,m.pitch);if(!hit)break;
-        const hk=heldKey(p),stick=hk==='knockbackStick'&&(p.inv.knockbackStick||0)>0;if(hk!=='sword'&&!stick){acFlag(p,'item','hit with '+hk);break}
-        const d=[hit.dir.x,hit.dir.y,hit.dir.z],now=R.t,nextCombo=p.comboTarget===q.id&&now-p.lastCombatAt<1.05?Math.min(8,p.comboCount+1):1;
-        const cr=!stick&&p.dy<-1,sprintMul=p.hspeed>5.15?1.14:1,kb=(stick?1.9:1)*sprintMul,damage=stick?1.5:(DMG[p.sw]+2*p.up.sharp)*(cr?1.5:1);
-        if(!hurt(R,q,damage,d[0]*kb,d[2]*kb,p,cr))break;
-        p.comboCount=nextCombo;p.comboTarget=q.id;p.lastCombatAt=now;
-        tx(p,{t:'hitok',id:q.id,hp:Math.max(0,Math.ceil(q.hp)),cr:cr?1:0,combo:p.comboCount});bc(R,{t:'anim',id:p.id,k:'attack'});break
+        if(!play)break;const seq=Number.isInteger(m.seq)&&m.seq>0?m.seq:++p.legacyAttackSeq;
+        enqueueMeleeAttack(R,p,{seq,id:m.id,yaw:m.yaw,pitch:m.pitch,clientTime:Number(m.clientTime)||0},Date.now());break;
       }
       case 'place': {
         const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
@@ -838,6 +877,7 @@ setInterval(() => {
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
+        if(p.alive&&!p.disconnected)processMeleeAttackQueue(R,p,Date.now());
         p.fx.speed=Math.max(0,p.fx.speed-dt);p.fx.jump=Math.max(0,p.fx.jump-dt);p.fx.invis=Math.max(0,p.fx.invis-dt);p.fx.slow=Math.max(0,(p.fx.slow||0)-dt);p.fx.fatigue=Math.max(0,(p.fx.fatigue||0)-dt);p.fx.blind=Math.max(0,(p.fx.blind||0)-dt);p.fx.milk=Math.max(0,(p.fx.milk||0)-dt);
         if(p.disconnected&&p.reconnectDeadline&&Date.now()>=p.reconnectDeadline){
           netLog(p,'prazo de reconexão expirou',`offline=${Date.now()-(p.disconnectedAt||Date.now())}ms`);

@@ -792,12 +792,15 @@ function playerTarget(){
  if(best!==null&&viewBlocked(bd,d))return null;
  return best;
 }
+const ATTACK_BATCH_MS=20,ATTACK_BATCH_MAX=6;let attackSequence=0,attackFlushTimer=0,pendingAttacks=[];
+function flushAttackBatch(){clearTimeout(attackFlushTimer);attackFlushTimer=0;if(!pendingAttacks.length)return;const attacks=pendingAttacks.splice(0,ATTACK_BATCH_MAX);send({t:'attackBatch',attacks});if(pendingAttacks.length)attackFlushTimer=setTimeout(flushAttackBatch,ATTACK_BATCH_MS)}
+function queueMeleeAttack(id){const now=performance.now();pendingAttacks.push({seq:++attackSequence,id,clientTime:+now.toFixed(2),yaw:pl.yaw,pitch:pl.pitch});if(pendingAttacks.length>=ATTACK_BATCH_MAX)flushAttackBatch();else if(!attackFlushTimer)attackFlushTimer=setTimeout(flushAttackBatch,ATTACK_BATCH_MS)}
 let breaking=null,breakAt=0,breakDur=0;
 function bestToolForBlock(b){const want=BLOCKS[b]?.tool;if(!want||!(tools[want]>0))return null;return want}
 function primary(){if(!started||!me.alive)return;audioInit();if(ADMIN.on&&ADMIN.build){const r=ray();if(r)send({t:'adminBreak',x:r.h[0],y:r.h[1],z:r.h[2]});return}
  const chest=chestTarget();if(chest){if(chest.team!==me.team){msg('Esse baú pertence a outro time.');sfx('blocked');return}openChest(chest.kind);return}
  const vendor=vendorTarget();if(vendor){if(vendor.team!==me.team){msg('Este vendedor pertence a outro time.');sfx('blocked');return}openShop();return}
- swing=1;useAnim=1;clk.push(performance.now());while(clk.length>40)clk.shift();const enemy=playerTarget();if(enemy!==null){send({t:'hit',id:enemy,yaw:pl.yaw,pitch:pl.pitch,k:slotKey(cur)});return}if(tg){const b=get(tg.h[0],tg.h[1],tg.h[2]);miningTool=bestToolForBlock(b);lastHeldSig='';refreshHeld();breaking=tg.h.join(',');breakAt=performance.now();breakDur=0;$('breakBox').style.display='none';send({t:'breakStart',x:tg.h[0],y:tg.h[1],z:tg.h[2]})}}
+ swing=1;useAnim=1;clk.push(performance.now());while(clk.length>40)clk.shift();const enemy=playerTarget();if(enemy!==null){queueMeleeAttack(enemy);return}if(tg){const b=get(tg.h[0],tg.h[1],tg.h[2]);miningTool=bestToolForBlock(b);lastHeldSig='';refreshHeld();breaking=tg.h.join(',');breakAt=performance.now();breakDur=0;$('breakBox').style.display='none';send({t:'breakStart',x:tg.h[0],y:tg.h[1],z:tg.h[2]})}}
 function stopBreak(){if(breaking){breaking=null;send({t:'breakStop'});$('breakBox').style.display='none';crackBox.visible=false}miningTool=null;lastHeldSig='';refreshHeld()}
 function beginBow(){if(!started||!me.alive||!inv.bow||inv.arrow<1)return;bowCharging=true;bowChargeAt=performance.now();$('bowCharge').style.display='block';$('bowChargeFill').style.width='0%';$('bowTrajectory').classList.add('show')}
 function drawBowTrajectory(){const el=$('bowTrajectory');if(!bowCharging){el.innerHTML='';el.classList.remove('show');return}const ratio=Math.max(.2,Math.min(1,(performance.now()-bowChargeAt)/1200)),speed=22+22*ratio,cy=Math.cos(pl.pitch),vx=-Math.sin(pl.yaw)*cy*speed,vy=Math.sin(pl.pitch)*speed,vz=-Math.cos(pl.yaw)*cy*speed,pts=[];for(let i=1;i<=13;i++){const t=i*.075,x=cam.position.x+vx*t,y=cam.position.y+vy*t-.5*8.2*t*t,z=cam.position.z+vz*t,v=new THREE.Vector3(x,y,z).project(cam);if(v.z<-1||v.z>1)continue;pts.push(`<i style="left:${'${(v.x*.5+.5)*100}'}%;top:${'${(-v.y*.5+.5)*100}'}%;opacity:${'${Math.max(.18,1-i/16)}'}"></i>`)}el.innerHTML=pts.join('')}
