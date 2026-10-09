@@ -452,3 +452,8 @@ button:active{border-top-color:#333;border-left-color:#333;border-right-color:#a
 #matchStatus .next-event{color:#fff55c;font-weight:700}body.low-health:before{content:"";position:fixed;inset:0;z-index:8;pointer-events:none;box-shadow:inset 0 0 90px rgba(190,0,0,.42);animation:lowHealthPulse 1.05s ease-in-out infinite}@keyframes lowHealthPulse{50%{box-shadow:inset 0 0 45px rgba(190,0,0,.18)}}
 #wt{padding:7px 8px;background:rgba(0,0,0,.08);border-left:3px solid #777}
 @media (pointer:coarse),(max-width:800px){.party-tools{grid-template-columns:1fr 1fr}#matchStatus{max-width:78vw;overflow:hidden}#matchStatus .next-event{display:none}.map-votes{font-size:6px}}
+
+
+/* Maps V3 / FFA 8 */
+#tm{max-height:78vh;overflow:hidden}.score-teams{display:flex;flex-direction:column;gap:1px}.score-team{min-height:14px}.score-team .score-name{min-width:62px}.score-team .score-count{margin-left:auto}
+@media (pointer:coarse),(max-width:800px){#tm{max-height:62vh;overflow:hidden}.score-team{font-size:6px;line-height:1.25;min-height:10px}.score-team .score-name{min-width:44px}.score-bed{font-size:6px}}

@@ -17,12 +17,19 @@ function ensureProfile(id,name='Jogador'){const k=String(id||'').replace(/[^a-zA
 function publicProfile(p){return{name:safePlayerName(p.name),xp:p.xp||0,level:profileLevel(p.xp),matches:p.matches||0,wins:p.wins||0,losses:p.losses||0,kills:p.kills||0,finalKills:p.finalKills||0,bedsDestroyed:p.bedsDestroyed||0,deaths:p.deaths||0,resourcesCollected:p.resourcesCollected||0}}
 function rankingPayload(limit=20){return Object.values(PROFILE_DB).sort((a,b)=>(b.xp||0)-(a.xp||0)||(b.wins||0)-(a.wins||0)||(b.finalKills||0)-(a.finalKills||0)).slice(0,limit).map(publicProfile)}
 function emptyChest(){return Object.fromEntries(CHEST_KEYS.map(k=>[k,0]))}
+const TEAM_COUNT=S.TN.length;
+const teamArray=f=>Array.from({length:TEAM_COUNT},(_,i)=>f(i));
+const teamWoolBlock=t=>(S.TW&&S.TW[t])||(t+1);
+const teamBedBlock=t=>(S.TB&&S.TB[t])||(8+t);
+const bedTeamFromBlock=b=>(S.TB||[8,9,10,11]).indexOf(b);
+const isTeamBedBlock=b=>bedTeamFromBlock(b)>=0;
+const isTeamWoolBlock=b=>(S.TW||[1,2,3,4]).includes(b);
 const MODES={
   '1v1':{id:'1v1',name:'Duelo 1v1',teamCap:1,maxPlayers:2,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1],description:'Duelo direto · um jogador por time'},
   '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
   '3v3':{id:'3v3',name:'3v3',teamCap:3,maxPlayers:6,minPlayers:2,quickMinPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 3 jogadores por time'},
   '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,minPlayers:2,quickMinPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
-  'solo':{id:'solo',name:'Solo / FFA',teamCap:1,maxPlayers:4,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1,2,3],solo:true,description:'Todos contra todos · 2 a 4 jogadores · uma base por jogador'}
+  'solo':{id:'solo',name:'Solo / FFA 8',teamCap:1,maxPlayers:8,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1,2,3,4,5,6,7],solo:true,description:'Todos contra todos · 2 a 8 jogadores · oito bases independentes'}
 };
 const modeCfg=R=>MODES[R.modeId]||MODES['2v2'];
 const QUICK_MATCH_CONFIG={READY_COUNTDOWN_MS:12000,FULL_COUNTDOWN_MS:4000,LOBBY_BROADCAST_MS:900};
@@ -99,7 +106,7 @@ function rebalanceForMode(R,mc){
   if(mc.solo){
     players.forEach((q,i)=>{q.team=mc.activeTeams[i%mc.activeTeams.length]});
   }else{
-    const counts=[0,0,0,0],groups=new Map();
+    const counts=Array(TEAM_COUNT).fill(0),groups=new Map();
     for(const q of players){const key=q.partyId?('party:'+q.partyId):('player:'+q.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(q)}
     const ordered=[...groups.values()].sort((a,b)=>b.length-a.length);
     for(const group of ordered){
@@ -190,9 +197,9 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, BASEPOS:g.BASEPOS, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: teamArray(()=>0), teamChest:teamArray(()=>emptyChest()), genTier:teamArray(()=>0), traps:teamArray(()=>[]), trapInside:teamArray(()=>new Set()), suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
       g: {
-        base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
+        base: teamArray(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
         em: { t:0 }
       } };
@@ -383,15 +390,15 @@ function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Mat
 function mapVoteSummary(R){const votes=R.mapVotes||(R.mapVotes=new Map()),counts={};for(const [id,mapId] of votes){if(!R.ps.has(id)||!S.MAPS[mapId])continue;counts[mapId]=(counts[mapId]||0)+1}return counts}
 function resolveMapVote(R){const counts=mapVoteSummary(R),ids=Object.keys(S.MAPS),top=Math.max(0,...ids.map(id=>counts[id]||0));if(top<=0)return S.MAPS[R.mapId]?R.mapId:ids[0];const tied=ids.filter(id=>(counts[id]||0)===top),hostVote=R.mapVotes?.get(R.host);if(hostVote&&tied.includes(hostVote))return hostVote;if(tied.includes(R.mapId))return R.mapId;return tied[0]}
 const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
-function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])return false;R.mapId=mapId;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];if(announce){bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R)}return true}
+function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])return false;R.mapId=mapId;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];if(announce){bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R)}return true}
 function matchStartError(requester,text){if(requester)tx(requester,{t:'m',s:text});return false}
 function startMatch(R,requester=null){
   if(R.st!=='lobby')return false;const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team)),needed=requester?(mc.minPlayers||2):(mc.quickMinPlayers||mc.minPlayers||2);
   if(active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
   if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
-  R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.genTier=[0,0,0,0];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
+  R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
   R.st='play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
-  for(let t=0;t<4;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];setb(R,b[0],b[1],b[2],0)}}
+  for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
   R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
 function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
@@ -598,7 +605,7 @@ function triggerTeamTraps(R){
     pinv(enemy);
   }
 }
-function chestPos(meta,t,kind){const sp=meta.SPAWN?.[t];if(!sp)return null;const [cx,cz]=S.IS[t],L=Math.hypot(cx,cz)||1,ix=-cx/L,iz=-cz/L,txv=-iz,tz=ix,side=kind==='team'?4:-4;return[sp[0]+txv*side+ix*1.5,sp[1],sp[2]+tz*side+iz*1.5]}
+function chestPos(meta,t,kind){const sp=meta.SPAWN?.[t];if(!sp)return null;const base=(meta.BASEPOS&&meta.BASEPOS[t])||S.IS[t]||[0,0],[cx,cz]=base,L=Math.hypot(cx,cz)||1,ix=-cx/L,iz=-cz/L,txv=-iz,tz=ix,side=kind==='team'?4:-4;return[sp[0]+txv*side+ix*1.5,sp[1],sp[2]+tz*side+iz*1.5]}
 function nearChest(R,p,kind){const a=chestPos(R,p.team,kind);return !!a&&Math.hypot(p.x-a[0],p.z-a[2])<4.8&&Math.abs(p.y-a[1])<4}
 function generatorUpgradeInfo(R,t){
   const tier=Math.max(0,Math.min(3,R.genTier?.[t]||0)),next=GEN_UPGRADE_COSTS[tier]||null;
@@ -670,7 +677,7 @@ function bridgeEggTrail(R,pr,nx,ny,nz){
     const a=i/steps,x=Math.floor(pr.x+(nx-pr.x)*a),y=Math.floor(pr.y+(ny-pr.y)*a-1.45),z=Math.floor(pr.z+(nz-pr.z)*a);
     if(!S.inXZ(x,z)||y<1||y>=S.H-2||get(R,x,y,z)||protectedPlacement(R,x,y,z))continue;
     if([...R.ps.values()].some(q=>playerHitsBlock(q,x,y,z)))continue;
-    setb(R,x,y,z,pr.team+1,1);
+    setb(R,x,y,z,teamWoolBlock(pr.team),1);
   }
 }
 function buildPopupTower(R,p,x,y,z){
@@ -685,7 +692,7 @@ function buildPopupTower(R,p,x,y,z){
   [[-1,-1,0],[0,-1,1],[0,0,2],[1,0,3]].forEach(([ox,oz,h])=>blocks.push([x+ox,y+h,z+oz]));
   const free=blocks.filter(([X,Y,Z])=>!get(R,X,Y,Z)&&![...R.ps.values()].some(q=>playerHitsBlock(q,X,Y,Z)));
   if(free.length<18)return false;
-  free.forEach(([X,Y,Z])=>setb(R,X,Y,Z,p.team+1,1));return true;
+  free.forEach(([X,Y,Z])=>setb(R,X,Y,Z,teamWoolBlock(p.team),1));return true;
 }
 function safePearlPos(R,pr,x,y,z){
  const h=Math.hypot(pr.vx,pr.vz)||1,back=[-pr.vx/h*.48,-pr.vz/h*.48],tries=[[x+back[0],y,z+back[1]],[x+back[0],y+.7,z+back[1]],[x+back[0]*1.8,y+.2,z+back[1]*1.8],[x,y+1.2,z]];
@@ -754,7 +761,7 @@ wss.on('connection', ws => {
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
       if(m.quick)R.quickMatch=true;const mc=modeCfg(R);
       if (R.ps.size>=mc.maxPlayers) return tx({ws},{t:'err',s:`Sala cheia para o modo ${mc.name} (${mc.maxPlayers} jogadores).`});
-      const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);const partyId=sanitizePartyCode(m.party),partyMembers=partyId?[...R.ps.values()].filter(q=>q.partyId===partyId):[];
+      const counts=Array(TEAM_COUNT).fill(0);R.ps.forEach(q=>counts[q.team]=(counts[q.team]||0)+1);const partyId=sanitizePartyCode(m.party),partyMembers=partyId?[...R.ps.values()].filter(q=>q.partyId===partyId):[];
       if(partyId&&!mc.solo&&mc.teamCap>1&&partyMembers.length>=mc.teamCap)return tx({ws},{t:'err',s:`A Party já atingiu o limite de ${mc.teamCap} jogador(es) para ${mc.name}.`});
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
       if(partyId&&!mc.solo&&mc.teamCap>1){const mate=partyMembers.find(q=>mc.activeTeams.includes(q.team)&&counts[q.team]<mc.teamCap);if(mate)team=mate.team}
@@ -772,7 +779,7 @@ wss.on('connection', ws => {
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
-        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=[emptyChest(),emptyChest(),emptyChest(),emptyChest()];R.genTier=[0,0,0,0];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
         R.ps.forEach((q,i)=>{
  q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.trapQueue=[];q.enderChest=emptyChest();
  if(!q.admin){q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};q.fx={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0};q.up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0};q.inv={wool:24,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0}}
@@ -865,7 +872,7 @@ wss.on('connection', ws => {
       case 'adminBreak': {
         if(!p.admin)break;const x=Math.floor(m.x),y=Math.floor(m.y),z=Math.floor(m.z);
         if(![x,y,z].every(Number.isInteger)||!S.inXZ(x,z)||y<0||y>=S.H)break;
-        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;const b=get(R,x,y,z);if(b>=8&&b<=11)killBed(R,b-8,p);else setb(R,x,y,z,0,0);break;
+        if(Math.hypot(x+.5-p.x,y+.5-(p.y+1.2),z+.5-p.z)>12)break;const b=get(R,x,y,z),bt=bedTeamFromBlock(b);if(bt>=0)killBed(R,bt,p);else setb(R,x,y,z,0,0);break;
       }
       case 'adminGive': {
         if(!p.admin||!Number.isInteger(m.id))break;const q=R.ps.get(m.id),k=String(m.k||''),n=Math.max(1,Math.min(999,Math.floor(Number(m.n)||1)));
@@ -906,7 +913,7 @@ wss.on('connection', ws => {
         enqueueMeleeAttack(R,p,{seq,id:m.id,yaw:m.yaw,pitch:m.pitch,clientTime:Number(m.clientTime)||0,serverTimeEstimate:Number(m.serverTimeEstimate),rtt:Number(m.rtt)||0},Date.now());break;
       }
       case 'place': {
-        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:p.team+1,planks:5,endstone:12,glass:7,obsidian:16}[item];
+        const held=heldKey(p),item=['wool','planks','endstone','glass','obsidian'].includes(held)?held:'',x=m.x,y=m.y,z=m.z,auto=m.auto===1,k={wool:teamWoolBlock(p.team),planks:5,endstone:12,glass:7,obsidian:16}[item];
         const opSeq=Number.isInteger(m.opSeq)&&m.opSeq>0?m.opSeq:0,bv=p.blockV4||(p.blockV4={lastOpSeq:0,pending:new Map()}),placeResult=(ok,reason='')=>tx(p,{t:'placeResult',ok:ok?1:0,reason,k:item||String(m.k||''),x,y,z,remaining:Number(p.inv[item]||0),opSeq,blockSeq:R.blockSeq||0});if(opSeq&&opSeq<=bv.lastOpSeq){placeResult(false,'stale_op');break}if(opSeq){bv.lastOpSeq=opSeq;bv.pending.set(opSeq,Date.now());while(bv.pending.size>BLOCKS_V4.MAX_PENDING_PER_PLAYER)bv.pending.delete(bv.pending.keys().next().value)}
         if(!play){placeResult(false,'not_playing');break}if(!item||!k){acFlag(p,'item','place '+String(m.k||'')+' held='+held);placeResult(false,'wrong_item');break}
         if(m.k&&m.k!==item){acFlag(p,'item','place declared '+m.k+' held='+item);placeResult(false,'wrong_item');break}
@@ -931,8 +938,8 @@ wss.on('connection', ws => {
         const {x,y,z}=m;
         if(!play||![x,y,z].every(Number.isInteger)||Math.hypot(x+.5-p.x,y+.5-p.y-1.6,z+.5-p.z)>7)break;
         const b=get(R,x,y,z); if(!b)break;
-        if(b>=8&&b<=11){
-          if(b-8===p.team){tx(p,{t:'m',s:'Essa é a sua cama!'});break;}
+        if(isTeamBedBlock(b)){
+          const bt=bedTeamFromBlock(b);if(bt===p.team){tx(p,{t:'m',s:'Essa é a sua cama!'});break;}
           p.breaking={x,y,z,b,need:.9,at:R.t};tx(p,{t:'breakp',x,y,z,d:.9});break;
         }
         if(!R.pf[S.ix(x,y,z)])break;
@@ -1026,12 +1033,12 @@ setInterval(() => {
             const br=p.breaking, same=get(R,br.x,br.y,br.z)===br.b, near=Math.hypot(br.x+.5-p.x,br.y+.5-p.y-1.6,br.z+.5-p.z)<=7;
             const cy=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cy,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cy,bx=br.x+.5-p.x,by=br.y+.5-(p.y+1.62),bz=br.z+.5-p.z,bl=Math.hypot(bx,by,bz)||1,looking=(bx*dx+by*dy+bz*dz)/bl>.82;
             if(!same||!near||!looking){p.breaking=null;tx(p,{t:'breakCancel'});}
-            else if(R.t-br.at>=br.need){if(br.b>=8&&br.b<=11)killBed(R,br.b-8,p);else if(R.pf[S.ix(br.x,br.y,br.z)]){const breakSfx=br.b>=1&&br.b<=4?'break_cloth':br.b===5?'break_wood':'break_stone';setb(R,br.x,br.y,br.z,0);sfxAt(R,breakSfx,br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;}
+            else if(R.t-br.at>=br.need){if(isTeamBedBlock(br.b))killBed(R,bedTeamFromBlock(br.b),p);else if(R.pf[S.ix(br.x,br.y,br.z)]){const breakSfx=isTeamWoolBlock(br.b)?'break_cloth':br.b===5?'break_wood':'break_stone';setb(R,br.x,br.y,br.z,0);sfxAt(R,breakSfx,br.x+.5,br.y+.5,br.z+.5,6);}p.breaking=null;}
           }
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
-      if(!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<4;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
+      if(!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<TEAM_COUNT;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
       if(R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
       triggerTeamTraps(R);
       R.g.base.forEach((g, i) => {
