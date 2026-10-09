@@ -18,19 +18,22 @@ function publicProfile(p){return{name:safePlayerName(p.name),xp:p.xp||0,level:pr
 function rankingPayload(limit=20){return Object.values(PROFILE_DB).sort((a,b)=>(b.xp||0)-(a.xp||0)||(b.wins||0)-(a.wins||0)||(b.finalKills||0)-(a.finalKills||0)).slice(0,limit).map(publicProfile)}
 function emptyChest(){return Object.fromEntries(CHEST_KEYS.map(k=>[k,0]))}
 const MODES={
-  '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
-  '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
-  'solo':{id:'solo',name:'Solo / FFA',teamCap:1,maxPlayers:4,activeTeams:[0,1,2,3],solo:true,description:'Todos contra todos · 2 a 4 jogadores · uma base por jogador'}
+  '1v1':{id:'1v1',name:'Duelo 1v1',teamCap:1,maxPlayers:2,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1],description:'Duelo direto · um jogador por time'},
+  '2v2':{id:'2v2',name:'2v2',teamCap:2,maxPlayers:4,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1],description:'Azul x Vermelho · até 2 jogadores por time'},
+  '3v3':{id:'3v3',name:'3v3',teamCap:3,maxPlayers:6,minPlayers:2,quickMinPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 3 jogadores por time'},
+  '4v4':{id:'4v4',name:'4v4',teamCap:4,maxPlayers:8,minPlayers:2,quickMinPlayers:4,activeTeams:[0,1],description:'Azul x Vermelho · até 4 jogadores por time'},
+  'solo':{id:'solo',name:'Solo / FFA',teamCap:1,maxPlayers:4,minPlayers:2,quickMinPlayers:2,activeTeams:[0,1,2,3],solo:true,description:'Todos contra todos · 2 a 4 jogadores · uma base por jogador'}
 };
 const modeCfg=R=>MODES[R.modeId]||MODES['2v2'];
+const QUICK_MATCH_CONFIG={READY_COUNTDOWN_MS:12000,FULL_COUNTDOWN_MS:4000,LOBBY_BROADCAST_MS:900};
 const PARTY_MATCH_ROOMS=new Map();
 const sanitizePartyCode=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
 function quickMatchRoom(modeId,partyCode=''){
   const mode=MODES[modeId]||MODES['2v2'],party=sanitizePartyCode(partyCode),remembered=party&&PARTY_MATCH_ROOMS.get(party);
-  if(remembered){const rr=rooms.get(remembered);if(rr&&rr.st==='lobby'&&rr.modeId===mode.id&&rr.ps.size<mode.maxPlayers)return rr;PARTY_MATCH_ROOMS.delete(party)}
+  if(remembered){const rr=rooms.get(remembered);if(rr&&rr.st==='lobby'&&rr.modeId===mode.id&&rr.ps.size<mode.maxPlayers){rr.quickMatch=true;return rr}PARTY_MATCH_ROOMS.delete(party)}
   let best=null;for(const R of rooms.values()){if(R.st!=='lobby'||R.modeId!==mode.id||!String(R.code).startsWith('mm'))continue;if(R.ps.size>=mode.maxPlayers)continue;if(!best||R.ps.size>best.ps.size)best=R}
-  if(!best){let code;do{code=('mm'+Math.random().toString(36).slice(2,9)).slice(0,12)}while(rooms.has(code));best=room(code);best.modeId=mode.id}
-  if(party)PARTY_MATCH_ROOMS.set(party,best.code);return best;
+  if(!best){let code;do{code=('mm'+Math.random().toString(36).slice(2,9)).slice(0,12)}while(rooms.has(code));best=room(code);best.modeId=mode.id;best.quickMatch=true;const ids=Object.keys(S.MAPS),pick=ids[(Math.random()*ids.length)|0];if(pick&&pick!==best.mapId)applyLobbyMap(best,pick,false)}
+  best.quickMatch=true;if(party)PARTY_MATCH_ROOMS.set(party,best.code);return best;
 }
 const BASE_GEN_TIERS=[
   {iron:3.0,gold:0,dia:0,name:'Ferro básico'},
@@ -96,11 +99,14 @@ function rebalanceForMode(R,mc){
   if(mc.solo){
     players.forEach((q,i)=>{q.team=mc.activeTeams[i%mc.activeTeams.length]});
   }else{
-    const counts=[0,0,0,0];
-    players.forEach(q=>{
-      const t=mc.activeTeams.reduce((best,x)=>counts[x]<counts[best]?x:best,mc.activeTeams[0]);
-      q.team=t;counts[t]++;
-    });
+    const counts=[0,0,0,0],groups=new Map();
+    for(const q of players){const key=q.partyId?('party:'+q.partyId):('player:'+q.id);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(q)}
+    const ordered=[...groups.values()].sort((a,b)=>b.length-a.length);
+    for(const group of ordered){
+      let choices=mc.activeTeams.filter(t=>counts[t]+group.length<=mc.teamCap).sort((a,b)=>counts[a]-counts[b]);
+      if(choices.length){const t=choices[0];group.forEach(q=>q.team=t);counts[t]+=group.length;continue}
+      for(const q of group){const t=mc.activeTeams.filter(x=>counts[x]<mc.teamCap).sort((a,b)=>counts[a]-counts[b])[0]??mc.activeTeams[0];q.team=t;counts[t]++}
+    }
   }
   players.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team]});
 }
@@ -170,7 +176,7 @@ function markDisconnected(R,p,ws,code=1006,reason=''){
     return;
   }
   netLog(p,'saiu do lobby',`code=${code} reason=${netReason(reason)}`);
-  R.ps.delete(p.id);if(R.host===p.id)R.host=[...R.ps.keys()][0]||null;
+  R.ps.delete(p.id);if(R.mapVotes)R.mapVotes.delete(p.id);if(R.host===p.id)R.host=[...R.ps.keys()][0]||null;
   if(!R.ps.size){rooms.delete(R.code);return}
   if(R.st==='lobby')lobby(R);
 }
@@ -184,7 +190,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null,
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: [0, 0, 0, 0], teamChest:[emptyChest(),emptyChest(),emptyChest(),emptyChest()], genTier:[0,0,0,0], traps:[[],[],[],[]], trapInside:[new Set(),new Set(),new Set(),new Set()], suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
       g: {
         base: [0,1,2,3].map(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -374,7 +380,27 @@ function protectedPlacement(R,x,y,z){
 }
 function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS[p.team][1]+.5];p.x=sp[0];p.y=sp[1];p.z=sp[2]; p.px=p.x;p.py=p.y;p.pz=p.z; p.hp = 20; p.alive = 1;p.spectator=false;p.spawnProtect=GAMEPLAY.spawnProtect;p.fallVyMin=0;p.grounded=false;p.wasGrounded=false; p.breaking=null;p.fx.blind=0;p.fx.fatigue=0;p.fx.slow=0; p.lt = Date.now();resetCombatInput(p);resetMovementV2(p); tx(p, { t: 'tp', x: p.x, y: p.y, z: p.z, hard:1 }); }
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
-const lobby = R => { const mc=modeCfg(R); bc(R, { t:'lobby', host:R.host, mapId:R.mapId, maps:Object.values(S.MAPS), modeId:R.modeId, modes:Object.values(MODES), teamCap:mc.teamCap, activeTeams:mc.activeTeams, solo:!!mc.solo, l:[...R.ps.values()].map(q=>[q.id,q.name,q.team,q.disconnected?1:0]) }); };
+function mapVoteSummary(R){const votes=R.mapVotes||(R.mapVotes=new Map()),counts={};for(const [id,mapId] of votes){if(!R.ps.has(id)||!S.MAPS[mapId])continue;counts[mapId]=(counts[mapId]||0)+1}return counts}
+function resolveMapVote(R){const counts=mapVoteSummary(R),ids=Object.keys(S.MAPS),top=Math.max(0,...ids.map(id=>counts[id]||0));if(top<=0)return S.MAPS[R.mapId]?R.mapId:ids[0];const tied=ids.filter(id=>(counts[id]||0)===top),hostVote=R.mapVotes?.get(R.host);if(hostVote&&tied.includes(hostVote))return hostVote;if(tied.includes(R.mapId))return R.mapId;return tied[0]}
+const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
+function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])return false;R.mapId=mapId;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];if(announce){bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R)}return true}
+function matchStartError(requester,text){if(requester)tx(requester,{t:'m',s:text});return false}
+function startMatch(R,requester=null){
+  if(R.st!=='lobby')return false;const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team)),needed=requester?(mc.minPlayers||2):(mc.quickMinPlayers||mc.minPlayers||2);
+  if(active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
+  if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
+  R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.genTier=[0,0,0,0];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
+  R.st='play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
+  for(let t=0;t<4;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];setb(R,b[0],b[1],b[2],0)}}
+  R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
+}
+function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
+function updateQuickCountdown(R,now=Date.now()){
+  if(!R.quickMatch||R.st!=='lobby')return;const mc=modeCfg(R),count=[...R.ps.values()].filter(q=>!q.admin).length,eligible=quickStartEligible(R);
+  if(!eligible){if(R.quickReadyAt){R.quickReadyAt=0;lobby(R)}else if(now-(R.lastLobbyBroadcast||0)>=QUICK_MATCH_CONFIG.LOBBY_BROADCAST_MS)lobby(R);return}
+  const full=count>=mc.maxPlayers,delay=full?QUICK_MATCH_CONFIG.FULL_COUNTDOWN_MS:QUICK_MATCH_CONFIG.READY_COUNTDOWN_MS,target=now+delay;if(!R.quickReadyAt||(full&&R.quickReadyAt>target)){R.quickReadyAt=target;lobby(R)}
+  if(now>=R.quickReadyAt){startMatch(R,null);return}if(now-(R.lastLobbyBroadcast||0)>=QUICK_MATCH_CONFIG.LOBBY_BROADCAST_MS)lobby(R)
+}
 
 function finalizeProfiles(R,winnerTeam,winnerId){
   const progress={};
@@ -726,12 +752,13 @@ wss.on('connection', ws => {
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
       for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
-      const mc=modeCfg(R);
+      if(m.quick)R.quickMatch=true;const mc=modeCfg(R);
       if (R.ps.size>=mc.maxPlayers) return tx({ws},{t:'err',s:`Sala cheia para o modo ${mc.name} (${mc.maxPlayers} jogadores).`});
-      const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);const partyId=sanitizePartyCode(m.party);
+      const counts=[0,0,0,0];R.ps.forEach(q=>counts[q.team]++);const partyId=sanitizePartyCode(m.party),partyMembers=partyId?[...R.ps.values()].filter(q=>q.partyId===partyId):[];
+      if(partyId&&!mc.solo&&mc.teamCap>1&&partyMembers.length>=mc.teamCap)return tx({ws},{t:'err',s:`A Party já atingiu o limite de ${mc.teamCap} jogador(es) para ${mc.name}.`});
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
-      if(partyId&&!mc.solo){const mate=[...R.ps.values()].find(q=>q.partyId===partyId&&mc.activeTeams.includes(q.team)&&counts[q.team]<mc.teamCap);if(mate)team=mate.team}
-      if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os dois times estão cheios.'});
+      if(partyId&&!mc.solo&&mc.teamCap>1){const mate=partyMembers.find(q=>mc.activeTeams.includes(q.team)&&counts[q.team]<mc.teamCap);if(mate)team=mate.team}
+      if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os times desse modo estão cheios.'});
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
       p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
@@ -745,7 +772,7 @@ wss.on('connection', ws => {
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
-        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=[emptyChest(),emptyChest(),emptyChest(),emptyChest()];R.genTier=[0,0,0,0];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=[emptyChest(),emptyChest(),emptyChest(),emptyChest()];R.genTier=[0,0,0,0];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};
         R.ps.forEach((q,i)=>{
  q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.trapQueue=[];q.enderChest=emptyChest();
  if(!q.admin){q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};q.fx={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0};q.up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0};q.inv={wool:24,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0}}
@@ -775,22 +802,31 @@ wss.on('connection', ws => {
       }
       case 'team': {
         const mc=modeCfg(R);
-        if(R.st!=='lobby'||!Number.isInteger(m.team)||!mc.activeTeams.includes(m.team))break;
-        const count=[...R.ps.values()].filter(q=>q!==p&&q.team===m.team).length;
-        if(count>=mc.teamCap){tx(p,{t:'m',s:`Esse time já está cheio (${mc.teamCap}/${mc.teamCap}).`});break}
-        p.team=m.team;p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];spawnLobby(p,[...R.ps.keys()].indexOf(p.id));lobby(R);break;
+        if(R.st!=='lobby'||!Number.isInteger(m.team)||!mc.activeTeams.includes(m.team))break;if(R.quickMatch){tx(p,{t:'m',s:'Na Partida Rápida os times são organizados automaticamente.'});break}
+        const moving=p.partyId&&!mc.solo&&mc.teamCap>1?[...R.ps.values()].filter(q=>q.partyId===p.partyId):[p],movingIds=new Set(moving.map(q=>q.id)),count=[...R.ps.values()].filter(q=>!movingIds.has(q.id)&&q.team===m.team).length;
+        if(count+moving.length>mc.teamCap){tx(p,{t:'m',s:`Não há espaço para sua Party nesse time (${mc.teamCap} vagas).`});break}
+        moving.forEach(q=>{q.team=m.team;q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team]});R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'mode': {
-        if(R.st!=='lobby'||p.id!==R.host||!MODES[m.mode])break;
+        if(R.st!=='lobby'||p.id!==R.host||!MODES[m.mode])break;if(R.quickMatch){tx(p,{t:'m',s:'O modo da Partida Rápida fica travado durante a busca.'});break}
         const next=MODES[m.mode];
         if(R.ps.size>next.maxPlayers){tx(p,{t:'m',s:`Não é possível mudar para ${next.name}: há ${R.ps.size} jogadores na sala.`});break}
-        R.modeId=next.id;rebalanceForMode(R,next);
+        if(!next.solo&&next.teamCap>1){const partySizes={};for(const q of R.ps.values())if(q.partyId)partySizes[q.partyId]=(partySizes[q.partyId]||0)+1;if(Object.values(partySizes).some(n=>n>next.teamCap)){tx(p,{t:'m',s:'Existe uma Party maior que a capacidade de um time nesse modo.'});break}}
+        R.modeId=next.id;R.quickReadyAt=0;rebalanceForMode(R,next);
         R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'map': {
-        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;
-        R.mapId=m.map;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];
-        bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R);break;
+        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;R.mapVotes=new Map();applyLobbyMap(R,m.map,true);break;
+      }
+      case 'mapVote': {
+        if(R.st!=='lobby'||!S.MAPS[m.map])break;R.mapVotes=R.mapVotes||new Map();R.mapVotes.set(p.id,m.map);const winner=resolveMapVote(R);if(winner!==R.mapId)applyLobbyMap(R,winner,true);else lobby(R);break;
+      }
+      case 'party': {
+        if(R.st!=='lobby')break;const next=sanitizePartyCode(m.code),old=p.partyId||'',mc=modeCfg(R),members=next?[...R.ps.values()].filter(q=>q!==p&&q.partyId===next):[];
+        if(next&&!mc.solo&&mc.teamCap>1&&members.length>=mc.teamCap){tx(p,{t:'m',s:`Essa Party já atingiu ${mc.teamCap} jogador(es) para ${mc.name}.`});break}
+        p.partyId=next;if(old&&PARTY_MATCH_ROOMS.get(old)===R.code&&![...R.ps.values()].some(q=>q!==p&&q.partyId===old))PARTY_MATCH_ROOMS.delete(old);if(next&&R.quickMatch)PARTY_MATCH_ROOMS.set(next,R.code);
+        if(next&&!mc.solo&&mc.teamCap>1&&members.length){const target=members[0].team,count=[...R.ps.values()].filter(q=>q!==p&&q.team===target).length;if(count<mc.teamCap)p.team=target}else if(!next&&!mc.solo)rebalanceForMode(R,mc);
+        p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.forEach((q,i)=>spawnLobby(q,i));R.quickReadyAt=0;lobby(R);break;
       }
       case 'chat': {
         const rawText=String(m.text||'').trim();
@@ -812,23 +848,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'start':
-        if (R.st !== 'lobby' || p.id !== R.host || [...R.ps.values()].filter(q=>!q.admin).length < 2) break;
-        { const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team));
-          if(mc.solo){
-            if(active.length<2){tx(p,{t:'m',s:'O modo Solo precisa de pelo menos 2 jogadores.'});break}
-            if(teams.size!==active.length){tx(p,{t:'m',s:'Cada jogador precisa estar em uma base diferente no Solo.'});break}
-          }else{
-            if(teams.size<2){tx(p,{t:'m',s:'É necessário ter jogadores nos times Azul e Vermelho.'});break}
-            if(active.some(q=>[...R.ps.values()].filter(x=>!x.admin&&x.team===q.team).length>mc.teamCap)){tx(p,{t:'m',s:'Um time excede a capacidade do modo escolhido.'});break}
-          }
-        }
-        const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=[[],[],[],[]];R.trapInside=[new Set(),new Set(),new Set(),new Set()];R.genTier=[0,0,0,0];R.g={base:[0,1,2,3].map(()=>({iron:0,gold:0,dia:0})),dia:S.DI.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
-        R.st = 'play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;
-        for (let t = 0; t < 4; t++) {
-          R.bed[t] = [...R.ps.values()].some(q => !q.admin&&q.team === t) ? 1 : 0;
-          if (!R.bed[t]) { const b = R.BD[t]; setb(R, b[0], b[1], b[2], 0); }
-        }
-        R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)}); R.ps.forEach(pinv); bc(R, { t:'start', bed:R.bed, mapId:R.mapId, modeId:R.modeId, activeChunks:R.activeChunks }); break;
+        if(R.st!=='lobby'||p.id!==R.host)break;if(R.quickMatch){tx(p,{t:'m',s:'A Partida Rápida inicia automaticamente quando estiver pronta.'});break}startMatch(R,p);break;
       case 'mv': {
         const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
         const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n,check=inspectMovementPacket(p,m,dt,n,spectating);if(check.drop)break;
@@ -983,6 +1003,7 @@ setInterval(() => {
   const tickStarted=performance.now(),wallMs=Math.max(1,tickStarted-lastServerTickAt);lastServerTickAt=tickStarted;const dt=Math.max(.005,Math.min(.10,wallMs/1000));SERVER_METRICS.lastWallMs=wallMs;
   rooms.forEach(R => {
     try{
+    if(R.st==='lobby'&&R.quickMatch)updateQuickCountdown(R,Date.now());
     R.t += dt;
     if (R.st === 'play') {
       const players = [...R.ps.values()];

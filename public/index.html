@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=game-feel-v2-20261009"><!-- MOBILE_DPAD_CRITICAL_V4 -->
+<link rel="stylesheet" href="/style.css?v=match-party-hud-modes-v2-20261009"><!-- MOBILE_DPAD_CRITICAL_V4 -->
 <style id="mobile-dpad-critical-v4">
 @media (pointer:coarse),(max-width:800px){
   #joy,#knob,#actBtn,#placeBtn,#useBtn,#jumpBtn{display:none!important}
@@ -83,7 +83,7 @@
 <p>Seu nome</p><input id="nm" maxlength="14" value="Jogador">
 <p>Código da sala (todos digitam o mesmo)</p><input id="rm" maxlength="12" value="sala1">
 <button id="go" style="text-align:center;margin-top:12px">Entrar na sala</button>
-<hr><p><b>PARTIDA RÁPIDA</b></p><select id="quickMode"><option value="2v2">2v2</option><option value="4v4">4v4</option><option value="solo">Solo</option></select><input id="partyCode" maxlength="8" placeholder="Código da Party (opcional)"><div class="meta-actions"><button type="button" onclick="quickPlay()">Jogar agora</button><button type="button" onclick="createPartyCode()">Criar Party</button></div><p id="er"></p></div></div>
+<hr><p><b>PARTIDA RÁPIDA</b></p><select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>2v2</option><option value="3v3">3v3</option><option value="4v4">4v4</option><option value="solo">Solo / FFA</option></select><input id="partyCode" maxlength="8" placeholder="Código da Party (opcional)"><div class="meta-actions party-tools"><button type="button" onclick="quickPlay()">⚡ Jogar agora</button><button type="button" onclick="createPartyCode()">Criar Party</button><button type="button" onclick="copyPartyCode()">Copiar código</button><button type="button" onclick="leavePartyCode()">Sair da Party</button></div><p id="partyStatus" class="party-status"></p><p id="er"></p></div></div>
 <div class="ov" id="lobby"><div class="lobby-panel"><h1>Sala <span id="rc"></span></h1>
 <div class="lobby-grid">
   <section><h2>Jogadores</h2><div id="pl"></div></section>
@@ -105,5 +105,5 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=core-v2-block-d-20261009"></script>
+<script src="/game.js?v=match-party-hud-modes-v2-20261009"></script>
 </body></html>
