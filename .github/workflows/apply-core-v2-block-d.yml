@@ -17,6 +17,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Normalize migration templates
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='.github/scripts/apply-core-v2-block-d.js';
+          let s=fs.readFileSync(p,'utf8');
+          const a=s.indexOf("game=once(game,\n`if(started)renderScoreboard(true);");
+          const marker="'hud status update');";
+          const b=a>=0?s.indexOf(marker,a):-1;
+          if(a>=0&&b>=0)s=s.slice(0,a)+s.slice(b+marker.length);
+          fs.writeFileSync(p,s);
+          NODE
       - name: Apply Core V2 block D
         run: node .github/scripts/apply-core-v2-block-d.js
       - name: Install dependencies
