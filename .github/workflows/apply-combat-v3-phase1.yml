@@ -1,0 +1,44 @@
+name: Apply Combat V3 Phase 1
+on:
+  push:
+    branches: [feature/combat-v3-phase1]
+    paths:
+      - '.github/scripts/apply-combat-v3-phase1.js'
+      - '.github/workflows/apply-combat-v3-phase1.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/combat-v3-phase1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply Combat V3 phase 1
+        run: node .github/scripts/apply-combat-v3-phase1.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate JavaScript
+        run: |
+          node --check server.js
+          node --check public/game.js
+          node --check public/shared.js
+      - name: Validate Combat V3 phase 1
+        run: |
+          grep -q 'const COMBAT_CONFIG=' server.js
+          grep -q 'MAX_USEFUL_CPS:15' server.js
+          grep -q 'MELEE_IFRAME_SEC:.22' server.js
+          grep -q "case 'attackBatch'" server.js
+          grep -q 'processMeleeAttackQueue' server.js
+          grep -q 'queueMeleeAttack' public/game.js
+          grep -q 'combat-v3-phase1-20261008' public/index.html
+      - name: Commit functional changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.js public/game.js public/index.html
+          git diff --cached --quiet || git commit -m 'Implement Combat V3 phase 1 input queue and CPS decoupling'
+          git push origin HEAD:feature/combat-v3-phase1
