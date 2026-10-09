@@ -1,0 +1,26 @@
+name: Polish Blocks V5
+on:
+  push:
+    branches: [feature/blocks-v5-bridge-rewind]
+permissions:
+  contents: write
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/blocks-v5-bridge-rewind
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: python3 .github/scripts/polish-blocks-v5.py
+      - run: npm ci
+      - run: node --check server.js && node --check public/game.js
+      - run: grep -q 'rollbackPlacementDependents' public/game.js && grep -q 'legacyTarget' server.js
+      - run: |
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add server.js public/game.js
+          git diff --cached --quiet || git commit -m "Polish Blocks V5 reconciliation"
+          git push origin HEAD:feature/blocks-v5-bridge-rewind
