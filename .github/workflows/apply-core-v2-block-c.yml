@@ -17,6 +17,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Normalize migration interpolation
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='.github/scripts/apply-core-v2-block-c.js';
+          let s=fs.readFileSync(p,'utf8');
+          s="const downtime='${downtime}';\n"+s;
+          fs.writeFileSync(p,s);
+          NODE
       - name: Apply Core V2 block C
         run: node .github/scripts/apply-core-v2-block-c.js
       - name: Install dependencies
