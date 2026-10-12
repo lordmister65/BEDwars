@@ -370,6 +370,16 @@ function step(e,dt){const k=Math.max(0,1-6.5*dt),vx=e.vx+e.kx,vz=e.vz+e.kz;e.kx*
 // estado
 const K={},SL=['Espada','Lã','Tábuas','End Stone','Vidro','Obsidiana','TNT','Maçã','Arco','B. Fogo','B. Neve','Pérola','Veloc.','Salto','Invis.','Bússola','Magic Milk','Bridge Egg','Pop-up Tower','Knockback Stick'],KY=[0,'wool','planks','endstone','glass','obsidian','tnt','apple','bow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'],SC=['#ccc','#3d6fe0','#b58a4e','#e8dfb0','#ddecff','#2c2036','#d83030','#ffd23d','#8b5a2b','#ff7a20','#eef6ff','#7b3fc6','#55ddff','#aaff55','#bbbbff','#d9b85f','#f6f2df','#ffe07b','#d55353','#8b5a32'],SN=['Punho','Pedra','Ferro','Diamante'],AN=['nenhuma','ferro','diamante'],CN={iron:'ferro',gold:'ouro',dia:'diamante',em:'esmeralda'};
 const TNT_TYPES=[['tnt','Explosiva',0xd7352f],['tntImpulse','Impulso',0xe8f4ff],['tntSlow','Lentidão',0x4f9dff],['tntDamage','Dano',0xff3154]];
+const HOTBAR_ASSET_BASE='/assets/ui/hotbar/';
+const HOTBAR_ICONS={
+ sword:'espada.png',wool:'la.png',planks:'madeira.png',endstone:'the-end.png',glass:'vidro.png',obsidian:'obsidian.png',
+ apple:'maca-dourada.png',bow:'arco.png',fireball:'boladefogo.png',snowball:'boladeneve.png',pearl:'perola.png',
+ tnt:'tnt.png',tntImpulse:'tnt-branca.png',tntSlow:'tnt-azul.png',tntDamage:'tnt-rosa.png'
+};
+const HOTBAR_WOOL_FILTER=['none','hue-rotate(135deg) saturate(1.35)','hue-rotate(260deg) saturate(1.15)','hue-rotate(205deg) saturate(1.25) brightness(1.16)','hue-rotate(320deg) saturate(1.08)','grayscale(1) brightness(2.15)','hue-rotate(105deg) saturate(1.25) brightness(1.15)','hue-rotate(50deg) saturate(1.18)'];
+function hotbarIcon(canonical,key){const k=canonical===0?'sword':key,file=HOTBAR_ICONS[k];return file?HOTBAR_ASSET_BASE+file+'?v=1':''}
+function hotbarIconFilter(canonical,key){return key==='wool'?(HOTBAR_WOOL_FILTER[me.team]||'none'):'none'}
+
 let tntSel=0;
 let inv={wool:0,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0},sw=0,ar=0,tools={pick:0,axe:0,shears:0},fxs={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0},up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0},trapQueue=[],cur=1,started=0,over=0,shopOpen=0,chestOpen=0,chestKind='team',chestData={},chestGenTier=0,chestGenNext=null,chestGenCurrent='',bed=[1,1,1,1],INFO={},tg=null,ws;
 let myProfile=null,rankingData=[];const CHEST_KEYS=['iron','gold','dia','em','wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick'];const CHEST_LABEL={iron:'Ferro',gold:'Ouro',dia:'Diamante',em:'Esmeralda',wool:'Lã',planks:'Tábuas',endstone:'End Stone',glass:'Vidro',obsidian:'Obsidiana',tnt:'TNT',tntImpulse:'TNT Impulso',tntSlow:'TNT Lentidão',tntDamage:'TNT Dano',apple:'Maçã',bow:'Arco',arrow:'Flechas',fireball:'Bola de Fogo',snowball:'Bola de Neve',pearl:'Pérola',speedPotion:'Velocidade',jumpPotion:'Salto',invisPotion:'Invisibilidade',compass:'Bússola',magicMilk:'Magic Milk',bridgeEgg:'Bridge Egg',popupTower:'Pop-up Tower',knockbackStick:'Knockback Stick'};
@@ -525,8 +535,8 @@ function hud(){
 html('bar',SL.map((_,i)=>{
  const ci=canonicalSlot(i),key=ci?slotKey(i):0;let q=ci?(inv[key]||0):'';if(ci===8)q=inv.bow?('F'+inv.arrow):0;
  const owned=ci===0||(ci===8?inv.bow>0:(q||0)>0),was=ownedState[i],reveal=owned&&was===false;ownedState[i]=owned;
- const label=slotName(i),clr=ci===1?(TC[me.team]||SC[ci]):ci===6?(activeTnt()[2]||0xd7352f):SC[ci];
- return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}" title="${owned?label:''}" onclick="pick(${i})"><i style="background:${typeof clr==='number'?'#'+hex(clr):clr}"></i><em>${i<9?i+1:''}</em><b>${owned?q:''}</b><span class="slot-label">${ci===6&&owned?activeTnt()[1]:''}</span></div>`
+ const label=slotName(i),clr=ci===1?(TC[me.team]||SC[ci]):ci===6?(activeTnt()[2]||0xd7352f):SC[ci],icon=hotbarIcon(ci,key),iconFilter=hotbarIconFilter(ci,key);
+ return `<div class="s${i===cur?' on':''}${owned?'':' empty'}${reveal?' reveal':''}${icon?' has-icon':''}" title="${owned?label:''}" onclick="pick(${i})"><i style="background:${typeof clr==='number'?'#'+hex(clr):clr}"></i>${icon?`<img class="hotbar-icon" src="${icon}" alt="" draggable="false" style="--hotbar-icon-filter:${iconFilter}">`:''}<em>${i<9?i+1:''}</em><b>${owned?q:''}</b><span class="slot-label">${ci===6&&owned?activeTnt()[1]:''}</span></div>`
 }).join(''));
 html('res',[
   ['iron','Ferro',inv.iron],['gold','Ouro',inv.gold],['dia','Diamante',inv.dia],['em','Esmeralda',inv.em]
