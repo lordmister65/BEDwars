@@ -1,0 +1,52 @@
+name: Apply Hotbar UI Assets V1
+on:
+  push:
+    branches: [feature/hotbar-ui-assets-v1]
+    paths:
+      - '.github/scripts/apply-hotbar-ui-assets-v1.py'
+      - '.github/workflows/apply-hotbar-ui-assets-v1.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/hotbar-ui-assets-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply hotbar UI migration
+        run: python3 .github/scripts/apply-hotbar-ui-assets-v1.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate JavaScript
+        run: node --check public/game.js && node --check server.js
+      - name: Validate hotbar assets
+        run: |
+          test -f public/assets/ui/hotbar/espada.png
+          test -f public/assets/ui/hotbar/la.png
+          test -f public/assets/ui/hotbar/madeira.png
+          test -f public/assets/ui/hotbar/arco.png
+          test -f public/assets/ui/hotbar/boladefogo.png
+          test -f public/assets/ui/hotbar/boladeneve.png
+          test -f public/assets/ui/hotbar/maca-dourada.png
+          test -f public/assets/ui/hotbar/obsidian.png
+          test -f public/assets/ui/hotbar/perola.png
+          test -f public/assets/ui/hotbar/the-end.png
+          test -f public/assets/ui/hotbar/tnt.png
+          test -f public/assets/ui/hotbar/tnt-azul.png
+          test -f public/assets/ui/hotbar/tnt-branca.png
+          test -f public/assets/ui/hotbar/tnt-rosa.png
+          test -f public/assets/ui/hotbar/vidro.png
+          grep -q 'HOTBAR_ICONS' public/game.js
+          grep -q 'hotbar-icon' public/style.css
+          grep -q 'hotbar-assets-v1-20261012' public/index.html
+      - name: Commit functional changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/game.js public/style.css public/index.html
+          git diff --cached --quiet || git commit -m 'Use custom item icons in hotbar'
+          git push origin HEAD:feature/hotbar-ui-assets-v1
