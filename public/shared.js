@@ -16,6 +16,7 @@
   const EMERALD=[0,0];
   const LOBBY=[0,52,0];
   const MAPS={
+    safety_industry:{id:'safety_industry',name:'Complexo Industrial NR',description:'Mapa exclusivo de treinamento solo em segurança do trabalho.',theme:'safety',baseRadius:24,centerRadius:25},
     classic:{id:'classic',name:'Clássico',description:'Jardins suspensos ampliados, oito bases, ilhas satélite, pavilhões e centro em dois níveis.',theme:'classic',baseRadius:23,centerRadius:32},
     castle:{id:'castle',name:'Castelo',description:'Oito fortalezas suspensas com muralhas, torres, postos avançados e cidadela central.',theme:'castle',baseRadius:24,centerRadius:34},
     volcano:{id:'volcano',name:'Vulcão',description:'Arquipélago vulcânico com oito bases, rochedos, fissuras de magma e cratera central.',theme:'volcano',baseRadius:23,centerRadius:35},
@@ -69,5 +70,33 @@
   function jungleDiamond(set,cx,cz,i){jungleCone(set,cx,cz,22,11,620+i);disk(set,cx,23,cz,4,28);ring(set,cx,23,cz,6,19,1);disk(set,cx,24,cz,2,32);clearBox(set,cx,cz,25,30,2,2);for(const[dx,dz]of[[-7,-6],[7,6]])junglePillar(set,cx+dx,23,cz+dz,5);jungleTree(set,cx-7,23,cz+5,5);jungleTree(set,cx+7,23,cz-5,5)}
   function jungleTemple(set){jungleCone(set,0,0,21,36,777);for(const[x,z]of[[-26,-18],[26,-18],[-26,18],[26,18],[-18,-27],[18,-27],[-18,27],[18,27]])jungleTree(set,x,22,z,9);for(const[x,z]of[[-24,-24],[24,-24],[-24,24],[24,24]]){junglePillar(set,x,22,z,10);ring(set,x,22,z,3,19,1)}const levels=[[28,22],[23,27],[18,32],[13,37],[8,42]];for(const[r,y]of levels){for(let x=-r;x<=r;x++)for(let z=-r;z<=r;z++){const border=Math.abs(x)===r||Math.abs(z)===r,court=Math.abs(x)<=Math.max(3,r-5)&&Math.abs(z)<=Math.max(3,r-5);if(border||court)set(x,y,z,(x+z+y)%7===0?19:28)}for(const[dx,dz]of[[-r,-r],[r,-r],[-r,r],[r,r]])junglePillar(set,dx,y,dz,Math.min(8,49-y))}for(let n=0;n<19;n++)for(let w=-4;w<=4;w++){set(w,22+Math.floor(n/4),29-n,28);if(Math.abs(w)===4)set(w,23+Math.floor(n/4),29-n,26)}for(let y=43;y<=52;y++)for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)if(Math.abs(x)===5||Math.abs(z)===5)set(x,y,z,(y%3===0)?26:28);disk(set,0,53,0,6,28);disk(set,0,54,0,4,33);clearBox(set,0,0,55,60,2,2)}
   function buildJungle(set,BD,SHOP,GEN,SPAWN,withCenter=true){J_BASES.forEach(([x,z],t)=>jungleActiveBase(set,BD,SHOP,GEN,SPAWN,t,x,z));J_EXTRA.forEach(([x,z],i)=>jungleRuinIsland(set,x,z,i));J_DI.forEach(([x,z],i)=>jungleDiamond(set,x,z,i));if(withCenter)jungleTemple(set);return{DIGEN:J_DI.map(([x,z])=>[x+.5,25.2,z+.5]),EMGEN:[.5,55.2,.5],BASEPOS:J_BASES}}
-  E.gen=(mapId='classic',includeLobby=false)=>{const cfg=MAPS[mapId]||MAPS.classic,B=new Uint8Array(W*H*D),BD=[],SHOP=[],GEN=[],SPAWN=[],active=new Set(),set=(x,y,z,v)=>{x=Math.round(x);y=Math.round(y);z=Math.round(z);if(!inXZ(x,z)||y<0||y>=H)return;B[ix(x,y,z)]=v;if(v)active.add(Math.floor(x/16)+','+Math.floor(z/16))};let DIGEN,EMGEN,BASEPOS;if(cfg.theme==='jungle'){const j=buildJungle(set,BD,SHOP,GEN,SPAWN,!includeLobby);DIGEN=j.DIGEN;EMGEN=j.EMGEN;BASEPOS=j.BASEPOS}else{BASEPOS=BASES;BASES.forEach(([x,z],t)=>teamBase(set,BD,SHOP,GEN,SPAWN,t,cfg));DIAMONDS.forEach(([x,z],i)=>diamondIsland(set,x,z,i,cfg));SIDE_ISLANDS.forEach(([x,z],i)=>sideIsland(set,x,z,i,cfg));centerIsland(set,cfg)}if(includeLobby){island(set,LOBBY[0],LOBBY[2],LOBBY[1]-1,13,12,6,900);ring(set,LOBBY[0],LOBBY[1],LOBBY[2],10,23,1);for(const[dx,dz]of[[-7,-7],[7,-7],[-7,7],[7,7]])tower(set,LOBBY[0]+dx,LOBBY[2]+dz,LOBBY[1],12,6)}if(!DIGEN)DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);if(!EMGEN){const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5]}return{B,BD,SHOP,GEN,SPAWN,DIGEN,EMGEN,BASEPOS:[...(BASEPOS||BASES)],mapId:cfg.id,activeChunks:[...active]}}
+  E.gen=(mapId='classic',includeLobby=false)=>{const cfg=MAPS[mapId]||MAPS.classic,B=new Uint8Array(W*H*D),BD=[],SHOP=[],GEN=[],SPAWN=[],active=new Set(),set=(x,y,z,v)=>{x=Math.round(x);y=Math.round(y);z=Math.round(z);if(!inXZ(x,z)||y<0||y>=H)return;B[ix(x,y,z)]=v;if(v)active.add(Math.floor(x/16)+','+Math.floor(z/16))};let DIGEN,EMGEN,BASEPOS;if(cfg.theme==='safety'){
+ // Industrial training campus: one connected factory island, three workstations, no enemy beds.
+ island(set,0,0,BASE_Y,39,28,6,829);
+ // Workshop floor, marked lanes, factory shell and bright skylights.
+ for(let x=-25;x<=25;x++)for(let z=-24;z<=24;z++){
+  if(Math.abs(x)<=23&&Math.abs(z)<=22){
+   set(x,BASE_Y,z,(x%7===0||z%7===0)?20:28);
+   if(Math.abs(x)===23||Math.abs(z)===22){if(Math.abs(x)<4&&z===22){}else for(let h=1;h<=6;h++)set(x,BASE_Y+h,z,h===4?7:26)}
+  }
+ }
+ for(let x=-24;x<=24;x++)for(let z=-23;z<=23;z++)if(Math.abs(x)%9===0||Math.abs(z)%9===0)set(x,BASE_Y+8,z,21);
+ for(const [x,z] of [[-21,-20],[21,-20],[-21,19],[21,19]]){for(let h=1;h<8;h++)set(x,BASE_Y+h,z,18);set(x,BASE_Y+8,z,34)}
+ // NR6 quarry/extraction rig: goggles and gloves; marker cyan.
+ for(let x=-18;x<=-9;x++)for(let z=-8;z<=4;z++)set(x,BASE_Y+1,z,6);
+ for(let y=BASE_Y+2;y<=BASE_Y+5;y++)for(let x of [-19,-8])for(let z of [-9,5])set(x,y,z,32);
+ for(let x=-18;x<=-9;x++)set(x,BASE_Y+6,-9,32);
+ // NR10 electrical switchgear with non-operational luminous indicators.
+ for(let x=8;x<=18;x++)for(let z=-8;z<=3;z++)set(x,BASE_Y+1,z,21);
+ for(let x=9;x<=17;x+=3){for(let y=BASE_Y+2;y<=BASE_Y+6;y++)set(x,y,-5,26);set(x,BASE_Y+5,-4,34)}
+ // NR12 guarded conveyor / safety cell.
+ for(let x=-7;x<=7;x++)for(let z=-19;z<=-10;z++)set(x,BASE_Y+1,z,28);
+ for(let x=-6;x<=6;x++)for(let z=-17;z<=-13;z++)set(x,BASE_Y+2,z,(x%3===0)?20:21);
+ for(let x=-8;x<=8;x++)for(let z of [-20,-9]){set(x,BASE_Y+2,z,7);if(x%4===0)set(x,BASE_Y+3,z,26)}
+ // Reception / safe start point.
+ for(let x=-4;x<=4;x++)for(let z=13;z<=19;z++)set(x,BASE_Y+1,z,20);
+ BD[0]=null;SHOP[0]=[0.5,BASE_Y+2,16.5];GEN[0]=[-13.5,BASE_Y+2,-1.5];
+ SPAWN[0]=[0.5,BASE_Y+2.02,15.5];BASEPOS=[[0,0]];
+ DIGEN=[];EMGEN=[11.5,BASE_Y+2,-2.5];
+ }else if(cfg.theme==='jungle'){const j=buildJungle(set,BD,SHOP,GEN,SPAWN,!includeLobby);DIGEN=j.DIGEN;EMGEN=j.EMGEN;BASEPOS=j.BASEPOS}else{BASEPOS=BASES;BASES.forEach(([x,z],t)=>teamBase(set,BD,SHOP,GEN,SPAWN,t,cfg));DIAMONDS.forEach(([x,z],i)=>diamondIsland(set,x,z,i,cfg));SIDE_ISLANDS.forEach(([x,z],i)=>sideIsland(set,x,z,i,cfg));centerIsland(set,cfg)}if(includeLobby){island(set,LOBBY[0],LOBBY[2],LOBBY[1]-1,13,12,6,900);ring(set,LOBBY[0],LOBBY[1],LOBBY[2],10,23,1);for(const[dx,dz]of[[-7,-7],[7,-7],[-7,7],[7,7]])tower(set,LOBBY[0]+dx,LOBBY[2]+dz,LOBBY[1],12,6)}if(!DIGEN)DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);if(!EMGEN){const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5]}return{B,BD,SHOP,GEN,SPAWN,DIGEN,EMGEN,BASEPOS:[...(BASEPOS||BASES)],mapId:cfg.id,activeChunks:[...active]}}
 })(typeof module!=='undefined'?module.exports:(window.BW={}));
