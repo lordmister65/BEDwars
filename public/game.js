@@ -222,7 +222,7 @@ function newGenerator(x,y,z,type,size=7){
  g.position.set(x,y,z);sc.add(g);const v={g,core,label,particles,type,labelText:'',phase:Math.random()*10};GEN_VIS.push(v);return v
 }
 function clearGeneratorVisuals(){while(GEN_VIS.length){const v=GEN_VIS.pop();sc.remove(v.g);v.g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const mm=Array.isArray(o.material)?o.material:[o.material];mm.forEach(m=>{if(m.map)m.map.dispose();m.dispose&&m.dispose()})}})}}
-function updateGeneratorIcons(meta){clearGeneratorVisuals();(meta.GEN||[]).forEach(([x,y,z],i)=>{if(!visualTeamActive(i))return;const v=newGenerator(x,y-.02,z,'base',7);v.index=i});(meta.DIGEN||[]).forEach(([x,y,z],i)=>{const v=newGenerator(x,y-.02,z,'dia',5);v.index=i});if(meta.EMGEN){const v=newGenerator(meta.EMGEN[0],meta.EMGEN[1]-.02,meta.EMGEN[2],'em',7);v.index=0}}
+function updateGeneratorIcons(meta){clearGeneratorVisuals();if(safetyGameType==='safety')return;(meta.GEN||[]).forEach(([x,y,z],i)=>{if(!visualTeamActive(i))return;const v=newGenerator(x,y-.02,z,'base',7);v.index=i});(meta.DIGEN||[]).forEach(([x,y,z],i)=>{const v=newGenerator(x,y-.02,z,'dia',5);v.index=i});if(meta.EMGEN){const v=newGenerator(meta.EMGEN[0],meta.EMGEN[1]-.02,meta.EMGEN[2],'em',7);v.index=0}}
 let genVisualAt=0,genLabelAt=0,genVisualDisabled=false;
 function updateGenerators(now){
  if(genVisualDisabled||now-genVisualAt<40)return;genVisualAt=now;const t=now*.001,doLabel=now-genLabelAt>=250;if(doLabel)genLabelAt=now;
@@ -314,7 +314,7 @@ function fallbackVendor(team){
 function markVendor(root,team){root.userData.vendorTeam=team;root.traverse(o=>o.userData.vendorTeam=team)}
 function vendorFacing(x,z){return Math.atan2(-x,-z)}
 function updateVendors(g,lobby=false){
- clearVendors();if(lobby||!g||!g.SHOP)return;
+ clearVendors();if(safetyGameType==='safety'||lobby||!g||!g.SHOP)return;
  g.SHOP.forEach((pos,team)=>{
    if(!visualTeamActive(team))return;const holder=new THREE.Group();holder.position.set(pos[0],pos[1],pos[2]);holder.rotation.y=vendorFacing(pos[0],pos[2]);
    const seller=fallbackVendor(team);markVendor(seller,team);holder.add(seller);markVendor(holder,team);
@@ -326,7 +326,7 @@ const CHESTS=[];
 function chestWorldPos(meta,t,kind){const sp=meta?.SPAWN?.[t];if(!sp)return null;const base=(meta.BASEPOS&&meta.BASEPOS[t])||IS[t]||[0,0],[cx,cz]=base,L=Math.hypot(cx,cz)||1,ix=-cx/L,iz=-cz/L,txv=-iz,tz=ix,side=kind==='team'?4:-4;return[sp[0]+txv*side+ix*1.5,sp[1],sp[2]+tz*side+iz*1.5]}
 function chestModel(kind,team){const g=new THREE.Group(),body=box(1.02,.58,.70,kind==='ender'?0x342347:0x8a5a2f),lid=box(1.02,.22,.72,kind==='ender'?0x55346f:0xa86d36),lock=box(.16,.20,.06,kind==='ender'?0xb85cff:0xe7c55f);body.position.y=.31;lid.position.y=.70;lock.position.set(0,.48,.38);g.add(body,lid,lock);g.userData.chestKind=kind;g.userData.chestTeam=team;g.traverse(o=>{o.userData.chestKind=kind;o.userData.chestTeam=team});return g}
 function clearChests(){while(CHESTS.length){const c=CHESTS.pop();sc.remove(c.root);c.root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()})}}
-function updateChests(meta,lobby=false){clearChests();if(lobby||!meta?.SPAWN)return;meta.SPAWN.forEach((_,team)=>{if(!visualTeamActive(team))return;for(const kind of ['team','ender']){const pos=chestWorldPos(meta,team,kind);if(!pos)continue;const root=chestModel(kind,team);root.position.set(pos[0],pos[1],pos[2]);root.rotation.y=Math.atan2(-pos[0],-pos[2]);sc.add(root);CHESTS.push({root,team,kind,pos})}})}
+function updateChests(meta,lobby=false){clearChests();if(safetyGameType==='safety'||lobby||!meta?.SPAWN)return;meta.SPAWN.forEach((_,team)=>{if(!visualTeamActive(team))return;for(const kind of ['team','ender']){const pos=chestWorldPos(meta,team,kind);if(!pos)continue;const root=chestModel(kind,team);root.position.set(pos[0],pos[1],pos[2]);root.rotation.y=Math.atan2(-pos[0],-pos[2]);sc.add(root);CHESTS.push({root,team,kind,pos})}})}
 const chestRay=new THREE.Raycaster(),chestDir=new THREE.Vector3();
 function chestTarget(){if(safetyGameType==='safety')return null;if(!started||!CHESTS.length)return null;cam.getWorldDirection(chestDir);chestRay.set(cam.position,chestDir);chestRay.far=5.2;const hits=chestRay.intersectObjects(CHESTS.map(c=>c.root),true);if(!hits.length)return null;const hit=hits[0];for(let d=.18;d<hit.distance-.12;d+=.18){const x=Math.floor(cam.position.x+chestDir.x*d),y=Math.floor(cam.position.y+chestDir.y*d),z=Math.floor(cam.position.z+chestDir.z*d);if(get(x,y,z))return null}const kind=hit.object.userData.chestKind,team=hit.object.userData.chestTeam;return CHESTS.find(c=>c.kind===kind&&c.team===team)||null}
 function vendorTarget(){
