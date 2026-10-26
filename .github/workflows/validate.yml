@@ -2,6 +2,7 @@ name: Validate BedWars
 on:
   push:
     branches:
+      - main
       - feature/nr6-safe-extraction
   pull_request:
     branches:
