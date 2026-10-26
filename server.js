@@ -808,7 +808,7 @@ wss.on('connection', ws => {
       const modeId=MODES[m.modeId]?m.modeId:'2v2',party=sanitizePartyCode(m.party),rr=quickMatchRoom(modeId,party);m.t='join';m.room=rr.code;m.party=party;m.quick=1;
     }
     if (m.t === 'join' && !p) {
-      const gameType=m.gameType==='safety'?'safety':'classic';const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room((m.quick&&gameType==='classic'?code:(gameType==='safety'?'s_':'c_')+code));if(R.ps.size===0)R.gameType=gameType;
+      const gameType=m.gameType==='safety'?'safety':'classic';const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room((m.quick&&gameType==='classic'?code:(gameType==='safety'?'s_':'c_')+code));if(R.ps.size===0)R.gameType=gameType;if(gameType==='safety'&&R.modeId!=='2v2'&&m.quick){R.modeId='2v2';}
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
       for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
