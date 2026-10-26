@@ -618,7 +618,7 @@ function buildSafetyStations(){
   g.userData.safetyStation=t;sc.add(g);safetyStationMeshes.push(g);
  }
 }
-function safetyAction(action,extras={}){send({t:'safetyAction',action,...extras})}
+function safetyAction(action,extras={}){if(action==='extract'){const base=(worldMeta&&worldMeta.GEN&&worldMeta.GEN[me.team])||(GEN&&GEN[me.team]);if(base&&Math.hypot(pl.x-base[0],pl.z-base[2])>5){msg('NR 6: aproxime-se da estação de extração da sua equipe.');return}}send({t:'safetyAction',action,...extras})}
 function safetyEquip(item){safetyAction('equip',{item,on:!safetyState?.epi?.[item]})}
 const send=o=>{
  const sock=ws;if(!sock||sock.readyState!==1)return false;
