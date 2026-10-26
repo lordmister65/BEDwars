@@ -17,14 +17,14 @@ function electrical(p,R,step){
  if(o.completed)return {ok:false,message:'NR 10: procedimento já concluído nesta partida.'};
  if(!STEPS.includes(step)||step!==STEPS[o.step])return {ok:false,message:'NR 10: siga a ordem de etapas.'};
  if(o.owner!==null&&o.owner!==p.id)return {ok:false,message:'NR 10: outro jogador iniciou o procedimento.'};
- const base=R.GEN[p.team]||R.SPAWN[p.team];if(!base||Math.hypot(p.x-base[0],p.z-base[2])>12)return {ok:false,message:'Aproxime-se do gerador da equipe.'};
+ const base=R.gameType==='safety'?[12.5,36,-3.5]:(R.GEN[p.team]||R.SPAWN[p.team]);if(!base||Math.hypot(p.x-base[0],p.z-base[2])>7)return {ok:false,message:'Aproxime-se do painel elétrico NR 10.'};
  o.owner=p.id;o.step++;
  if(o.step===STEPS.length)o.completed=true;
  return {ok:true,message:o.completed?'NR 10: painel simulado desenergizado! +2 ouros.':'NR 10: etapa registrada.',gold:o.completed?2:0};
 }
 function machine(p,R,action){
  const m=R.safety.machine;
- const base=R.GEN[p.team]||R.SPAWN[p.team];if(!base||Math.hypot(p.x-base[0],p.z-base[2])>12)return {ok:false,message:'Aproxime-se da estação da equipe.'};
+ const base=R.gameType==='safety'?[0,36,-15]:(R.GEN[p.team]||R.SPAWN[p.team]);if(!base||Math.hypot(p.x-base[0],p.z-base[2])>7)return {ok:false,message:'Aproxime-se da esteira NR 12.'};
  switch(action){
  case 'guard':m.guard=true;m.running=false;m.reset=false;break;
  case 'stop':m.stop=true;m.running=false;m.reset=false;break;
