@@ -9,7 +9,7 @@ function extract(p,R,now=Date.now()){
  if(!EPIS.every(k=>p.safety.epi[k]))return {ok:false,message:'NR 6: equipe óculos e luvas antes da extração.'};
  const base=R.GEN[p.team]||R.SPAWN[p.team];if(!base||!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.hypot(p.x-base[0],p.z-base[2])>5)return {ok:false,message:'Aproxime-se do gerador da sua equipe.'};
  if(p.safety.extractedAt && now-p.safety.extractedAt<12000)return {ok:false,message:'Extração em intervalo de recuperação.'};
- p.safety.extractedAt=now;p.safety.extractions++;return {ok:true,message:'NR 6: extração concluída! +3 ferros.',iron:3};
+ p.safety.extractedAt=now;p.safety.extractions++;return {ok:true,message:'NR 6: extração segura concluída!'};
 }
 const STEPS=['isolate','lock','verify','ground','protect','signal'];
 function electrical(p,R,step){
@@ -20,7 +20,7 @@ function electrical(p,R,step){
  const base=R.gameType==='safety'?[12.5,36,-3.5]:(R.GEN[p.team]||R.SPAWN[p.team]);if(!base||Math.hypot(p.x-base[0],p.z-base[2])>7)return {ok:false,message:'Aproxime-se do painel elétrico NR 10.'};
  o.owner=p.id;o.step++;
  if(o.step===STEPS.length)o.completed=true;
- return {ok:true,message:o.completed?'NR 10: painel simulado desenergizado! +2 ouros.':'NR 10: etapa registrada.',gold:o.completed?2:0};
+ return {ok:true,message:o.completed?'NR 10: painel simulado desenergizado!':'NR 10: etapa registrada.'};
 }
 function machine(p,R,action){
  const m=R.safety.machine;
