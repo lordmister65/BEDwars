@@ -822,7 +822,7 @@ wss.on('connection', ws => {
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
       p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId,gameType:R.gameType, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId,gameType:R.gameType, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R);if(R.gameType==='safety')startMatch(R,p); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
