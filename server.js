@@ -449,7 +449,7 @@ function startMatch(R,requester=null){
   R.mapId=R.gameType==='safety'?'safety_industry':resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
   R.st='play';R.safety=SAFETY.newRoom();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
   for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
-  R.ps.forEach(q=>{if(R.gameType==='safety')q.team=0;q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
+  R.ps.forEach(q=>{if(R.gameType==='safety'){q.team=0;q.inv=Object.fromEntries(Object.keys(q.inv).map(k=>[k,0]));q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};}q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
 function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
 function updateQuickCountdown(R,now=Date.now()){
@@ -826,6 +826,12 @@ wss.on('connection', ws => {
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
+    // A modalidade educativa não aceita equipamentos, inventário, loja ou combate do BedWars.
+    const classicOnlyActions=new Set(['buy','place','placeBatch','breakStart','breakStop','shoot','use','apple','attackBatch','hit','chestOpen','chestMove','genUpgrade','adminGive','adminSetGear']);
+    if(R.gameType==='safety'&&classicOnlyActions.has(m.t)){
+      if(m.t==='buy')tx(p,{t:'m',s:'A loja BedWars não existe na Operação Segura.'});
+      return;
+    }
     switch (m.t) {
       case 'safetyAction': {
         if(R.gameType!=='safety'||!play||p.disconnected||!allow(p,'safetyAction',200))break;
@@ -835,7 +841,7 @@ wss.on('connection', ws => {
         else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
         else if(action==='machine')result=SAFETY.machine(p,R,m.step);
         if(result.ok&&R.gameType==='safety'&&p.safety.extractions>=1&&R.safety.electrical.completed&&R.safety.machine.running){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
-        if(result.ok){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
+        if(result.ok&&R.gameType==='classic'){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
         tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok});break;
       }
       case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
