@@ -1,0 +1,23 @@
+name: Validate BedWars
+on:
+  push:
+    branches:
+      - feature/nr6-safe-extraction
+  pull_request:
+    branches:
+      - main
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: node --check server.js
+      - run: node --check public/game.js
+      - run: node --check safety-mode.js
+      - run: npm test
