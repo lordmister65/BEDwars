@@ -2,6 +2,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
+const SAFETY = require('./safety-mode.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND='/calopsita';
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
@@ -197,7 +198,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, BASEPOS:g.BASEPOS, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: teamArray(()=>0), teamChest:teamArray(()=>emptyChest()), genTier:teamArray(()=>0), traps:teamArray(()=>[]), trapInside:teamArray(()=>new Set()), suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
+    R = { code, gameType:'classic', safety:SAFETY.newRoom(), mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, BASEPOS:g.BASEPOS, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: teamArray(()=>0), teamChest:teamArray(()=>emptyChest()), genTier:teamArray(()=>0), traps:teamArray(()=>[]), trapInside:teamArray(()=>new Set()), suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
       g: {
         base: teamArray(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -207,7 +208,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
+const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, safety:SAFETY.newPlayer(), x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
   attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},moveV2:{vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0},blockV5:{lastOpSeq:0,pending:new Map(),queue:[],recentResults:new Map(),networkTokens:PLACEMENT_V5.NETWORK_CAPACITY,networkAt:Date.now(),usefulTokens:PLACEMENT_V5.USEFUL_CAPACITY,usefulAt:Date.now(),autoY:null,autoAt:0,metrics:{accepted:0,rejected:0,lastReason:'',lastRewind:0,lastDist:0}},
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', partyId:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,lastComboHitAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
@@ -438,7 +439,7 @@ function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 function mapVoteSummary(R){const votes=R.mapVotes||(R.mapVotes=new Map()),counts={};for(const [id,mapId] of votes){if(!R.ps.has(id)||!S.MAPS[mapId])continue;counts[mapId]=(counts[mapId]||0)+1}return counts}
 function resolveMapVote(R){const counts=mapVoteSummary(R),ids=Object.keys(S.MAPS),top=Math.max(0,...ids.map(id=>counts[id]||0));if(top<=0)return S.MAPS[R.mapId]?R.mapId:ids[0];const tied=ids.filter(id=>(counts[id]||0)===top),hostVote=R.mapVotes?.get(R.host);if(hostVote&&tied.includes(hostVote))return hostVote;if(tied.includes(R.mapId))return R.mapId;return tied[0]}
-const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
+const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,gameType:R.gameType,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
 function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])return false;R.mapId=mapId;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];if(announce){bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R)}return true}
 function matchStartError(requester,text){if(requester)tx(requester,{t:'m',s:text});return false}
 function startMatch(R,requester=null){
@@ -446,9 +447,9 @@ function startMatch(R,requester=null){
   if(active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
   if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
   R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
-  R.st='play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
+  R.st='play';R.safety=SAFETY.newRoom();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
   for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
-  R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
+  R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
 function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
 function updateQuickCountdown(R,now=Date.now()){
@@ -796,15 +797,18 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();resetMovementV2(p);resetPlacementInput(p);recordCombatHistory(p,Date.now());ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,placeOpSeq:p.blockV5?.lastOpSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,gameType:R.gameType,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,placeOpSeq:p.blockV5?.lastOpSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
+    }
+    if (m.t === 'matchmake' && !p && m.gameType==='safety') {
+      m.t='join';m.room='safety2v2';m.quick=1;m.modeId='2v2';
     }
     if (m.t === 'matchmake' && !p) {
       const modeId=MODES[m.modeId]?m.modeId:'2v2',party=sanitizePartyCode(m.party),rr=quickMatchRoom(modeId,party);m.t='join';m.room=rr.code;m.party=party;m.quick=1;
     }
     if (m.t === 'join' && !p) {
-      const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room(code);
+      const gameType=m.gameType==='safety'?'safety':'classic';const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room((m.quick&&gameType==='classic'?code:(gameType==='safety'?'s_':'c_')+code));if(R.ps.size===0)R.gameType=gameType;if(gameType==='safety'&&R.modeId!=='2v2'&&m.quick){R.modeId='2v2';}
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
       for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
@@ -818,17 +822,28 @@ wss.on('connection', ws => {
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
       p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId,gameType:R.gameType, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
     switch (m.t) {
+      case 'safetyAction': {
+        if(R.gameType!=='safety'||!play||p.disconnected||!allow(p,'safetyAction',200))break;
+        let result={ok:false,message:'Ação desconhecida.'};const action=String(m.action||'');
+        if(action==='equip')result=SAFETY.equipment(p,m.item,m.on);
+        else if(action==='extract')result=SAFETY.extract(p,R);
+        else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
+        else if(action==='machine')result=SAFETY.machine(p,R,m.step);
+        if(result.ok){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
+        tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok});break;
+      }
       case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
+      case 'safetySync': if(R.gameType==='safety')tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),ok:true});break;
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
-        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.safety=SAFETY.newRoom();R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
         R.ps.forEach((q,i)=>{
  q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.trapQueue=[];q.enderChest=emptyChest();
  if(!q.admin){q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};q.fx={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0};q.up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0};q.inv={wool:24,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0}}
