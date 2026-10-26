@@ -7,8 +7,8 @@ function snapshot(p,R,now=Date.now()){return {epi:{...p.safety.epi},extractions:
 function equipment(p,item,on){if(!EPIS.includes(item)||typeof on!=='boolean')return {ok:false,message:'EPI inválido'};p.safety.epi[item]=on;return {ok:true,message:on?'EPI equipado.':'EPI retirado.'};}
 function extract(p,R,now=Date.now()){
  if(!EPIS.every(k=>p.safety.epi[k]))return {ok:false,message:'NR 6: equipe óculos e luvas antes da extração.'};
- const base=R.GEN[p.team]||R.SPAWN[p.team];if(!base||!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.hypot(p.x-base[0],p.z-base[2])>12)return {ok:false,message:'Aproxime-se do gerador da sua equipe.'};
- if(now-p.safety.extractedAt<12000)return {ok:false,message:'Extração em intervalo de recuperação.'};
+ const base=R.GEN[p.team]||R.SPAWN[p.team];if(!base||!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.hypot(p.x-base[0],p.z-base[2])>5)return {ok:false,message:'Aproxime-se do gerador da sua equipe.'};
+ if(p.safety.extractedAt && now-p.safety.extractedAt<12000)return {ok:false,message:'Extração em intervalo de recuperação.'};
  p.safety.extractedAt=now;p.safety.extractions++;return {ok:true,message:'NR 6: extração concluída! +3 ferros.',iron:3};
 }
 const STEPS=['isolate','lock','verify','ground','protect','signal'];
