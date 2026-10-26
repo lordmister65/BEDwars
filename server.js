@@ -444,12 +444,12 @@ function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])
 function matchStartError(requester,text){if(requester)tx(requester,{t:'m',s:text});return false}
 function startMatch(R,requester=null){
   if(R.st!=='lobby')return false;const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team)),needed=requester?(mc.minPlayers||2):(mc.quickMinPlayers||mc.minPlayers||2);
-  if(active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
-  if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
-  R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
+  if(R.gameType!=='safety'&&active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
+  if(R.gameType==='safety'){}else if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
+  R.mapId=R.gameType==='safety'?'safety_industry':resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
   R.st='play';R.safety=SAFETY.newRoom();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
   for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
-  R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
+  R.ps.forEach(q=>{if(R.gameType==='safety')q.team=0;q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
 function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
 function updateQuickCountdown(R,now=Date.now()){
@@ -464,7 +464,7 @@ function finalizeProfiles(R,winnerTeam,winnerId){
   R.ps.forEach(p=>{if(p.admin||!p.profileId)return;const rec=ensureProfile(p.profileId,p.name),won=R.modeId==='solo'?p.id===winnerId:p.team===winnerTeam,xpGain=25+(won?100:0)+(p.stats.kills||0)*10+(p.stats.finalKills||0)*25+(p.stats.bedsDestroyed||0)*40;rec.matches=(rec.matches||0)+1;rec.wins=(rec.wins||0)+(won?1:0);rec.losses=(rec.losses||0)+(won?0:1);for(const k of ['kills','finalKills','bedsDestroyed','deaths','resourcesCollected'])rec[k]=(rec[k]||0)+(p.stats[k]||0);rec.xp=(rec.xp||0)+xpGain;progress[p.id]={xpGain,profile:publicProfile(rec)};tx(p,{t:'profileUpdate',xpGain,profile:progress[p.id].profile})});saveProfiles();return progress
 }
 function win(R) {
-  if (R.st !== 'play') return;
+  if (R.st !== 'play'||R.gameType==='safety') return;
   const live = [...R.ps.values()].filter(q => !q.out&&!q.admin), teams = new Set(live.map(q => q.team));
   if (teams.size <= 1) {
     const winnerTeam=live[0]?.team ?? -1,winnerId=live[0]?.id??-1,winnerName=live[0]?.name||'';
@@ -802,13 +802,13 @@ wss.on('connection', ws => {
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
     if (m.t === 'matchmake' && !p && m.gameType==='safety') {
-      m.t='join';m.room='safety2v2';m.quick=1;m.modeId='2v2';
+      m.t='join';m.room='training'+crypto.randomBytes(3).toString('hex');m.quick=0;m.modeId='2v2';
     }
     if (m.t === 'matchmake' && !p) {
       const modeId=MODES[m.modeId]?m.modeId:'2v2',party=sanitizePartyCode(m.party),rr=quickMatchRoom(modeId,party);m.t='join';m.room=rr.code;m.party=party;m.quick=1;
     }
     if (m.t === 'join' && !p) {
-      const gameType=m.gameType==='safety'?'safety':'classic';const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room((m.quick&&gameType==='classic'?code:(gameType==='safety'?'s_':'c_')+code));if(R.ps.size===0)R.gameType=gameType;if(gameType==='safety'&&R.modeId!=='2v2'&&m.quick){R.modeId='2v2';}
+      const gameType=m.gameType==='safety'?'safety':'classic';const code = String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room((m.quick&&gameType==='classic'?code:(gameType==='safety'?'s_':'c_')+code));if(R.ps.size===0){R.gameType=gameType;if(gameType==='safety'){R.mapId='safety_industry';applyLobbyMap(R,'safety_industry',false)}}if(gameType==='safety'&&R.modeId!=='2v2'&&m.quick){R.modeId='2v2';}
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
       for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
@@ -834,6 +834,7 @@ wss.on('connection', ws => {
         else if(action==='extract')result=SAFETY.extract(p,R);
         else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
         else if(action==='machine')result=SAFETY.machine(p,R,m.step);
+        if(result.ok&&R.gameType==='safety'&&p.safety.extractions>=1&&R.safety.electrical.completed&&R.safety.machine.running){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
         if(result.ok){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
         tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok});break;
       }
@@ -887,10 +888,10 @@ wss.on('connection', ws => {
         R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'map': {
-        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;R.mapVotes=new Map();applyLobbyMap(R,m.map,true);break;
+        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map]||R.gameType==='safety')break;R.mapVotes=new Map();applyLobbyMap(R,m.map,true);break;
       }
       case 'mapVote': {
-        if(R.st!=='lobby'||!S.MAPS[m.map])break;R.mapVotes=R.mapVotes||new Map();R.mapVotes.set(p.id,m.map);const winner=resolveMapVote(R);if(winner!==R.mapId)applyLobbyMap(R,winner,true);else lobby(R);break;
+        if(R.st!=='lobby'||!S.MAPS[m.map]||R.gameType==='safety')break;R.mapVotes=R.mapVotes||new Map();R.mapVotes.set(p.id,m.map);const winner=resolveMapVote(R);if(winner!==R.mapId)applyLobbyMap(R,winner,true);else lobby(R);break;
       }
       case 'party': {
         if(R.st!=='lobby')break;const next=sanitizePartyCode(m.code),old=p.partyId||'',mc=modeCfg(R),members=next?[...R.ps.values()].filter(q=>q!==p&&q.partyId===next):[];
@@ -919,7 +920,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'start':
-        if(R.st!=='lobby'||p.id!==R.host)break;if(R.quickMatch){tx(p,{t:'m',s:'A Partida Rápida inicia automaticamente quando estiver pronta.'});break}startMatch(R,p);break;
+        if(R.st!=='lobby'||p.id!==R.host)break;if(R.gameType==='safety'){startMatch(R,p);break}if(R.quickMatch){tx(p,{t:'m',s:'A Partida Rápida inicia automaticamente quando estiver pronta.'});break}startMatch(R,p);break;
       case 'mv': {
         const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
         const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n,check=inspectMovementPacket(p,m,dt,n,spectating);if(check.drop)break;
@@ -1087,8 +1088,8 @@ setInterval(() => {
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
-      if(!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<TEAM_COUNT;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
-      if(R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
+      if(R.gameType!=='safety'&&!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<TEAM_COUNT;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
+      if(R.gameType!=='safety'&&R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
       triggerTeamTraps(R);
       R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
