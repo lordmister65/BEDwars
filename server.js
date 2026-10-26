@@ -1108,6 +1108,7 @@ setInterval(() => {
         if(cfg.gold&&g.gold>=cfg.gold){g.gold-=cfg.gold;addDrop(R,'gold',1,gx+1,gy+.2,gz,10)}
         if(cfg.dia&&g.dia>=cfg.dia){g.dia-=cfg.dia;addDrop(R,'dia',1,gx-1,gy+.2,gz,4)}
       });
+      if(R.gameType!=='safety'){
       const centralCfg=centralGenCfg(R);
       R.g.dia.forEach((g, i) => {
         g.t += dt;
@@ -1119,6 +1120,7 @@ setInterval(() => {
       if(R.g.em.t>=centralCfg.emerald){
         R.g.em.t-=centralCfg.emerald;
         const [gx,gy,gz]=R.EMGEN;addDrop(R,'em',1,gx,gy,gz,2);
+      }
       }
       R.pickupAcc+=dt;if(R.pickupAcc>=.1){R.pickupAcc=0;pickupDrops(R,players);}
       R.syncAcc=(R.syncAcc||0)+dt;if(R.syncAcc>=2.5){R.syncAcc=0;R.ps.forEach(q=>tx(q,{t:'stateDigest',blockSeq:R.blockSeq||0,invSeq:q.invSeq||0}))}
