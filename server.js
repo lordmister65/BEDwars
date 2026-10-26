@@ -801,6 +801,9 @@ wss.on('connection', ws => {
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
     }
+    if (m.t === 'matchmake' && !p && m.gameType==='safety') {
+      m.t='join';m.room='safety2v2';m.quick=1;m.modeId='2v2';
+    }
     if (m.t === 'matchmake' && !p) {
       const modeId=MODES[m.modeId]?m.modeId:'2v2',party=sanitizePartyCode(m.party),rr=quickMatchRoom(modeId,party);m.t='join';m.room=rr.code;m.party=party;m.quick=1;
     }
