@@ -113,6 +113,23 @@
  // Walkable pathways connecting all three stations to the reception.
  for(let z=5;z<=16;z++)for(let x=-2;x<=2;x++)set(x,BASE_Y+1,z,20);
  for(let x=-13;x<=13;x++)for(let z=5;z<=7;z++)set(x,BASE_Y+1,z,20);
+ // Industrial wayfinding: illuminated sector gates, lockers, pallets and guarded access.
+ for(const [cx,cz,accent] of [[-13,-2,32],[13,-2,34],[0,-15,33]]){
+  // Entrance pillars and colored lintel, leaving the walkway accessible.
+  for(const side of [-1,1]){for(let h=1;h<=4;h++)set(cx+side*4,BASE_Y+h,cz+8,26);set(cx+side*4,BASE_Y+5,cz+8,accent);}
+  for(let x=-4;x<=4;x++)set(cx+x,BASE_Y+5,cz+8,accent);
+  // Simulated industrial storage away from the stations and walking lanes.
+  for(const side of [-1,1]){const px=cx+side*5,pz=cz-3;set(px,BASE_Y+2,pz,5);set(px,BASE_Y+3,pz,20);set(px,BASE_Y+4,pz,34);}
+ }
+ // Colored floor guidance lines connect the reception to the training wings.
+ for(let z=8;z<=14;z++){set(-2,BASE_Y+1,z,32);set(2,BASE_Y+1,z,34);}
+ for(let x=-13;x<=13;x++){set(x,BASE_Y+1,8,x<0?32:x>0?34:20);}
+ // Reception desk, information podium and lamps, outside the spawn path.
+ for(let x=-3;x<=3;x++){set(x,BASE_Y+2,20,5);set(x,BASE_Y+3,20,20);}
+ for(const x of [-6,6]){for(let h=2;h<=5;h++)set(x,BASE_Y+h,14,28);set(x,BASE_Y+6,14,34);}
+ // Perimeter safety rail and illuminated corners.
+ for(let x=-21;x<=21;x+=3){set(x,BASE_Y+2,-22,20);set(x,BASE_Y+3,-22,26);}
+ for(const z of [-19,0,19])for(const x of [-21,21]){for(let h=2;h<=5;h++)set(x,BASE_Y+h,z,28);set(x,BASE_Y+6,z,34);}
  // Reception / safe start point.
  for(let x=-4;x<=4;x++)for(let z=13;z<=19;z++)set(x,BASE_Y+1,z,20);
  BD[0]=null;SHOP[0]=[0.5,BASE_Y+2,16.5];GEN[0]=[-13.5,BASE_Y+2,-1.5];
