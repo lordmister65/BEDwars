@@ -645,7 +645,7 @@ function buildSafetyNpcs(){
    hair:new THREE.MeshBasicMaterial({color:n.hair}),boot:new THREE.MeshBasicMaterial({color:0x20252c}),
    dark:new THREE.MeshBasicMaterial({color:0x1a2028}),white:new THREE.MeshBasicMaterial({color:0xe8e9dd}),
    reflective:new THREE.MeshBasicMaterial({color:0xfff5b1})};
-  const cube=(parent,w,h,d,x,y,z,mat)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);parent.add(o);return o};
+  const cube=(parent,w,h,d,x,y,z,mat)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);o.material.colorWrite=true;o.material.needsUpdate=true;parent.add(o);return o};
   cube(body,.73,.86,.38,0,1.10,0,mats.uniform);
   cube(body,.74,.10,.40,0,1.25,.01,mats.reflective);
   cube(body,.18,.20,.025,.18,1.09,.205,mats.white);
@@ -765,7 +765,7 @@ setInterval(()=>{
 },NET_PING_MS);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&started&&reconnectToken&&(!ws||ws.readyState!==1))startReconnect()});
 addEventListener('online',()=>{if(started&&reconnectToken&&(!ws||ws.readyState!==1))startReconnect()});
-$('go').onclick=()=>{$('er').textContent='Conectando…';connectSocket('join')};
+$('go').onclick=()=>{try{$('er').textContent='Conectando…';if(ws&&ws.readyState===WebSocket.CONNECTING){$('er').textContent='Conexão em andamento...';return}connectSocket('join')}catch(err){console.error('[JOIN] Falha ao abrir partida',err);$('er').textContent='Falha ao iniciar: '+(err.message||err)}};
 $('st').onclick=()=>{send({t:'start'});requestGameLock()};
 function leaveToLobby(){clearReconnect();location.reload()}
 function replaySameRoom(){send({t:'replay'});$('endSub').textContent='Preparando nova partida na mesma sala...'}
