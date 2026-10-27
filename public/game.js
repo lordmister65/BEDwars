@@ -741,7 +741,7 @@ function safetyNpcTick(){
   const d=Math.hypot(pl.x-n.root.position.x,pl.z-n.root.position.z);
   if(d<dist){nearest=n;dist=d}
  }
- const prompt=$('safetyNpcPrompt');if(prompt){prompt.style.display=nearest?'block':'none';if(nearest)prompt.textContent='[E] Conversar com '+nearest.name}
+ const prompt=$('safetyNpcPrompt');if(prompt){const st=NR_WORKSTATIONS.find(q=>q.mission===safetyState?.mission&&Math.hypot(pl.x-q.x,pl.z-q.z)<4.2);prompt.style.display=nearest||st?'block':'none';if(nearest)prompt.textContent='[E] Conversar com '+nearest.name;else if(st)prompt.textContent='[E] Usar '+st.name}
 }
 let nrTalkNpc=null;
 const NR_DIALOGUE={
@@ -756,16 +756,28 @@ function openNrNpcDialogue(id){
 }
 function closeNrNpcDialogue(){nrTalkNpc=null;const modal=$('nrNpcDialogue');if(modal)modal.style.display='none'}
 function acceptNrNpcMission(){if(!nrTalkNpc)return;const id=nrTalkNpc;closeNrNpcDialogue();safetyAction('npc',{id});toggleNrMissionMenu(true)}
-function renderNrMissionActions(){
- const area=$('nrMissionActions');if(!area)return;const id=safetyState?.mission;
- const button=(title,callback)=>{const b=document.createElement('button');b.type='button';b.textContent=title;b.onclick=callback;area.appendChild(b)};
- area.replaceChildren();
- if(safetyGameType!=='safety'||!started||!id||safetyState?.completed?.[id])return;
- if(id==='nr6'){button(safetyState?.epi?.goggles?'✅ Retirar óculos':'🥽 Equipar óculos',()=>safetyEquip('goggles'));button(safetyState?.epi?.gloves?'✅ Retirar luvas':'🧤 Equipar luvas',()=>safetyEquip('gloves'));button('⛏ Extração segura',()=>safetyAction('extract'))}
- if(id==='nr10'){const steps=['isolate','lock','verify','ground','protect','signal'],names=['Seccionamento','Impedir reenergização','Verificar ausência de tensão','Aterramento','Proteger partes adjacentes','Sinalizar'];const i=Math.min(5,safetyState?.electrical?.step||0);button('⚡ '+names[i],()=>safetyAction('electrical',{step:steps[i]}))}
- if(id==='nr12')for(const [k,label] of [['guard','Instalar proteção'],['stop','Parada de emergência'],['release','Liberar parada'],['reset','Rearmar'],['start','Iniciar simulação']])button(label,()=>safetyAction('machine',{step:k}));
+function renderNrMissionActions(){const a=$('nrMissionActions');if(a)a.textContent=safetyState?.mission?'Vá até a estação correspondente e pressione E para interagir.':'Aceite uma missão com um instrutor.'}
+function safetyStationInteract(){
+ const current=safetyState?.mission;if(!current)return false;
+ const o=NR_WORKSTATIONS.find(st=>st.mission===current&&Math.hypot(pl.x-st.x,pl.z-st.z)<4.2);
+ if(!o)return false;
+ if(o.id==='locker'){openNrStationMenu('locker');return true}
+ if(o.id==='extract'){safetyAction('extract');return true}
+ if(o.id==='electrical'){openNrStationMenu('electrical');return true}
+ if(o.id==='machine'){openNrStationMenu('machine');return true}
+ return false;
 }
-function safetyNpcInteract(){if(safetyGameType!=='safety'||!started||over)return false;let nearest=null,dist=4.5;for(const n of safetyNpcs){const p=n.root.position,d=Math.hypot(pl.x-p.x,pl.z-p.z);if(d<dist){nearest=n;dist=d}}if(nearest){openNrNpcDialogue(nearest.id);return true}return false}
+function openNrStationMenu(id){
+ const box=$('nrStationMenu'),title=$('nrStationTitle'),actions=$('nrStationButtons');
+ if(!box||!title||!actions)return;box.style.display='flex';
+ title.textContent=NR_WORKSTATIONS.find(o=>o.id===id)?.name||'Estação';actions.replaceChildren();
+ const button=(text,fn)=>{const b=document.createElement('button');b.textContent=text;b.type='button';b.onclick=()=>{fn();closeNrStationMenu()};actions.appendChild(b)};
+ if(id==='locker'){button(safetyState?.epi?.goggles?'Retirar óculos':'Equipar óculos',()=>safetyEquip('goggles'));button(safetyState?.epi?.gloves?'Retirar luvas':'Equipar luvas',()=>safetyEquip('gloves'))}
+ if(id==='electrical'){const steps=['isolate','lock','verify','ground','protect','signal'],labels=['Seccionamento','Impedir reenergização','Verificar ausência de tensão','Aterramento','Proteger partes adjacentes','Sinalização'];const i=Math.min(5,safetyState?.electrical?.step||0);button('Confirmar: '+labels[i],()=>safetyAction('electrical',{step:steps[i]}))}
+ if(id==='machine'){for(const [k,t] of [['guard','Instalar proteção'],['stop','Acionar parada'],['release','Liberar parada'],['reset','Rearmar'],['start','Iniciar teste']])button(t,()=>safetyAction('machine',{step:k}))}
+}
+function closeNrStationMenu(){const box=$('nrStationMenu');if(box)box.style.display='none'}
+function safetyNpcInteract(){if(safetyGameType!=='safety'||!started||over)return false;let nearest=null,dist=4.5;for(const n of safetyNpcs){const p=n.root.position,d=Math.hypot(pl.x-p.x,pl.z-p.z);if(d<dist){nearest=n;dist=d}}if(nearest){openNrNpcDialogue(nearest.id);return true}return safetyStationInteract()}
 document.addEventListener('keydown',e=>{if(e.code!=='KeyE'||e.repeat||safetyGameType!=='safety'||!started)return; if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;if(safetyNpcInteract()){e.preventDefault();e.stopImmediatePropagation()}},true);
 function safetyAction(action,extras={}){if(action==='extract'){const base=worldMeta?.GEN?.[me.team];if(base&&Math.hypot(pl.x-base[0],pl.z-base[2])>5){msg('NR 6: aproxime-se da estação de extração da sua equipe.');return}}send({t:'safetyAction',action,...extras})}
 function safetyEquip(item){safetyAction('equip',{item,on:!safetyState?.epi?.[item]})}
