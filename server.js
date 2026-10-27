@@ -3,6 +3,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
 const SAFETY = require('./safety-mode.js');
+const NPCNAV = require('./safety-navigation.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND='/calopsita';
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
@@ -447,7 +448,7 @@ function startMatch(R,requester=null){
   if(R.gameType!=='safety'&&active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
   if(R.gameType==='safety'){}else if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
   R.mapId=R.gameType==='safety'?'safety_industry':resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
-  R.st='play';R.safety=SAFETY.newRoom();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
+  R.st='play';R.safety=SAFETY.newRoom();if(R.gameType==='safety')R.safety.npcs=NPCNAV.create();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
   for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
   R.ps.forEach(q=>{if(R.gameType==='safety'){q.team=0;q.inv=Object.fromEntries(Object.keys(q.inv).map(k=>[k,0]));q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};}q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
@@ -1070,6 +1071,7 @@ setInterval(() => {
     if(R.st==='lobby'&&R.quickMatch)updateQuickCountdown(R,Date.now());
     R.t += dt;
     if (R.st === 'play') {
+      if(R.gameType==='safety')NPCNAV.tick(R,dt);
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
@@ -1130,7 +1132,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=SNAPSHOT_SEC){R.snapAcc%=SNAPSHOT_SEC;SERVER_METRICS.snapshots++;bc(R,{t:'s',seq:++R.netSeq,serverAt:Date.now(),time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=SNAPSHOT_SEC){R.snapAcc%=SNAPSHOT_SEC;SERVER_METRICS.snapshots++;bc(R,{t:'s',seq:++R.netSeq,serverAt:Date.now(),time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',npcs:R.gameType==='safety'?NPCNAV.snapshot(R):undefined,pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
     }catch(err){console.error(`[TICK] erro isolado na sala ${R.code}`,err);}
   });
   const tickCost=performance.now()-tickStarted;SERVER_METRICS.ticks++;SERVER_METRICS.lastTickMs=tickCost;SERVER_METRICS.avgTickMs=SERVER_METRICS.avgTickMs?SERVER_METRICS.avgTickMs*.92+tickCost*.08:tickCost;SERVER_METRICS.maxTickMs=Math.max(tickCost,SERVER_METRICS.maxTickMs*.995);if(tickCost>SERVER_TICK_MS)SERVER_METRICS.overruns++;SERVER_METRICS.rooms=rooms.size;let playerCount=0;rooms.forEach(R=>playerCount+=R.ps.size);SERVER_METRICS.players=playerCount;
