@@ -623,24 +623,78 @@ function buildSafetyStations(){
  }
 }
 
-const SAFETY_NPCS=[{id:'nr6',name:'Supervisora de EPI',x:-10,z:12,color:0xf1c94b},{id:'nr10',name:'Técnico Eletricista',x:12,z:11,color:0x42d2f7},{id:'nr12',name:'Instrutora de Máquinas',x:0,z:8,color:0x81db83}];
+const SAFETY_NPCS=[
+ {id:'nr6',name:'Supervisora de EPI',role:'NR 6',x:-10,z:12,color:0xffc83d,pants:0x283448,helmet:0xffd843,skin:0xe5b28d,hair:0x573a2c},
+ {id:'nr10',name:'Técnico Eletricista',role:'NR 10',x:12,z:11,color:0x258fcf,pants:0x243248,helmet:0x51c9fa,skin:0xb9825d,hair:0x30251e},
+ {id:'nr12',name:'Instrutora de Máquinas',role:'NR 12',x:0,z:8,color:0x48a86e,pants:0x293c35,helmet:0x88d990,skin:0xd6a37c,hair:0x493023}
+];
 let safetyNpcs=[];
-function clearSafetyNpcs(){for(const a of safetyNpcs){sc.remove(a.root);a.root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}safetyNpcs=[]}
+function clearSafetyNpcs(){
+ for(const n of safetyNpcs){sc.remove(n.root);n.root.traverse(o=>{
+  if(o.geometry)o.geometry.dispose();
+  if(o.material){for(const m of (Array.isArray(o.material)?o.material:[o.material])){if(m.map)m.map.dispose();m.dispose()}}
+ });}
+ safetyNpcs=[];
+}
 function buildSafetyNpcs(){
  clearSafetyNpcs();if(safetyGameType!=='safety')return;
  for(const n of SAFETY_NPCS){
-  const root=new THREE.Group(),mat=new THREE.MeshLambertMaterial({color:n.color}),skin=new THREE.MeshLambertMaterial({color:0xe0b48b});
-  function cube(w,h,d,y,m){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.y=y;root.add(o)}
-  cube(.64,.8,.36,.95,mat);cube(.47,.48,.43,1.57,skin);cube(.7,.2,.52,1.84,mat);
-  cube(.24,.66,.24,.31,mat);root.position.set(n.x,36.05,n.z);sc.add(root);safetyNpcs.push({root,...n});
+  const root=new THREE.Group(),body=new THREE.Group();root.add(body);
+  const mats={uniform:new THREE.MeshLambertMaterial({color:n.color}),pants:new THREE.MeshLambertMaterial({color:n.pants}),
+   helmet:new THREE.MeshLambertMaterial({color:n.helmet}),skin:new THREE.MeshLambertMaterial({color:n.skin}),
+   hair:new THREE.MeshLambertMaterial({color:n.hair}),boot:new THREE.MeshLambertMaterial({color:0x20252c}),
+   dark:new THREE.MeshBasicMaterial({color:0x1a2028}),white:new THREE.MeshLambertMaterial({color:0xe8e9dd}),
+   reflective:new THREE.MeshLambertMaterial({color:0xfff5b1})};
+  const cube=(parent,w,h,d,x,y,z,mat)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);parent.add(o);return o};
+  cube(body,.73,.86,.38,0,1.10,0,mats.uniform);
+  cube(body,.74,.10,.40,0,1.25,.01,mats.reflective);
+  cube(body,.18,.20,.025,.18,1.09,.205,mats.white);
+  cube(body,.52,.51,.47,0,1.81,0,mats.skin);
+  cube(body,.55,.14,.48,0,2.08,-.02,mats.hair);
+  cube(body,.63,.17,.58,0,2.12,0,mats.helmet);
+  cube(body,.73,.06,.67,0,2.03,.065,mats.helmet);
+  for(const x of [-.12,.12])cube(body,.064,.066,.024,x,1.85,.247,mats.dark);
+  cube(body,.17,.03,.025,0,1.69,.25,mats.dark);
+  const arms=[],legs=[];
+  for(const side of [-1,1]){
+   const arm=new THREE.Group();arm.position.set(side*.47,1.43,0);body.add(arm);
+   cube(arm,.22,.64,.27,0,-.32,0,mats.uniform);
+   cube(arm,.21,.16,.24,0,-.70,0,mats.skin);arms.push(arm);
+   const leg=new THREE.Group();leg.position.set(side*.19,.70,0);body.add(leg);
+   cube(leg,.27,.64,.29,0,-.32,0,mats.pants);
+   cube(leg,.29,.19,.36,0,-.70,.05,mats.boot);legs.push(leg);
+  }
+  // Floating role sign faces the camera without any external texture dependencies.
+  const canvas=document.createElement('canvas');canvas.width=256;canvas.height=72;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#152731';ctx.fillRect(0,0,256,72);
+  ctx.strokeStyle='#f6d15a';ctx.lineWidth=4;ctx.strokeRect(2,2,252,68);
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 18px Arial';ctx.fillText(n.name,128,30);
+  ctx.font='bold 16px Arial';ctx.fillText(n.role,128,54);
+  const texture=new THREE.CanvasTexture(canvas),label=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
+  label.position.y=2.9;label.scale.set(3.7,1.05,1);root.add(label);
+  root.position.set(n.x,36.05,n.z);sc.add(root);
+  safetyNpcs.push({...n,root,body,arms,legs,label});
  }
 }
-function safetyNpcPos(n,now=Date.now()){const phase=now/2600+SAFETY_NPCS.findIndex(x=>x.id===n.id)*2.3;return{x:n.x+Math.sin(phase)*2,z:n.z+Math.cos(phase)*1.4}}
+function safetyNpcPos(n,now=Date.now()){
+ const phase=now/2600+SAFETY_NPCS.findIndex(x=>x.id===n.id)*2.3;
+ return {x:n.x+Math.sin(phase)*2,z:n.z+Math.cos(phase)*1.4};
+}
 function safetyNpcTick(){
  if(safetyGameType!=='safety'||!started)return;
- const now=Date.now();let closest=null,dist=4.5;
- for(const n of safetyNpcs){const p=safetyNpcPos(n,now),d=Math.hypot(pl.x-p.x,pl.z-p.z);n.root.position.x=p.x;n.root.position.z=p.z;n.root.rotation.y=Math.atan2(Math.cos(now/2600),Math.sin(now/2600));if(d<dist){closest=n;dist=d}}
- const label=$('safetyNpcPrompt');if(label){label.style.display=closest?'block':'none';if(closest)label.textContent='[E] Conversar com '+closest.name}
+ const now=Date.now();let nearest=null,dist=4.5;
+ for(const n of safetyNpcs){
+  const p=safetyNpcPos(n,now),d=Math.hypot(pl.x-p.x,pl.z-p.z),phase=now/2600+SAFETY_NPCS.findIndex(x=>x.id===n.id)*2.3;
+  const vx=Math.cos(phase)*2/2600,vz=-Math.sin(phase)*1.4/2600;
+  n.root.position.set(p.x,36.05,p.z);n.root.rotation.y=Math.atan2(vx,vz);
+  const stride=Math.sin(now*.007+SAFETY_NPCS.findIndex(x=>x.id===n.id)),swing=.45*stride;
+  n.arms[0].rotation.x=swing;n.arms[1].rotation.x=-swing;
+  n.legs[0].rotation.x=-swing;n.legs[1].rotation.x=swing;
+  n.body.position.y=Math.abs(stride)*.045;n.body.rotation.z=Math.sin(now*.0015)*.016;
+  n.label.position.y=2.9+Math.sin(now*.002)*.045;
+  if(d<dist){nearest=n;dist=d}
+ }
+ const prompt=$('safetyNpcPrompt');if(prompt){prompt.style.display=nearest?'block':'none';if(nearest)prompt.textContent='[E] Conversar com '+nearest.name}
 }
 function safetyNpcInteract(){if(safetyGameType!=='safety'||!started||over)return false;let nearest=null,dist=4.5;for(const n of safetyNpcs){const p=safetyNpcPos(n),d=Math.hypot(pl.x-p.x,pl.z-p.z);if(d<dist){nearest=n;dist=d}}if(nearest){safetyAction('npc',{id:nearest.id});return true}return false}
 document.addEventListener('keydown',e=>{if(e.code!=='KeyE'||e.repeat||safetyGameType!=='safety'||!started)return; if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;if(safetyNpcInteract()){e.preventDefault();e.stopImmediatePropagation()}},true);
