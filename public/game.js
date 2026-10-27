@@ -640,11 +640,11 @@ function buildSafetyNpcs(){
  clearSafetyNpcs();if(safetyGameType!=='safety')return;
  for(const n of SAFETY_NPCS){
   const root=new THREE.Group(),body=new THREE.Group();root.add(body);
-  const mats={uniform:new THREE.MeshLambertMaterial({color:n.color}),pants:new THREE.MeshLambertMaterial({color:n.pants}),
-   helmet:new THREE.MeshLambertMaterial({color:n.helmet}),skin:new THREE.MeshLambertMaterial({color:n.skin}),
-   hair:new THREE.MeshLambertMaterial({color:n.hair}),boot:new THREE.MeshLambertMaterial({color:0x20252c}),
-   dark:new THREE.MeshBasicMaterial({color:0x1a2028}),white:new THREE.MeshLambertMaterial({color:0xe8e9dd}),
-   reflective:new THREE.MeshLambertMaterial({color:0xfff5b1})};
+  const mats={uniform:new THREE.MeshBasicMaterial({color:n.color}),pants:new THREE.MeshBasicMaterial({color:n.pants}),
+   helmet:new THREE.MeshBasicMaterial({color:n.helmet}),skin:new THREE.MeshBasicMaterial({color:n.skin}),
+   hair:new THREE.MeshBasicMaterial({color:n.hair}),boot:new THREE.MeshBasicMaterial({color:0x20252c}),
+   dark:new THREE.MeshBasicMaterial({color:0x1a2028}),white:new THREE.MeshBasicMaterial({color:0xe8e9dd}),
+   reflective:new THREE.MeshBasicMaterial({color:0xfff5b1})};
   const cube=(parent,w,h,d,x,y,z,mat)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);o.position.set(x,y,z);parent.add(o);return o};
   cube(body,.73,.86,.38,0,1.10,0,mats.uniform);
   cube(body,.74,.10,.40,0,1.25,.01,mats.reflective);
