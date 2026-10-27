@@ -619,10 +619,10 @@ function renderNrMissionJournal(){
  const done=safetyState?.completed||{},active=safetyState?.mission;
  const count=NR_TASKS.filter(n=>done[n.id]).length;
  $('nrMissionSummary').textContent=count+'/3 concluídas · '+(active?'Atual: '+active.toUpperCase():'Procure um NPC instrutor');
- $('nrMissionCards').innerHTML=NR_TASKS.map(n=>'<div class="nr-task'+(done[n.id]?' done':'')+'"><b>'+(done[n.id]?'✅ ':active===n.id?'▶ ':'⬜ ')+n.name+'</b><p>'+n.where+'</p><p>'+n.detail+'</p><small>'+(done[n.id]?'Concluída':active===n.id?'Missão em andamento':'Fale com o instrutor')+'</small></div>').join('');
+ renderNrMissionActions();$('nrMissionCards').innerHTML=NR_TASKS.map(n=>'<div class="nr-task'+(done[n.id]?' done':'')+'"><b>'+(done[n.id]?'✅ ':active===n.id?'▶ ':'⬜ ')+n.name+'</b><p>'+n.where+'</p><p>'+n.detail+'</p><small>'+(done[n.id]?'Concluída':active===n.id?'Missão em andamento':'Fale com o instrutor')+'</small></div>').join('');
 }
 document.addEventListener('keydown',e=>{if(e.code==='KeyM'&&safetyGameType==='safety'&&started&&!e.repeat&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){toggleNrMissionMenu(!nrMissionOpen);e.preventDefault()}});
-function safetyDraw(){const classic=safetyGameType==='safety';if($('bar'))$('bar').style.display=classic?'none':'';const box=$('safetyPanel');if(!box)return;box.style.display=safetyGameType==='safety'&&started&&!over?'block':'none';if($('safetyProgress'))$('safetyProgress').style.whiteSpace='pre-line';if(box.style.display==='none')return;const e=safetyState?.epi||{};$('safetyGoggles').textContent=e.goggles?'✅ Óculos equipados':'🥽 Equipar óculos';$('safetyGloves').textContent=e.gloves?'✅ Luvas equipadas':'🧤 Equipar luvas';$('safetyProgress').textContent='MISSÃO: '+(safetyState?.mission?.toUpperCase()||'Fale com um instrutor')+'\n'+['nr6','nr10','nr12'].map(k=>(safetyState?.completed?.[k]?'✅ ':'⬜ ')+k.toUpperCase()).join('  ')}
+function safetyDraw(){if($('bar'))$('bar').style.display=safetyGameType==='safety'?'none':'';renderNrMissionJournal()}
 // Small voxel station near each team resource generator; client visuals only.
 let safetyStationMeshes=[];
 function clearSafetyStations(){for(const m of safetyStationMeshes){sc.remove(m);m.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()})}safetyStationMeshes=[]}
@@ -719,7 +719,29 @@ function safetyNpcTick(){
  }
  const prompt=$('safetyNpcPrompt');if(prompt){prompt.style.display=nearest?'block':'none';if(nearest)prompt.textContent='[E] Conversar com '+nearest.name}
 }
-function safetyNpcInteract(){if(safetyGameType!=='safety'||!started||over)return false;let nearest=null,dist=4.5;for(const n of safetyNpcs){const p=n.root.position,d=Math.hypot(pl.x-p.x,pl.z-p.z);if(d<dist){nearest=n;dist=d}}if(nearest){safetyAction('npc',{id:nearest.id});return true}return false}
+let nrTalkNpc=null;
+const NR_DIALOGUE={
+ nr6:['Supervisora de EPI','Antes de entrar na área de extração, precisamos garantir sua proteção. Óculos e luvas fazem parte deste exercício. Você aceita conferir os equipamentos e executar a tarefa simulada?','Sim, quero aprender a usar os EPIs corretamente.'],
+ nr10:['Técnico Eletricista','Bem-vindo à estação elétrica de treinamento. Aqui você seguirá uma sequência simulada de segurança. Não execute esses procedimentos em instalações reais sem qualificação. Aceita o desafio?','Aceito! Vou seguir a sequência da simulação.'],
+ nr12:['Instrutora de Máquinas','Nesta área vamos verificar as proteções de uma esteira industrial simulada e testar uma parada de emergência. Vamos iniciar a atividade?','Sim! Quero verificar os dispositivos de segurança.']
+};
+function openNrNpcDialogue(id){
+ if(safetyGameType!=='safety'||!started||!NR_DIALOGUE[id])return;
+ nrTalkNpc=id;const d=NR_DIALOGUE[id];$('nrTalkRole').textContent=id.toUpperCase()+' · TREINAMENTO';$('nrTalkName').textContent=d[0];$('nrTalkLine').textContent=d[1];$('nrPlayerLine').textContent=d[2];
+ const modal=$('nrNpcDialogue');if(modal)modal.style.display='flex';
+}
+function closeNrNpcDialogue(){nrTalkNpc=null;const modal=$('nrNpcDialogue');if(modal)modal.style.display='none'}
+function acceptNrNpcMission(){if(!nrTalkNpc)return;const id=nrTalkNpc;closeNrNpcDialogue();safetyAction('npc',{id});toggleNrMissionMenu(true)}
+function renderNrMissionActions(){
+ const area=$('nrMissionActions');if(!area)return;const id=safetyState?.mission;
+ const button=(title,callback)=>{const b=document.createElement('button');b.type='button';b.textContent=title;b.onclick=callback;area.appendChild(b)};
+ area.replaceChildren();
+ if(safetyGameType!=='safety'||!started||!id||safetyState?.completed?.[id])return;
+ if(id==='nr6'){button(safetyState?.epi?.goggles?'✅ Retirar óculos':'🥽 Equipar óculos',()=>safetyEquip('goggles'));button(safetyState?.epi?.gloves?'✅ Retirar luvas':'🧤 Equipar luvas',()=>safetyEquip('gloves'));button('⛏ Extração segura',()=>safetyAction('extract'))}
+ if(id==='nr10'){const steps=['isolate','lock','verify','ground','protect','signal'],names=['Seccionamento','Impedir reenergização','Verificar ausência de tensão','Aterramento','Proteger partes adjacentes','Sinalizar'];const i=Math.min(5,safetyState?.electrical?.step||0);button('⚡ '+names[i],()=>safetyAction('electrical',{step:steps[i]}))}
+ if(id==='nr12')for(const [k,label] of [['guard','Instalar proteção'],['stop','Parada de emergência'],['release','Liberar parada'],['reset','Rearmar'],['start','Iniciar simulação']])button(label,()=>safetyAction('machine',{step:k}));
+}
+function safetyNpcInteract(){if(safetyGameType!=='safety'||!started||over)return false;let nearest=null,dist=4.5;for(const n of safetyNpcs){const p=n.root.position,d=Math.hypot(pl.x-p.x,pl.z-p.z);if(d<dist){nearest=n;dist=d}}if(nearest){openNrNpcDialogue(nearest.id);return true}return false}
 document.addEventListener('keydown',e=>{if(e.code!=='KeyE'||e.repeat||safetyGameType!=='safety'||!started)return; if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;if(safetyNpcInteract()){e.preventDefault();e.stopImmediatePropagation()}},true);
 function safetyAction(action,extras={}){if(action==='extract'){const base=worldMeta?.GEN?.[me.team];if(base&&Math.hypot(pl.x-base[0],pl.z-base[2])>5){msg('NR 6: aproxime-se da estação de extração da sua equipe.');return}}send({t:'safetyAction',action,...extras})}
 function safetyEquip(item){safetyAction('equip',{item,on:!safetyState?.epi?.[item]})}
@@ -825,8 +847,8 @@ function releaseDrop(k,m){m.visible=false;const pool=DROP_POOL.get(k)||[];if(poo
 function syncDrops(l){const seen=new Set();l.forEach(d=>{seen.add(d.id);let o=DROP.get(d.id);if(!o){const m=acquireDrop(d.k);if(!m.parent)sc.add(m);o={m,k:d.k,baseY:d.y,phase:(d.id%17)*.37};DROP.set(d.id,o)}o.baseY=d.y;o.m.position.set(d.x,d.y,d.z);o.n=d.n});DROP.forEach((o,id)=>{if(!seen.has(id)){releaseDrop(o.k,o.m);DROP.delete(id)}})}
 let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){const gap=lowEnd?66:qualityMode==='medium'?44:33;if(dropVisualDisabled||now-dropVisualAt<gap)return;dropVisualAt=now;const t=now*.001;try{DROP.forEach(o=>{o.m.rotation.y=t*1.8+o.phase;o.m.rotation.z=Math.sin(t*.9+o.phase)*.08;const d=Math.hypot(o.m.position.x-pl.x,o.m.position.z-pl.z);if(me.alive&&d<3.2){const a=(3.2-d)/3.2*.14;o.m.position.x+=(pl.x-o.m.position.x)*a;o.m.position.z+=(pl.z-o.m.position.z)*a;o.baseY+=(pl.y+.65-o.baseY)*a}o.m.position.y=o.baseY+.15+Math.sin(t*2.6+o.phase)*.08})}catch(err){dropVisualDisabled=true;console.warn('Drops visuais desativados para preservar gameplay',err)}}
 function on(m){switch(m.t){
-case'safetyComplete':toggleNrMissionMenu(false);clearSafetyNpcs();over=1;started=0;clearSafetyStations();showEventBanner('🏆 OPERAÇÃO SEGURA CONCLUÍDA!','start',6500);msg(m.message||'Treinamento concluído!');$('end').style.display='flex';$('et').textContent='Missão concluída!';$('endSub').textContent='Você concluiu os desafios NR 6, NR 10 e NR 12.';$('endStats').textContent='Treinamento individual finalizado.';break;
-case'safetyState':safetyState=m.state||safetyState;if(m.message)msg(m.message);if(safetyState?.electrical?.step!=null){const sel=$('safetyElectricStep');if(sel&&sel.options.length>0)sel.selectedIndex=Math.min(sel.options.length-1,safetyState.electrical.step)}safetyDraw();renderNrMissionJournal();break;
+case'safetyComplete':closeNrNpcDialogue();toggleNrMissionMenu(false);clearSafetyNpcs();over=1;started=0;clearSafetyStations();showEventBanner('🏆 OPERAÇÃO SEGURA CONCLUÍDA!','start',6500);msg(m.message||'Treinamento concluído!');$('end').style.display='flex';$('et').textContent='Missão concluída!';$('endSub').textContent='Você concluiu os desafios NR 6, NR 10 e NR 12.';$('endStats').textContent='Treinamento individual finalizado.';break;
+case'safetyState':safetyState=m.state||safetyState;if(m.message)msg(m.message);safetyDraw();renderNrMissionJournal();break;
 case'init':safetyGameType=m.gameType||'classic';safetyState=null;me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;blockOpSeq=Math.max(blockOpSeq,Number(m.placeOpSeq)||0);placementQueue.length=0;BRIDGE_PRED.clear();reconnectToken=m.token||reconnectToken;if($('rc'))$('rc').textContent=roomCode;if(m.party!=null)setPartyCode(m.party,false);myProfile=m.profile||myProfile;rankingData=m.ranking||rankingData;drawProfile();drawRanking();saveReconnect();loadMap(m.mapId||'classic',true,m.activeChunks);BLOCK_SEQ.clear();lastBlockSeq=0;(m.ed||[]).forEach(applyServerBlock);flush(999);syncDrops(m.drops||[]);pl.yaw=0;$('er').textContent=m.quick?'Partida encontrada!':'';break;
 case'reconnected':
  safetyGameType=m.gameType||'classic';safetyState=null;setTimeout(()=>send({t:'safetySync'}),200);
