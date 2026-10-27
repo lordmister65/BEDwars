@@ -93,6 +93,26 @@
  for(let x=-7;x<=7;x++)for(let z=-19;z<=-10;z++)set(x,BASE_Y+1,z,28);
  for(let x=-6;x<=6;x++)for(let z=-17;z<=-13;z++)set(x,BASE_Y+2,z,(x%3===0)?20:21);
  for(let x=-8;x<=8;x++)for(let z of [-20,-9]){set(x,BASE_Y+2,z,7);if(x%4===0)set(x,BASE_Y+3,z,26)}
+ // Three clearly organized training buildings, with open doors and colored signs.
+ const facilities=[
+  {cx:-13,cz:-2,accent:32}, // NR 6 / PPE and extraction
+  {cx:13,cz:-2,accent:34}, // NR 10 / electrical simulator
+  {cx:0,cz:-15,accent:33} // NR 12 / machine guard
+ ];
+ for(const f of facilities){
+  for(let dx=-7;dx<=7;dx++)for(let dz=-7;dz<=7;dz++){
+   const xx=f.cx+dx,zz=f.cz+dz;if(Math.abs(xx)>22||Math.abs(zz)>21)continue;
+   if(Math.abs(dx)===7||Math.abs(dz)===7){
+    if(dz===7&&Math.abs(dx)<=2)continue; // Walk-in entrance from the reception.
+    for(let h=2;h<=5;h++)set(xx,BASE_Y+h,zz,h===5?f.accent:7);
+   }
+  }
+  for(let dx=-2;dx<=2;dx++)for(let h=2;h<=4;h++)set(f.cx+dx,BASE_Y+h,f.cz+7,0);
+  for(let dx=-3;dx<=3;dx++)set(f.cx+dx,BASE_Y+6,f.cz+7,f.accent);
+ }
+ // Walkable pathways connecting all three stations to the reception.
+ for(let z=5;z<=16;z++)for(let x=-2;x<=2;x++)set(x,BASE_Y+1,z,20);
+ for(let x=-13;x<=13;x++)for(let z=5;z<=7;z++)set(x,BASE_Y+1,z,20);
  // Reception / safe start point.
  for(let x=-4;x<=4;x++)for(let z=13;z<=19;z++)set(x,BASE_Y+1,z,20);
  BD[0]=null;SHOP[0]=[0.5,BASE_Y+2,16.5];GEN[0]=[-13.5,BASE_Y+2,-1.5];
