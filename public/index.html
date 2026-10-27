@@ -50,7 +50,17 @@
 .nr-task{border:1px solid #41616d;border-radius:10px;padding:11px;margin:10px 0;background:#203a46}.nr-task.done{border-color:#56c595}
 #safetyPanel{max-height:65vh;overflow-y:auto}
 @media(max-width:700px){#nrMissionHud{top:auto;bottom:105px;left:8px;width:min(255px,70vw);font-size:12px}}
-</style></head><body>
+</style><style id="nr-dialogue-style">
+#nrNpcDialogue{position:fixed;inset:0;z-index:55;align-items:center;justify-content:center;background:rgba(6,19,28,.8);color:white;font-family:Arial}
+.nr-talk{width:min(540px,92vw);background:linear-gradient(145deg,#213c4b,#0c222e);border:2px solid #8cdae0;border-radius:18px;padding:20px;box-shadow:0 12px 50px #000b}
+.nr-talk-head{display:flex;justify-content:space-between;color:#a8eff2;font-size:12px;font-weight:bold;letter-spacing:.08em}
+.nr-talk-head button{background:transparent;color:white;border:0;cursor:pointer;font-size:20px}
+.nr-talk h2{margin:8px 0 16px}.nr-talk p{line-height:1.6}.nr-talk-player{background:#304d58;padding:12px;border-radius:9px;margin:16px 0}
+.nr-talk-actions{display:flex;gap:10px;flex-wrap:wrap}.nr-talk-actions button{padding:11px 18px;border-radius:8px;background:#176e80;color:white;border:1px solid #86d5e1;cursor:pointer}
+#nrMissionActions{margin-top:12px;border-top:1px solid #406371;padding-top:12px;display:flex;gap:7px;flex-wrap:wrap}
+#nrMissionActions button{padding:8px 10px}
+</style>
+</head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="eventBanner"></div><div id="matchStatus"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
