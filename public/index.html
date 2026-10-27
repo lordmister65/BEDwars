@@ -42,7 +42,15 @@
 .s.empty.has-icon:hover .hotbar-icon{opacity:.34!important}
 .s.has-icon:not(.empty) .hotbar-icon{opacity:1!important}
 </style>
-</head><body>
+<style id="nr-mission-ui">
+#nrMissionHud{display:none;position:fixed;top:68px;left:12px;z-index:17;width:min(305px,45vw);background:#12232de8;color:#fff;border:1px solid #71c6ca;border-radius:12px;padding:12px;font:13px Arial;box-shadow:0 8px 24px #0009}
+#nrMissionHud b{color:#9ef3ef}#nrMissionHud button,#nrMissionMenu button{background:#22677b;color:white;border:1px solid #78bbcb;border-radius:7px;padding:7px;cursor:pointer}
+#nrMissionMenu{display:none;position:fixed;inset:0;z-index:35;align-items:center;justify-content:center;background:#07121acc}
+#nrMissionMenu .nr-sheet{width:min(620px,92vw);max-height:85vh;overflow:auto;background:#142935;color:white;border:2px solid #74c9cd;border-radius:16px;padding:22px;font:15px Arial}
+.nr-task{border:1px solid #41616d;border-radius:10px;padding:11px;margin:10px 0;background:#203a46}.nr-task.done{border-color:#56c595}
+#safetyPanel{max-height:65vh;overflow-y:auto}
+@media(max-width:700px){#nrMissionHud{top:auto;bottom:105px;left:8px;width:min(255px,70vw);font-size:12px}}
+</style></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="eventBanner"></div><div id="matchStatus"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
@@ -52,6 +60,8 @@
   <div class="audio-settings-actions"><button id="audioMuteBtn" type="button">Silenciar</button><button id="audioTestBtn" type="button">Testar som</button></div>
   <small>Máximo de 150% com proteção contra picos.</small>
 </div>
+<div id="nrMissionHud"><b>🦺 OPERAÇÃO SEGURA</b><div id="nrMissionSummary">Converse com um instrutor para receber sua missão.</div><button type="button" onclick="toggleNrMissionMenu(true)">📋 Missões (M)</button></div>
+<div id="nrMissionMenu"><div class="nr-sheet"><h2>📋 Central de Missões</h2><p>Converse com os instrutores usando a tecla E para iniciar cada treinamento.</p><div id="nrMissionCards"></div><button type="button" onclick="toggleNrMissionMenu(false)">Fechar · M</button></div></div>
 <div id="safetyNpcPrompt" style="display:none;position:fixed;bottom:22%;left:50%;transform:translateX(-50%);z-index:19;background:#15242cdd;border:1px solid #ffcc41;color:white;border-radius:9px;padding:10px 18px;font:600 15px Arial;pointer-events:none"></div>
 <div id="safetyPanel" style="display:none;position:fixed;right:10px;top:66px;z-index:18;max-width:260px;background:rgba(10,24,35,.94);color:white;border:2px solid #ffcc41;border-radius:12px;padding:12px;font:13px Arial;box-shadow:0 2px 15px #0008"><b>🦺 OPERAÇÃO SEGURA</b><p id="safetyProgress" style="margin:8px 0">Conectando...</p><p>NR 6 · Extração segura</p><button id="safetyGoggles" onclick="safetyEquip('goggles')">🥽 Equipar óculos</button><button id="safetyGloves" onclick="safetyEquip('gloves')">🧤 Equipar luvas</button><button onclick="safetyAction('extract')">⛏ Realizar extração segura</button><p>NR 10 · Painel elétrico</p><select id="safetyElectricStep"><option value="isolate">1 Seccionamento</option><option value="lock">2 Impedir reenergização</option><option value="verify">3 Verificar ausência de tensão</option><option value="ground">4 Aterramento</option><option value="protect">5 Proteger partes adjacentes</option><option value="signal">6 Sinalizar</option></select><button onclick="safetyAction('electrical',{step:document.getElementById('safetyElectricStep').value})">Confirmar etapa</button><p>NR 12 · Máquina</p><div style="display:flex;flex-wrap:wrap;gap:3px"><button onclick="safetyAction('machine',{step:'guard'})">Instalar proteção</button><button onclick="safetyAction('machine',{step:'stop'})">Parada</button><button onclick="safetyAction('machine',{step:'release'})">Liberar</button><button onclick="safetyAction('machine',{step:'reset'})">Rearmar</button><button onclick="safetyAction('machine',{step:'start'})">Iniciar</button></div><small>Simulação educativa, não representa procedimento real.</small></div><div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
@@ -112,6 +122,6 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="/shared.js?v=safety-map-20261026"></script>
 <script src="/blockbench-models.js"></script>
-<script src="/game.js?v=npc-collision-20261027"></script>
+<script src="/game.js?v=nr-map-ui-20261027"></script>
 <script src="/cloud-system.js?v=clouds-v1-20261012"></script>
 </body></html>
