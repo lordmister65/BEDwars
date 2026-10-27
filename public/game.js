@@ -626,17 +626,41 @@ function safetyDraw(){if($('bar'))$('bar').style.display=safetyGameType==='safet
 // Small voxel station near each team resource generator; client visuals only.
 let safetyStationMeshes=[];
 function clearSafetyStations(){for(const m of safetyStationMeshes){sc.remove(m);m.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()})}safetyStationMeshes=[]}
+const NR_WORKSTATIONS=[
+ {id:'locker',name:'Armário de EPIs',x:-15,z:2,mission:'nr6'},
+ {id:'extract',name:'Estação de extração',x:-13.5,z:-1.5,mission:'nr6'},
+ {id:'electrical',name:'Painel elétrico simulado',x:12.5,z:-3.5,mission:'nr10'},
+ {id:'machine',name:'Esteira industrial',x:0,z:-15,mission:'nr12'}
+];
 function buildSafetyStations(){
  clearSafetyStations();if(safetyGameType!=='safety'||!started)return;
- const sites=Array.isArray(worldMeta?.GEN)?worldMeta.GEN:[];
- for(let t=0;t<Math.min(2,sites.length);t++){
-  const p=sites[t];if(!p)continue;
-  const g=new THREE.Group();g.position.set(p[0]+2,p[1],p[2]+2);
-  const material=new THREE.MeshLambertMaterial({color:0xd6a61c});
-  const dark=new THREE.MeshLambertMaterial({color:0x38434b});
-  const box=(w,h,d,x,y,z,mat)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);g.add(m)};
-  box(2.2,.3,1.6,0,.15,0,dark);box(1.7,1.1,1.1,0,.8,0,material);box(.7,.35,.8,0,1.48,0,dark);
-  g.userData.safetyStation=t;sc.add(g);safetyStationMeshes.push(g);
+ const basic=c=>new THREE.MeshBasicMaterial({color:c}),metal=basic(0x566875),edge=basic(0x172b36),bright=basic(0xffc947),glass=basic(0x72c9e7),green=basic(0x37c884),red=basic(0xeb4e49);
+ const add=(root,w,h,d,x,y,z,mat)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);root.add(mesh);return mesh};
+ for(const o of NR_WORKSTATIONS){
+  const g=new THREE.Group();g.position.set(o.x,36,o.z);g.userData.workstation=o.id;
+  if(o.id==='locker'){
+   add(g,2.3,2.8,.85,0,1.4,0,metal);add(g,2.25,.16,.93,0,2.75,0,bright);
+   for(const x of [-.57,.57]){add(g,.97,2.37,.07,x,1.42,.48,edge);add(g,.12,.4,.12,x+.27,1.4,.56,bright);
+    for(let y=.8;y<2.4;y+=.27)add(g,.48,.035,.075,x,y,.54,glass)}
+   add(g,.75,.55,.10,0,3.12,0,bright);
+  }else if(o.id==='extract'){
+   add(g,3,.28,2.2,0,.18,0,edge);add(g,2.2,1.15,1.65,0,.88,0,metal);
+   for(let x of [-1.15,1.15]){add(g,.13,2.4,.13,x,1.6,-.9,bright);add(g,.13,.13,1.8,x,2.8,0,metal)}
+   add(g,1.05,.18,.9,0,1.58,.10,bright);add(g,.6,.25,.35,0,1.82,.10,glass);
+  }else if(o.id==='electrical'){
+   add(g,2.9,2.85,.95,0,1.43,0,metal);add(g,2.7,2.55,.12,0,1.42,.54,edge);
+   add(g,1.75,1.05,.10,0,1.97,.64,glass);
+   for(let i=0;i<5;i++){add(g,.19,.19,.12,-.82+i*.41,1.15,.65,i%2?green:bright);
+    add(g,.22,.36,.15,-.82+i*.41,.64,.65,metal)}
+   add(g,3.1,.2,1.15,0,2.91,0,bright);
+  }else{
+   for(const x of [-2.2,2.2]){add(g,.22,1.7,.22,x,.85,-.8,bright);add(g,.22,1.7,.22,x,.85,.8,bright)}
+   add(g,5,.25,2.3,0,.7,0,metal);add(g,4.5,.09,1.65,0,.92,0,edge);
+   for(let x=-1.9;x<2;x+=.5)add(g,.36,.055,1.55,x,.98,0,glass);
+   for(const z of [-1.03,1.03])add(g,4.8,.2,.14,0,1.6,z,bright);
+   add(g,.85,1.2,.8,2.5,1.14,0,metal);add(g,.43,.43,.2,2.5,1.52,.49,red);
+  }
+  sc.add(g);safetyStationMeshes.push(g);
  }
 }
 
