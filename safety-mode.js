@@ -4,7 +4,7 @@ const EPIS=['goggles','gloves'];
 function newPlayer(){return {epi:{goggles:false,gloves:false},extractedAt:0,extractions:0,mission:null,completed:{nr6:false,nr10:false,nr12:false}};}
 function newRoom(){return {electrical:{step:0,completed:false,owner:null},machine:{guard:false,stop:false,reset:false,running:false}};}
 function snapshot(p,R,now=Date.now()){return {epi:{...p.safety.epi},extractions:p.safety.extractions,cooldownMs:Math.max(0,12000-(now-p.safety.extractedAt)),electrical:{...R.safety.electrical},machine:{...R.safety.machine},mission:p.safety.mission,completed:{...p.safety.completed}};}
-function equipment(p,item,on){if(!EPIS.includes(item)||typeof on!=='boolean')return {ok:false,message:'EPI inválido'};p.safety.epi[item]=on;return {ok:true,message:on?'EPI equipado.':'EPI retirado.'};}
+function equipment(p,item,on,R=null){if(!EPIS.includes(item)||typeof on!=='boolean')return {ok:false,message:'EPI inválido'};if(R&&R.gameType==='safety'&&(p.safety.mission!=='nr6'||!Number.isFinite(p.x)||!Number.isFinite(p.z)||Math.hypot(p.x+15,p.z-2)>5))return {ok:false,message:'NR 6: aceite a missão e aproxime-se do armário de EPIs.'};p.safety.epi[item]=on;return {ok:true,message:on?'EPI equipado.':'EPI retirado.'};}
 function extract(p,R,now=Date.now()){
  if(p.safety.mission!=='nr6')return {ok:false,message:'Converse primeiro com o NPC responsável pela NR6.'};
  if(!EPIS.every(k=>p.safety.epi[k]))return {ok:false,message:'NR 6: equipe óculos e luvas antes da extração.'};
