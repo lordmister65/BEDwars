@@ -837,7 +837,7 @@ wss.on('connection', ws => {
       case 'safetyAction': {
         if(R.gameType!=='safety'||!play||p.disconnected||!allow(p,'safetyAction',200))break;
         let result={ok:false,message:'Ação desconhecida.'};const action=String(m.action||'');
-        if(action==='npc')result=SAFETY.interact(p,String(m.id||''));
+        if(action==='npc')result=SAFETY.interact(p,String(m.id||''),Date.now(),R);
         else if(action==='equip')result=SAFETY.equipment(p,m.item,m.on);
         else if(action==='extract')result=SAFETY.extract(p,R);
         else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
