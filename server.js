@@ -836,11 +836,12 @@ wss.on('connection', ws => {
       case 'safetyAction': {
         if(R.gameType!=='safety'||!play||p.disconnected||!allow(p,'safetyAction',200))break;
         let result={ok:false,message:'Ação desconhecida.'};const action=String(m.action||'');
-        if(action==='equip')result=SAFETY.equipment(p,m.item,m.on);
+        if(action==='npc')result=SAFETY.interact(p,String(m.id||''));
+        else if(action==='equip')result=SAFETY.equipment(p,m.item,m.on);
         else if(action==='extract')result=SAFETY.extract(p,R);
         else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
         else if(action==='machine')result=SAFETY.machine(p,R,m.step);
-        if(result.ok&&R.gameType==='safety'&&p.safety.extractions>=1&&R.safety.electrical.completed&&R.safety.machine.running){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
+        if(result.ok&&R.gameType==='safety'&&SAFETY.completeCurrent(p,R)){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
         if(result.ok&&R.gameType==='classic'){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
         tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok});break;
       }
