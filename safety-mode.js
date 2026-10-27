@@ -50,8 +50,8 @@ function npcPosition(id,now=Date.now()){
  const phase=now/2600+(NPCS.indexOf(npc)*2.3);
  return {...npc,x:npc.x+Math.sin(phase)*2,z:npc.z+Math.cos(phase)*1.4,y:36.05};
 }
-function interact(p,id,now=Date.now()){
- const npc=npcPosition(id,now);
+function interact(p,id,now=Date.now(),R=null){
+ const npc=R?.safety?.npcs?.find(n=>n.id===id)||npcPosition(id,now);
  if(!npc||!Number.isFinite(p.x)||Math.hypot(p.x-npc.x,p.z-npc.z)>4.5)return {ok:false,message:'Aproxime-se do instrutor para conversar.'};
  if(p.safety.completed[id])return {ok:true,message:npc.name+': você já concluiu este treinamento.'};
  p.safety.mission=id;
