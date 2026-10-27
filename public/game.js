@@ -222,6 +222,8 @@ function newGenerator(x,y,z,type,size=7){
  g.position.set(x,y,z);sc.add(g);const v={g,core,label,particles,type,labelText:'',phase:Math.random()*10};GEN_VIS.push(v);return v
 }
 function clearGeneratorVisuals(){while(GEN_VIS.length){const v=GEN_VIS.pop();sc.remove(v.g);v.g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const mm=Array.isArray(o.material)?o.material:[o.material];mm.forEach(m=>{if(m.map)m.map.dispose();m.dispose&&m.dispose()})}})}}
+let safetyGameType='classic';
+let safetyState=null;
 function updateGeneratorIcons(meta){clearGeneratorVisuals();if(safetyGameType==='safety')return;(meta.GEN||[]).forEach(([x,y,z],i)=>{if(!visualTeamActive(i))return;const v=newGenerator(x,y-.02,z,'base',7);v.index=i});(meta.DIGEN||[]).forEach(([x,y,z],i)=>{const v=newGenerator(x,y-.02,z,'dia',5);v.index=i});if(meta.EMGEN){const v=newGenerator(meta.EMGEN[0],meta.EMGEN[1]-.02,meta.EMGEN[2],'em',7);v.index=0}}
 let genVisualAt=0,genLabelAt=0,genVisualDisabled=false;
 function updateGenerators(now){
@@ -601,8 +603,7 @@ $('ov').onclick=()=>{audioInit();scr(null);requestGameLock()};
 // rede e reconexão
 const NET_RECONNECT_MS=60000,NET_CONNECT_TIMEOUT_MS=8000,NET_STALE_MS=25000,NET_PING_MS=10000;
 let netSeq=0,netAttemptAt=0,socketOpenedAt=0,lastNetMessageAt=Date.now(),connectTimeout=null,reconnectFailCount=0;
-let safetyGameType='classic';
-let safetyState=null;
+
 function safetyMode(){return $('gameType')?.value||'classic'}
 function safetyDraw(){const classic=safetyGameType==='safety';if($('bar'))$('bar').style.display=classic?'none':'';const box=$('safetyPanel');if(!box)return;box.style.display=safetyGameType==='safety'&&started&&!over?'block':'none';if(box.style.display==='none')return;const e=safetyState?.epi||{};$('safetyGoggles').textContent=e.goggles?'✅ Óculos equipados':'🥽 Equipar óculos';$('safetyGloves').textContent=e.gloves?'✅ Luvas equipadas':'🧤 Equipar luvas';$('safetyProgress').textContent='Extrações: '+(safetyState?.extractions||0)+' | NR 10: '+(safetyState?.electrical?.step||0)+'/6 | Máquina: '+(safetyState?.machine?.running?'Operando':'Parada')}
 // Small voxel station near each team resource generator; client visuals only.
