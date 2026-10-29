@@ -71,69 +71,56 @@
   function jungleTemple(set){jungleCone(set,0,0,21,36,777);for(const[x,z]of[[-26,-18],[26,-18],[-26,18],[26,18],[-18,-27],[18,-27],[-18,27],[18,27]])jungleTree(set,x,22,z,9);for(const[x,z]of[[-24,-24],[24,-24],[-24,24],[24,24]]){junglePillar(set,x,22,z,10);ring(set,x,22,z,3,19,1)}const levels=[[28,22],[23,27],[18,32],[13,37],[8,42]];for(const[r,y]of levels){for(let x=-r;x<=r;x++)for(let z=-r;z<=r;z++){const border=Math.abs(x)===r||Math.abs(z)===r,court=Math.abs(x)<=Math.max(3,r-5)&&Math.abs(z)<=Math.max(3,r-5);if(border||court)set(x,y,z,(x+z+y)%7===0?19:28)}for(const[dx,dz]of[[-r,-r],[r,-r],[-r,r],[r,r]])junglePillar(set,dx,y,dz,Math.min(8,49-y))}for(let n=0;n<19;n++)for(let w=-4;w<=4;w++){set(w,22+Math.floor(n/4),29-n,28);if(Math.abs(w)===4)set(w,23+Math.floor(n/4),29-n,26)}for(let y=43;y<=52;y++)for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)if(Math.abs(x)===5||Math.abs(z)===5)set(x,y,z,(y%3===0)?26:28);disk(set,0,53,0,6,28);disk(set,0,54,0,4,33);clearBox(set,0,0,55,60,2,2)}
   function buildJungle(set,BD,SHOP,GEN,SPAWN,withCenter=true){J_BASES.forEach(([x,z],t)=>jungleActiveBase(set,BD,SHOP,GEN,SPAWN,t,x,z));J_EXTRA.forEach(([x,z],i)=>jungleRuinIsland(set,x,z,i));J_DI.forEach(([x,z],i)=>jungleDiamond(set,x,z,i));if(withCenter)jungleTemple(set);return{DIGEN:J_DI.map(([x,z])=>[x+.5,25.2,z+.5]),EMGEN:[.5,55.2,.5],BASEPOS:J_BASES}}
   E.gen=(mapId='classic',includeLobby=false)=>{const cfg=MAPS[mapId]||MAPS.classic,B=new Uint8Array(W*H*D),BD=[],SHOP=[],GEN=[],SPAWN=[],active=new Set(),set=(x,y,z,v)=>{x=Math.round(x);y=Math.round(y);z=Math.round(z);if(!inXZ(x,z)||y<0||y>=H)return;B[ix(x,y,z)]=v;if(v)active.add(Math.floor(x/16)+','+Math.floor(z/16))};let DIGEN,EMGEN,BASEPOS;if(cfg.theme==='safety'){
- // Industrial training campus: one connected factory island, three workstations, no enemy beds.
- island(set,0,0,BASE_Y,39,28,6,829);
- // Workshop floor, marked lanes, factory shell and bright skylights.
- for(let x=-25;x<=25;x++)for(let z=-24;z<=24;z++){
-  if(Math.abs(x)<=23&&Math.abs(z)<=22){
-   set(x,BASE_Y,z,(x%7===0||z%7===0)?20:28);
-   if(Math.abs(x)===23||Math.abs(z)===22){if(Math.abs(x)<4&&z===22){}else for(let h=1;h<=6;h++)set(x,BASE_Y+h,z,h===4?7:26)}
-  }
- }
- for(let x=-24;x<=24;x++)for(let z=-23;z<=23;z++)if(Math.abs(x)%9===0||Math.abs(z)%9===0)set(x,BASE_Y+8,z,21);
- for(const [x,z] of [[-21,-20],[21,-20],[-21,19],[21,19]]){for(let h=1;h<8;h++)set(x,BASE_Y+h,z,18);set(x,BASE_Y+8,z,34)}
- // NR6 quarry/extraction rig: goggles and gloves; marker cyan.
- for(let x=-18;x<=-9;x++)for(let z=-8;z<=4;z++)set(x,BASE_Y+1,z,6);
- for(let y=BASE_Y+2;y<=BASE_Y+5;y++)for(let x of [-19,-8])for(let z of [-9,5])set(x,y,z,32);
- for(let x=-18;x<=-9;x++)set(x,BASE_Y+6,-9,32);
- // NR10 electrical switchgear with non-operational luminous indicators.
- for(let x=8;x<=18;x++)for(let z=-8;z<=3;z++)set(x,BASE_Y+1,z,21);
- for(let x=9;x<=17;x+=3){for(let y=BASE_Y+2;y<=BASE_Y+6;y++)set(x,y,-5,26);set(x,BASE_Y+5,-4,34)}
- // NR12 guarded conveyor / safety cell.
- for(let x=-7;x<=7;x++)for(let z=-19;z<=-10;z++)set(x,BASE_Y+1,z,28);
- for(let x=-6;x<=6;x++)for(let z=-17;z<=-13;z++)set(x,BASE_Y+2,z,(x%3===0)?20:21);
- for(let x=-8;x<=8;x++)for(let z of [-20,-9]){set(x,BASE_Y+2,z,7);if(x%4===0)set(x,BASE_Y+3,z,26)}
- // Three clearly organized training buildings, with open doors and colored signs.
- const facilities=[
-  {cx:-13,cz:-2,accent:32}, // NR 6 / PPE and extraction
-  {cx:13,cz:-2,accent:34}, // NR 10 / electrical simulator
-  {cx:0,cz:-15,accent:33} // NR 12 / machine guard
+ // Separated industrial training campus. Every sector is reachable on a level walkway.
+ island(set,0,-3,BASE_Y,43,43,6,829);
+ const floor=BASE_Y+1;
+ for(let x=-38;x<=38;x++)for(let z=-37;z<=29;z++)set(x,floor,z,28);
+ // Perimeter barriers stay away from the mission routes.
+ for(let x=-38;x<=38;x++)for(const z of [-37,29])for(let h=2;h<=4;h++)set(x,BASE_Y+h,z,h===4?20:26);
+ for(let z=-37;z<=29;z++)for(const x of [-38,38])for(let h=2;h<=4;h++)set(x,BASE_Y+h,z,h===4?20:26);
+ // Broad central avenue and two branching training routes.
+ for(let z=-28;z<=19;z++)for(let x=-3;x<=3;x++)set(x,floor,z,20);
+ for(let x=-27;x<=27;x++)for(let z=8;z<=11;z++)set(x,floor,z,20);
+ for(const x0 of [-24,24])for(let z=3;z<=11;z++)for(let dx=-2;dx<=2;dx++)set(x0+dx,floor,z,20);
+ // Three isolated buildings with always-open, four-block-wide entrances.
+ const halls=[
+  {id:'nr6',cx:-24,cz:-5,hx:10,hz:9,accent:32,ground:6},
+  {id:'nr10',cx:24,cz:-5,hx:10,hz:9,accent:34,ground:21},
+  {id:'nr12',cx:0,cz:-25,hx:12,hz:9,accent:33,ground:28}
  ];
- for(const f of facilities){
-  for(let dx=-7;dx<=7;dx++)for(let dz=-7;dz<=7;dz++){
-   const xx=f.cx+dx,zz=f.cz+dz;if(Math.abs(xx)>22||Math.abs(zz)>21)continue;
-   if(Math.abs(dx)===7||Math.abs(dz)===7){
-    if(dz===7&&Math.abs(dx)<=2)continue; // Walk-in entrance from the reception.
-    for(let h=2;h<=5;h++)set(xx,BASE_Y+h,zz,h===5?f.accent:7);
-   }
+ for(const h of halls){
+  for(let x=h.cx-h.hx+1;x<h.cx+h.hx;x++)for(let z=h.cz-h.hz+1;z<h.cz+h.hz;z++)set(x,floor,z,h.ground);
+  for(let x=h.cx-h.hx;x<=h.cx+h.hx;x++)for(let z=h.cz-h.hz;z<=h.cz+h.hz;z++){
+   const boundary=(Math.abs(x-h.cx)===h.hx||Math.abs(z-h.cz)===h.hz);
+   if(!boundary)continue;
+   const doorway=z===h.cz+h.hz&&Math.abs(x-h.cx)<=2;
+   for(let n=2;n<=5;n++)if(!doorway)set(x,BASE_Y+n,z,n===5?h.accent:n===3?7:26);
   }
-  for(let dx=-2;dx<=2;dx++)for(let h=2;h<=4;h++)set(f.cx+dx,BASE_Y+h,f.cz+7,0);
-  for(let dx=-3;dx<=3;dx++)set(f.cx+dx,BASE_Y+6,f.cz+7,f.accent);
+  // Tall sign over the clear entrance; supports set outside of the passage.
+  for(let dx=-4;dx<=4;dx++)set(h.cx+dx,BASE_Y+6,h.cz+h.hz,h.accent);
+  for(const side of [-1,1])for(let n=2;n<=6;n++)set(h.cx+side*4,BASE_Y+n,h.cz+h.hz,20);
+  // Side storage racks never touch central routes or station interaction areas.
+  for(const side of [-1,1]){const x=h.cx+side*(h.hx-3),z=h.cz-4;set(x,BASE_Y+2,z,5);set(x,BASE_Y+3,z,20);}
  }
- // Walkable pathways connecting all three stations to the reception.
- for(let z=5;z<=16;z++)for(let x=-2;x<=2;x++)set(x,BASE_Y+1,z,20);
- for(let x=-13;x<=13;x++)for(let z=5;z<=7;z++)set(x,BASE_Y+1,z,20);
- // Industrial wayfinding: illuminated sector gates, lockers, pallets and guarded access.
- for(const [cx,cz,accent] of [[-13,-2,32],[13,-2,34],[0,-15,33]]){
-  // Entrance pillars and colored lintel, leaving the walkway accessible.
-  for(const side of [-1,1]){for(let h=1;h<=4;h++)set(cx+side*4,BASE_Y+h,cz+8,26);set(cx+side*4,BASE_Y+5,cz+8,accent);}
-  for(let x=-4;x<=4;x++)set(cx+x,BASE_Y+5,cz+8,accent);
-  // Simulated industrial storage away from the stations and walking lanes.
-  for(const side of [-1,1]){const px=cx+side*5,pz=cz-3;set(px,BASE_Y+2,pz,5);set(px,BASE_Y+3,pz,20);set(px,BASE_Y+4,pz,34);}
- }
- // Colored floor guidance lines connect the reception to the training wings.
- for(let z=8;z<=14;z++){set(-2,BASE_Y+1,z,32);set(2,BASE_Y+1,z,34);}
- for(let x=-13;x<=13;x++){set(x,BASE_Y+1,8,x<0?32:x>0?34:20);}
- // Reception desk, information podium and lamps, outside the spawn path.
- for(let x=-3;x<=3;x++){set(x,BASE_Y+2,20,5);set(x,BASE_Y+3,20,20);}
- for(const x of [-6,6]){for(let h=2;h<=5;h++)set(x,BASE_Y+h,14,28);set(x,BASE_Y+6,14,34);}
- // Perimeter safety rail and illuminated corners.
- for(let x=-21;x<=21;x+=3){set(x,BASE_Y+2,-22,20);set(x,BASE_Y+3,-22,26);}
- for(const z of [-19,0,19])for(const x of [-21,21]){for(let h=2;h<=5;h++)set(x,BASE_Y+h,z,28);set(x,BASE_Y+6,z,34);}
- // Reception / safe start point.
- for(let x=-4;x<=4;x++)for(let z=13;z<=19;z++)set(x,BASE_Y+1,z,20);
- BD[0]=null;SHOP[0]=[0.5,BASE_Y+2,16.5];GEN[0]=[-13.5,BASE_Y+2,-1.5];
- SPAWN[0]=[0.5,BASE_Y+2.02,15.5];BASEPOS=[[0,0]];
- DIGEN=[];EMGEN=[11.5,BASE_Y+2,-2.5];
+ // NR6 workstation platform and PPE locker access.
+ for(let x=-28;x<=-20;x++)for(let z=-9;z<=-3;z++)set(x,floor,z,6);
+ // NR10 switchgear alcove, without solid obstacles in front of the panel.
+ for(let x=19;x<=29;x+=3){set(x,BASE_Y+2,-12,26);set(x,BASE_Y+3,-12,34);}
+ // NR12 side-mounted guarded conveyor, keeping the centre walkway clear.
+ for(let x=-10;x<=-5;x++)for(let z=-29;z<=-23;z++)set(x,BASE_Y+2,z,21);
+ for(let x=6;x<=10;x++)for(let z=-30;z<=-22;z++)if(z%3===0)set(x,BASE_Y+2,z,20);
+ // Priority collision cleanup: the entire route from reception to each station.
+ const clearWalk=(x,z)=>{for(let y=BASE_Y+2;y<=BASE_Y+5;y++)set(x,y,z,0);};
+ for(let z=-27;z<=17;z++)for(let x=-2;x<=2;x++)clearWalk(x,z);
+ for(let x=-26;x<=26;x++)for(let z=8;z<=10;z++)clearWalk(x,z);
+ for(const x0 of [-24,24])for(let z=3;z<=10;z++)for(let dx=-2;dx<=2;dx++)clearWalk(x0+dx,z);
+ // Open the northern NR12 entrance and clear its central approach explicitly.
+ for(let z=-33;z<=-15;z++)for(let x=-2;x<=2;x++)clearWalk(x,z);
+ // Reception plaza with space for walking mission NPCs.
+ for(let x=-7;x<=7;x++)for(let z=13;z<=23;z++)set(x,floor,z,20);
+ for(let x=-5;x<=5;x++)for(let z=13;z<=22;z++)clearWalk(x,z);
+ BD[0]=null;SHOP[0]=[0.5,BASE_Y+2,17.5];GEN[0]=[-24,BASE_Y+2,-6];
+ SPAWN[0]=[0.5,BASE_Y+2.02,17.5];BASEPOS=[[0,0]];
+ DIGEN=[];EMGEN=[24,BASE_Y+2,-6];
  }else if(cfg.theme==='jungle'){const j=buildJungle(set,BD,SHOP,GEN,SPAWN,!includeLobby);DIGEN=j.DIGEN;EMGEN=j.EMGEN;BASEPOS=j.BASEPOS}else{BASEPOS=BASES;BASES.forEach(([x,z],t)=>teamBase(set,BD,SHOP,GEN,SPAWN,t,cfg));DIAMONDS.forEach(([x,z],i)=>diamondIsland(set,x,z,i,cfg));SIDE_ISLANDS.forEach(([x,z],i)=>sideIsland(set,x,z,i,cfg));centerIsland(set,cfg)}if(includeLobby){island(set,LOBBY[0],LOBBY[2],LOBBY[1]-1,13,12,6,900);ring(set,LOBBY[0],LOBBY[1],LOBBY[2],10,23,1);for(const[dx,dz]of[[-7,-7],[7,-7],[-7,7],[7,7]])tower(set,LOBBY[0]+dx,LOBBY[2]+dz,LOBBY[1],12,6)}if(!DIGEN)DIGEN=DIAMONDS.map(([x,z])=>[x+.5,BASE_Y+1.35,z+.5]);if(!EMGEN){const EMY=cfg.theme==='volcano'?BASE_Y+10.35:BASE_Y+6.35;EMGEN=[EMERALD[0]+.5,EMY,EMERALD[1]+.5]}return{B,BD,SHOP,GEN,SPAWN,DIGEN,EMGEN,BASEPOS:[...(BASEPOS||BASES)],mapId:cfg.id,activeChunks:[...active]}}
 })(typeof module!=='undefined'?module.exports:(window.BW={}));
