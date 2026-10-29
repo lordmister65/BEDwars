@@ -102,6 +102,40 @@
   // Side storage racks never touch central routes or station interaction areas.
   for(const side of [-1,1]){const x=h.cx+side*(h.hx-3),z=h.cz-4;set(x,BASE_Y+2,z,5);set(x,BASE_Y+3,z,20);}
  }
+ // Phase 2 architecture: steel frame, skylights, facade bands and protected service corridors.
+ // Details are static voxel geometry, batched into chunk meshes instead of many draw calls.
+ for(const h of halls){
+  const y=BASE_Y;
+  // Roof trusses run across the rear and sides; entrance stays uncovered.
+  for(let x=h.cx-h.hx+1;x<h.cx+h.hx;x+=4){
+   for(let z=h.cz-h.hz+1;z<=h.cz+h.hz-3;z+=3)set(x,y+8,z,21);
+  }
+  for(const z of [h.cz-h.hz+1,h.cz+h.hz-2]){
+   for(let x=h.cx-h.hx+1;x<=h.cx+h.hx-1;x++)set(x,y+8,z,h.accent);
+  }
+  // Transparent clerestory windows and concrete pilasters.
+  for(const side of [-1,1]){
+   const x=h.cx+side*h.hx;
+   for(let z=h.cz-h.hz+2;z<=h.cz+h.hz-3;z+=4){
+    for(let yy=y+2;yy<=y+5;yy++)set(x,yy,z,28);
+    set(x,y+6,z,h.accent);
+   }
+  }
+  // Safety stripe marks the interior threshold without causing a step.
+  for(let dx=-4;dx<=4;dx++)set(h.cx+dx,floor,h.cz+h.hz-2,h.accent);
+  // Industrial ceiling light strips.
+  for(const x of [h.cx-5,h.cx+5])for(const z of [h.cz-5,h.cz,h.cz+3])set(x,y+7,z,34);
+ }
+ // Reception orientation totems, outside the spawn lane.
+ for(const [x,c] of [[-9,32],[9,34]]){
+  for(let yy=BASE_Y+2;yy<=BASE_Y+5;yy++)set(x,yy,19,26);
+  set(x,BASE_Y+6,19,c);
+ }
+ // Utility pallets along outer walls, never inside the central aisle.
+ for(const x of [-33,33])for(const z of [-20,-11,-2]){
+  for(let dx=0;dx<2;dx++)for(let dz=0;dz<2;dz++)set(x+dx,floor+1,z+dz,5);
+  set(x,floor+2,z,20);
+ }
  // NR6 workstation platform and PPE locker access.
  for(let x=-28;x<=-20;x++)for(let z=-9;z<=-3;z++)set(x,floor,z,6);
  // NR10 switchgear alcove, without solid obstacles in front of the panel.
