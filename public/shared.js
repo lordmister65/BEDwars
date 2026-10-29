@@ -143,6 +143,54 @@
  // NR12 side-mounted guarded conveyor, keeping the centre walkway clear.
  for(let x=-10;x<=-5;x++)for(let z=-29;z<=-23;z++)set(x,BASE_Y+2,z,21);
  for(let x=6;x<=10;x++)for(let z=-30;z<=-22;z++)if(z%3===0)set(x,BASE_Y+2,z,20);
+ // VISUAL CAMPUS V3: unmistakable skyline, color-coded industrial halls and reception atrium.
+ // Geometry remains voxel-batched by chunks: no independent Mesh objects for this architecture.
+ const styles=[{cx:-24,cz:-5,hx:10,hz:9,trim:14,sign:32},{cx:24,cz:-5,hx:10,hz:9,trim:17,sign:34},{cx:0,cz:-25,hx:12,hz:9,trim:19,sign:33}];
+ for(const h of styles){
+  // Structural corner columns, two-storey glazed walls and high roof rim.
+  for(const x of [h.cx-h.hx,h.cx+h.hx])for(const z of [h.cz-h.hz,h.cz+h.hz]){
+   for(let y=BASE_Y+2;y<=BASE_Y+11;y++)set(x,y,z,21);
+   set(x,BASE_Y+12,z,h.sign);
+  }
+  for(let x=h.cx-h.hx;x<=h.cx+h.hx;x++){
+   for(const z of [h.cz-h.hz,h.cz+h.hz]){
+    set(x,BASE_Y+10,z,21);set(x,BASE_Y+11,z,h.sign);
+    if(Math.abs(x-h.cx)%4===0)set(x,BASE_Y+9,z,34);
+   }
+  }
+  for(let z=h.cz-h.hz;z<=h.cz+h.hz;z++){
+   for(const x of [h.cx-h.hx,h.cx+h.hx]){
+    set(x,BASE_Y+10,z,21);set(x,BASE_Y+11,z,h.sign);
+    if(Math.abs(z-h.cz)%4===0)set(x,BASE_Y+7,z,34);
+   }
+  }
+  // Open-span roof framing with light wells; never enclose the entrance.
+  for(let x=h.cx-h.hx+2;x<h.cx+h.hx-1;x+=5)
+   for(let z=h.cz-h.hz+2;z<h.cz+h.hz-2;z++)set(x,BASE_Y+10,z,26);
+  for(let x=h.cx-h.hx+2;x<h.cx+h.hx-1;x+=5)
+   for(let z=h.cz-h.hz+3;z<h.cz+h.hz-3;z+=4)set(x,BASE_Y+10,z,34);
+  // Signature fascia: recognizable color band visible from the reception.
+  for(let x=h.cx-h.hx+1;x<h.cx+h.hx;x++){
+   set(x,BASE_Y+8,h.cz+h.hz,h.sign);
+   if(Math.abs(x-h.cx)%3===0)set(x,BASE_Y+7,h.cz+h.hz,23);
+  }
+  // Clear front portal, 7 blocks wide and 5 high, with illuminated lintel.
+  for(let x=h.cx-3;x<=h.cx+3;x++)for(let y=BASE_Y+2;y<=BASE_Y+6;y++)set(x,y,h.cz+h.hz,0);
+  for(let x=h.cx-4;x<=h.cx+4;x++)set(x,BASE_Y+7,h.cz+h.hz,h.sign);
+ }
+ // Wayfinding: oversized sector monuments in front of each building.
+ for(const [x,z,accent] of [[-24,7,32],[24,7,34],[8,-17,33]]){
+  for(let y=BASE_Y+2;y<=BASE_Y+8;y++)set(x,y,z,21);
+  for(let dx=-1;dx<=1;dx++)for(let y=BASE_Y+6;y<=BASE_Y+9;y++)set(x+dx,y,z,accent);
+  set(x,BASE_Y+10,z,34);
+ }
+ // Reception gateway: a large lit portal visible as soon as the player spawns.
+ for(const x of [-6,6])for(let y=BASE_Y+2;y<=BASE_Y+9;y++)set(x,y,13,21);
+ for(let x=-6;x<=6;x++)for(let z=12;z<=14;z++)set(x,BASE_Y+10,z,26);
+ for(let x=-5;x<=5;x++)set(x,BASE_Y+9,13,20);
+ for(const x of [-4,-2,0,2,4])set(x,BASE_Y+9,12,34);
+ // Centerline light markers reinforce direction without obstructing movement.
+ for(let z=-28;z<=9;z+=5){for(const x of [-3,3])set(x,BASE_Y+2,z,34);}
  // Priority collision cleanup: the entire route from reception to each station.
  const clearWalk=(x,z)=>{for(let y=BASE_Y+2;y<=BASE_Y+5;y++)set(x,y,z,0);};
  for(let z=-27;z<=17;z++)for(let x=-2;x<=2;x++)clearWalk(x,z);
