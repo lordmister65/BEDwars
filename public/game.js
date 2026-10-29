@@ -13,7 +13,7 @@ const P={5:[0xb58a4e],6:[0xaaa6a0],7:[0xddeeff],12:[0xe8dfb0],13:[0xd9d9d9,0xd83
 const F=[[[1,0,0],[1,0,0],[1,1,0],[1,1,1],[1,0,1],.8,1],[[-1,0,0],[0,0,0],[0,0,1],[0,1,1],[0,1,0],.8,1],[[0,1,0],[0,1,0],[0,1,1],[1,1,1],[1,1,0],1,0],[[0,-1,0],[0,0,0],[1,0,0],[1,0,1],[0,0,1],.5,2],[[0,0,1],[0,0,1],[1,0,1],[1,1,1],[0,1,1],.65,1],[[0,0,-1],[0,0,0],[0,1,0],[1,1,0],[1,0,0],.65,1]];
 let qualityMode=(()=>{try{return localStorage.getItem('bwQuality')||'auto'}catch(e){return'auto'}})();
 let autoQuality=(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4)||(navigator.deviceMemory&&navigator.deviceMemory<=4)?'low':'high',lowEnd=qualityMode==='low'||(qualityMode==='auto'&&autoQuality==='low');
-const R=new THREE.WebGLRenderer({antialias:!lowEnd,powerPreference:'high-performance'});function applyRenderQuality(){lowEnd=qualityMode==='low'||(qualityMode==='auto'&&autoQuality==='low');R.setPixelRatio(Math.min(devicePixelRatio,lowEnd?0.85:qualityMode==='medium'?1.15:1.5));GEN_VIS.forEach(v=>{v.particles.forEach((p,i)=>p.visible=!lowEnd||i<3)});try{localStorage.setItem('bwQuality',qualityMode)}catch(e){}}R.setPixelRatio(Math.min(devicePixelRatio,lowEnd?0.85:1.5));document.body.prepend(R.domElement);
+const R=new THREE.WebGLRenderer({antialias:!lowEnd,powerPreference:'high-performance'});function applyRenderQuality(){lowEnd=qualityMode==='low'||(qualityMode==='auto'&&autoQuality==='low');R.setPixelRatio(Math.min(devicePixelRatio,lowEnd?0.8:qualityMode==='medium'?1:1.25));GEN_VIS.forEach(v=>{v.particles.forEach((p,i)=>p.visible=!lowEnd||i<3)});try{localStorage.setItem('bwQuality',qualityMode)}catch(e){}}R.setPixelRatio(Math.min(devicePixelRatio,lowEnd?0.8:1.25));document.body.prepend(R.domElement);
 const sky=0x8fc8ee,sc=new THREE.Scene();sc.background=new THREE.Color(sky);sc.fog=new THREE.Fog(sky,170,560);
 const cam=new THREE.PerspectiveCamera(72,1,.05,1200);cam.rotation.order='YXZ';sc.add(cam);
 const BB_CACHE=new Map(),BB_PENDING=new Map(),BB_LOADER=new THREE.GLTFLoader();
@@ -612,20 +612,26 @@ function toggleNrMissionMenu(open){
  nrMissionOpen=!!open;const panel=$('nrMissionMenu');if(panel)panel.style.display=nrMissionOpen?'flex':'none';
  renderNrMissionJournal();
 }
+let nrJournalCache='';
 function renderNrMissionJournal(){
  const hud=$('nrMissionHud'),panel=$('nrMissionMenu');
  if(!hud||!panel)return;
- const visible=safetyGameType==='safety'&&started&&!over;hud.style.display=visible?'block':'none';if(!visible){panel.style.display='none';nrMissionOpen=false;return}
+ const visible=safetyGameType==='safety'&&started&&!over;
+ const show=visible?'block':'none';if(hud.style.display!==show)hud.style.display=show;
+ if(!visible){if(panel.style.display!=='none')panel.style.display='none';nrMissionOpen=false;nrJournalCache='';return}
  const done=safetyState?.completed||{},active=safetyState?.mission;
+ const stateKey=JSON.stringify([active,done,safetyState?.epi,safetyState?.electrical?.step,safetyState?.machine]);
+ if(stateKey===nrJournalCache)return;nrJournalCache=stateKey;
  const count=NR_TASKS.filter(n=>done[n.id]).length;
  $('nrMissionSummary').textContent=count+'/3 concluídas · '+(active?'Atual: '+active.toUpperCase():'Procure um NPC instrutor');
- renderNrMissionActions();$('nrMissionCards').innerHTML=NR_TASKS.map(n=>'<div class="nr-task'+(done[n.id]?' done':'')+'"><b>'+(done[n.id]?'✅ ':active===n.id?'▶ ':'⬜ ')+n.name+'</b><p>'+n.where+'</p><p>'+n.detail+'</p><small>'+(done[n.id]?'Concluída':active===n.id?'Missão em andamento':'Fale com o instrutor')+'</small></div>').join('');
+ renderNrMissionActions();
+ $('nrMissionCards').innerHTML=NR_TASKS.map(n=>'<div class="nr-task'+(done[n.id]?' done':'')+'"><b>'+(done[n.id]?'✅ ':active===n.id?'▶ ':'⬜ ')+n.name+'</b><p>'+n.where+'</p><p>'+n.detail+'</p><small>'+(done[n.id]?'Concluída':active===n.id?'Missão em andamento':'Fale com o instrutor')+'</small></div>').join('');
 }
 document.addEventListener('keydown',e=>{if(e.code==='KeyM'&&safetyGameType==='safety'&&started&&!e.repeat&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){toggleNrMissionMenu(!nrMissionOpen);e.preventDefault()}});
 function safetyDraw(){if($('bar'))$('bar').style.display=safetyGameType==='safety'?'none':'';renderNrMissionJournal()}
 // Small voxel station near each team resource generator; client visuals only.
 let safetyStationMeshes=[];
-function clearSafetyStations(){for(const m of safetyStationMeshes){sc.remove(m);m.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose&&o.material.dispose()})}safetyStationMeshes=[]}
+function clearSafetyStations(){const geometries=new Set(),materials=new Set();for(const m of safetyStationMeshes){sc.remove(m);m.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(mat=>materials.add(mat))})}geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());safetyStationMeshes=[]}
 const NR_WORKSTATIONS=[
  {id:'locker',name:'Armário de EPIs',x:-15,z:2,mission:'nr6'},
  {id:'extract',name:'Estação de extração',x:-13.5,z:-1.5,mission:'nr6'},
@@ -635,7 +641,7 @@ const NR_WORKSTATIONS=[
 function buildSafetyStations(){
  clearSafetyStations();if(safetyGameType!=='safety'||!started)return;
  const basic=c=>new THREE.MeshBasicMaterial({color:c}),metal=basic(0x566875),edge=basic(0x172b36),bright=basic(0xffc947),glass=basic(0x72c9e7),green=basic(0x37c884),red=basic(0xeb4e49);
- const add=(root,w,h,d,x,y,z,mat)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);root.add(mesh);return mesh};
+ const safetyBoxGeometry=new THREE.BoxGeometry(1,1,1);const add=(root,w,h,d,x,y,z,mat)=>{const mesh=new THREE.Mesh(safetyBoxGeometry,mat);mesh.scale.set(w,h,d);mesh.position.set(x,y,z);root.add(mesh);return mesh};
  for(const o of NR_WORKSTATIONS){
   const g=new THREE.Group();g.position.set(o.x,36,o.z);g.userData.workstation=o.id;
   if(o.id==='locker'){
@@ -910,7 +916,7 @@ case'lobby':{
  $('mapPick').innerHTML=(m.maps||Object.values(MAPS)).map(mp=>`<button class="map-card${mp.id===m.mapId?' active':''}${myVote===mp.id?' voted':''}" onclick="send({t:'mapVote',map:'${mp.id}'})"><b>${mp.name}</b><small>${mp.description||''}</small><em class="map-votes">🗳 ${votes[mp.id]||0}${myVote===mp.id?' · SEU VOTO':''}</em></button>`).join('');
  $('st').style.display=m.quick?'none':me.id===m.host?'block':'none';if(m.quick){const q=m.queue||{},cd=q.countdown>0?' · inicia em '+q.countdown+'s':q.ready?' · preparando partida':' · mínimo '+(q.min||2)+' jogadores';$('wt').textContent='⚡ PARTIDA RÁPIDA · '+(q.count||m.l.length)+'/'+(q.max||'?')+cd}else $('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · vote no mapa.`:`Modo ${currentMode.toUpperCase()} · organize os times e vote no mapa.`):'Aguardando o anfitrião · você já pode votar no mapa.';renderPartyStatus();scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
-case'start':safetyGameType=m.gameType||safetyGameType;safetyState=null;if(safetyGameType==='safety')setTimeout(()=>send({t:'safetySync'}),250);HELD_CACHE.clear();setTimeout(preloadHeld,50);currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;setTimeout(()=>{buildSafetyStations();buildSafetyNpcs();renderNrMissionJournal()},100);queueState={quick:false,count:0,min:0,max:0,countdown:0};bed=m.bed;syncBedVisuals(worldMeta,bed);matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();showEventBanner('⚔ '+String(currentMode||'BED WARS').toUpperCase()+' · '+((MAPS[currentMap]||{}).name||currentMap),'start',2100);scr(safetyGameType==='safety'||touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);renderMatchStatus();break;
+case'start':safetyGameType=m.gameType||safetyGameType;safetyState=null;if(safetyGameType==='safety')setTimeout(()=>send({t:'safetySync'}),250);HELD_CACHE.clear();setTimeout(preloadHeld,50);currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;nrJournalCache='';setTimeout(()=>{buildSafetyStations();buildSafetyNpcs();renderNrMissionJournal()},100);queueState={quick:false,count:0,min:0,max:0,countdown:0};bed=m.bed;syncBedVisuals(worldMeta,bed);matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();showEventBanner('⚔ '+String(currentMode||'BED WARS').toUpperCase()+' · '+((MAPS[currentMap]||{}).name||currentMap),'start',2100);scr(safetyGameType==='safety'||touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);renderMatchStatus();break;
 case's':{if(Array.isArray(m.npcs)){for(const data of m.npcs){const n=safetyNpcs.find(q=>q.id===data[0]);if(n)n.serverPos={x:data[1],y:data[2],z:data[3],heading:data[4]}}}if(Number.isInteger(m.seq)){if(m.seq<=lastSnapshotSeq)break;lastSnapshotSeq=m.seq;diag.snapshotSeq=m.seq}syncProjectiles(m.pr||[]);if(m.time!=null)matchTime=m.time;if(m.bed)bed=m.bed;if(m.gen)genState=m.gen;if(m.phase)matchPhase=m.phase;const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin,out,rt,kills,finalKills,spawnProt])=>{seen.add(id);matchPlayers.set(id,{id,team:tm,alive:!!al,out:!!out,admin:!!radmin,kills:kills||0,finalKills:finalKills||0,rt:rt||0});if(id===me.id){me.hp=hp;me.alive=al;me.out=!!out;me.spawnProtect=!!spawnProt;myMatchStats={kills:kills||0,finalKills:finalKills||0};return}
 let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id);matchPlayers.delete(id)}});renderScoreboard();break}
@@ -1085,7 +1091,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70,lastRenderAt=0;hud();
-function tick(now){requestAnimationFrame(tick);safetyNpcTick();if((now|0)%500<18){safetyDraw();renderNrMissionJournal();}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
+function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started)safetyNpcTick();const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
 if(serverCorrection&&me.alive){const a=Math.min(1,dt/Math.max(.001,serverCorrection.t));pl.x+=(serverCorrection.x-pl.x)*a;pl.y+=(serverCorrection.y-pl.y)*a;pl.z+=(serverCorrection.z-pl.z)*a;serverCorrection.t-=dt;if(serverCorrection.t<=0)serverCorrection=null}
 if((started||lobbyExplore)&&!over&&(me.alive||spectator)){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
