@@ -707,10 +707,51 @@ function buildSafetyStations(){
    add(g,.5,.12,.4,2.5,1.88,.33,bright);
    for(let x of [-1.7,0,1.7])add(g,.1,.48,.12,x,1.28,-1.02,metal);
   }
+  // Animated operational parts stay attached to the station; no dynamic lights or extra scene searches.
+  if(o.id==='locker'){
+   const left=new THREE.Group(),right=new THREE.Group();
+   left.position.set(-1.1,1.4,.58);right.position.set(1.1,1.4,.58);
+   add(left,.95,2.25,.08,.48,0,0,bright);add(right,.95,2.25,.08,-.48,0,0,bright);
+   add(left,.08,.3,.12,.82,0,.09,edge);add(right,.08,.3,.12,-.82,0,.09,edge);
+   g.add(left,right);g.userData.doors=[left,right];
+  }
+  if(o.id==='electrical'){
+   const lamp=add(g,.3,.3,.14,0,2.55,.72,red);g.userData.indicator=lamp;
+  }
+  if(o.id==='machine'){
+   const rollers=new THREE.Group();
+   for(let i=0;i<7;i++)add(rollers,.36,.07,1.4,-1.8+i*.6,0,0,glass);
+   rollers.position.y=1.08;g.add(rollers);g.userData.rollers=rollers;
+   g.userData.indicator=add(g,.2,.18,.16,2.5,2.2,.48,red);
+  }
+  g.userData.stationId=o.id;
   sc.add(g);safetyStationMeshes.push(g);
  }
 }
 
+let safetyStationAnimAt=0;
+function animateSafetyStations(now){
+ if(safetyGameType!=='safety'||!started||now-safetyStationAnimAt<55)return;
+ const dt=Math.min(.1,(now-safetyStationAnimAt)/1000||.05);safetyStationAnimAt=now;
+ for(const root of safetyStationMeshes){
+  const id=root.userData.stationId;
+  if(id==='locker'&&root.userData.doors){
+   const open=safetyState?.mission==='nr6'&&(safetyState?.epi?.goggles||safetyState?.epi?.gloves);
+   const goal=open?1.12:0;const [left,right]=root.userData.doors;
+   left.rotation.y+=(goal-left.rotation.y)*Math.min(1,dt*4);
+   right.rotation.y+=(-goal-right.rotation.y)*Math.min(1,dt*4);
+  }
+  if(id==='electrical'&&root.userData.indicator){
+   root.userData.indicator.material=root.userData.indicator.userData.greenMat||(root.userData.indicator.userData.greenMat=new THREE.MeshBasicMaterial({color:0x35df80}));
+   root.userData.indicator.visible=!!(safetyState?.electrical?.completed||safetyState?.electrical?.step>0);
+  }
+  if(id==='machine'&&root.userData.rollers){
+   const running=!!safetyState?.machine?.running;
+   root.userData.rollers.position.x=running?Math.sin(now*.012)*.09:0;
+   root.userData.indicator.visible=running;
+  }
+ }
+}
 const SAFETY_NPCS=[
  {id:'nr6',name:'Supervisora de EPI',role:'NR 6',x:-24,z:10,color:0xffc83d,pants:0x283448,helmet:0xffd843,skin:0xe5b28d,hair:0x573a2c},
  {id:'nr10',name:'Técnico Eletricista',role:'NR 10',x:24,z:10,color:0x258fcf,pants:0x243248,helmet:0x51c9fa,skin:0xb9825d,hair:0x30251e},
@@ -1133,7 +1174,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70,lastRenderAt=0;hud();
-function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started)safetyNpcTick();const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
+function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started){safetyNpcTick();animateSafetyStations(now)}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
 if(serverCorrection&&me.alive){const a=Math.min(1,dt/Math.max(.001,serverCorrection.t));pl.x+=(serverCorrection.x-pl.x)*a;pl.y+=(serverCorrection.y-pl.y)*a;pl.z+=(serverCorrection.z-pl.z)*a;serverCorrection.t-=dt;if(serverCorrection.t<=0)serverCorrection=null}
 if((started||lobbyExplore)&&!over&&(me.alive||spectator)){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
