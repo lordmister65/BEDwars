@@ -4,11 +4,11 @@ const assert=require('node:assert/strict');
 const S=require('../safety-mode');
 function setup(){
  const p={id:7,team:0,x:0,z:0,alive:1,safety:S.newPlayer()};
- const R={gameType:'safety',GEN:[[-13.5,36,-1.5]],SPAWN:[[0.5,36,15.5]],safety:S.newRoom()};
+ const R={gameType:'safety',GEN:[[-24,36,-6]],SPAWN:[[0.5,36,15.5]],safety:S.newRoom()};
  return {p,R};
 }
 test('NR6: mission, EPI and distance are required',()=>{
- const {p,R}=setup();p.x=-13.5;p.z=-1.5;
+ const {p,R}=setup();p.x=-24;p.z=-6;
  assert.equal(S.extract(p,R,15000).ok,false);
  p.safety.mission='nr6';S.equipment(p,'goggles',true);
  assert.equal(S.extract(p,R,15000).ok,false);
@@ -22,14 +22,14 @@ test('NR6: invalid equipment rejected',()=>{
  assert.equal(S.equipment(p,'gloves','true').ok,false);
 });
 test('NR10: ordered steps and proximity',()=>{
- const {p,R}=setup();p.safety.mission='nr10';p.x=12.5;p.z=-3.5;
+ const {p,R}=setup();p.safety.mission='nr10';p.x=24;p.z=-6;
  assert.equal(S.electrical(p,R,'lock').ok,false);
  for(const step of S.STEPS)assert.equal(S.electrical(p,R,step).ok,true);
  assert.equal(R.safety.electrical.completed,true);
  assert.equal(S.electrical(p,R,'isolate').ok,false);
 });
 test('NR12: guard, stop and reset required',()=>{
- const {p,R}=setup();p.safety.mission='nr12';p.x=0;p.z=-15;
+ const {p,R}=setup();p.safety.mission='nr12';p.x=0;p.z=-25;
  assert.equal(S.machine(p,R,'start').ok,false);
  assert.equal(S.machine(p,R,'guard').ok,true);
  assert.equal(S.machine(p,R,'stop').ok,true);
