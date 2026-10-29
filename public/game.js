@@ -633,10 +633,10 @@ function safetyDraw(){if($('bar'))$('bar').style.display=safetyGameType==='safet
 let safetyStationMeshes=[];
 function clearSafetyStations(){const geometries=new Set(),materials=new Set();for(const m of safetyStationMeshes){sc.remove(m);m.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(mat=>materials.add(mat))})}geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());safetyStationMeshes=[]}
 const NR_WORKSTATIONS=[
- {id:'locker',name:'Armário de EPIs',x:-15,z:2,mission:'nr6'},
- {id:'extract',name:'Estação de extração',x:-13.5,z:-1.5,mission:'nr6'},
- {id:'electrical',name:'Painel elétrico simulado',x:12.5,z:-3.5,mission:'nr10'},
- {id:'machine',name:'Esteira industrial',x:0,z:-15,mission:'nr12'}
+ {id:'locker',name:'Armário de EPIs',x:-27,z:-3,mission:'nr6'},
+ {id:'extract',name:'Estação de extração',x:-24,z:-6,mission:'nr6'},
+ {id:'electrical',name:'Painel elétrico simulado',x:24,z:-6,mission:'nr10'},
+ {id:'machine',name:'Esteira industrial',x:0,z:-25,mission:'nr12'}
 ];
 function buildSafetyStations(){
  clearSafetyStations();if(safetyGameType!=='safety'||!started)return;
@@ -671,9 +671,9 @@ function buildSafetyStations(){
 }
 
 const SAFETY_NPCS=[
- {id:'nr6',name:'Supervisora de EPI',role:'NR 6',x:-10,z:12,color:0xffc83d,pants:0x283448,helmet:0xffd843,skin:0xe5b28d,hair:0x573a2c},
- {id:'nr10',name:'Técnico Eletricista',role:'NR 10',x:12,z:11,color:0x258fcf,pants:0x243248,helmet:0x51c9fa,skin:0xb9825d,hair:0x30251e},
- {id:'nr12',name:'Instrutora de Máquinas',role:'NR 12',x:0,z:8,color:0x48a86e,pants:0x293c35,helmet:0x88d990,skin:0xd6a37c,hair:0x493023}
+ {id:'nr6',name:'Supervisora de EPI',role:'NR 6',x:-24,z:10,color:0xffc83d,pants:0x283448,helmet:0xffd843,skin:0xe5b28d,hair:0x573a2c},
+ {id:'nr10',name:'Técnico Eletricista',role:'NR 10',x:24,z:10,color:0x258fcf,pants:0x243248,helmet:0x51c9fa,skin:0xb9825d,hair:0x30251e},
+ {id:'nr12',name:'Instrutora de Máquinas',role:'NR 12',x:0,z:-13,color:0x48a86e,pants:0x293c35,helmet:0x88d990,skin:0xd6a37c,hair:0x493023}
 ];
 const safetyNpcCubeGeometry=new THREE.BoxGeometry(1,1,1);
 let safetyNpcs=[];
