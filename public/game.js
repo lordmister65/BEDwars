@@ -742,13 +742,13 @@ function animateSafetyStations(now){
    right.rotation.y+=(-goal-right.rotation.y)*Math.min(1,dt*4);
   }
   if(id==='electrical'&&root.userData.indicator){
-   root.userData.indicator.material=root.userData.indicator.userData.greenMat||(root.userData.indicator.userData.greenMat=new THREE.MeshBasicMaterial({color:0x35df80}));
-   root.userData.indicator.visible=!!(safetyState?.electrical?.completed||safetyState?.electrical?.step>0);
+   root.userData.indicator.material.color.setHex(safetyState?.electrical?.completed?0x35df80:0xffc947);
+   root.userData.indicator.visible=true;
   }
   if(id==='machine'&&root.userData.rollers){
    const running=!!safetyState?.machine?.running;
    root.userData.rollers.position.x=running?Math.sin(now*.012)*.09:0;
-   root.userData.indicator.visible=running;
+   root.userData.indicator.visible=true;root.userData.indicator.material.color.setHex(running?0x35df80:0xeb4e49);
   }
  }
 }
