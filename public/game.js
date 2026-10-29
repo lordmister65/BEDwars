@@ -285,7 +285,7 @@ function syncBedVisuals(meta=worldMeta,state=null){
 
 function build(cx,cz){const p=[],c=[],i=[],u=[],col=new THREE.Color();let n=0;
 for(let x=cx*CS;x<cx*CS+CS;x++)for(let z=cz*CS;z<cz*CS+CS;z++){if(!inXZ(x,z))continue;for(let y=0;y<H;y++){const b=B[ix(x,y,z)];if(!b||isBedBlock(b))continue;
-const v=.96+((x*73856093^y*19349663^z*83492791)>>>0)%100/2200;
+const v=(currentMap==='safety_industry'?1.08:.96)+((x*73856093^y*19349663^z*83492791)>>>0)%100/2200;
 for(const f of F){const d=f[0],nb=get(x+d[0],y+d[1],z+d[2]);if(nb&&!isBedBlock(nb))continue;col.setHex(blockTint(b,f[6])).multiplyScalar(f[5]*v);
 for(let k=1;k<5;k++){p.push(x+f[k][0],y+f[k][1],z+f[k][2]);c.push(col.r,col.g,col.b);u.push((tl(b)+.02+.96*[0,1,1,0][k-1])/16,.02+.96*[0,0,1,1][k-1])}
 i.push(n,n+1,n+2,n,n+2,n+3);n+=4}}}
@@ -345,11 +345,33 @@ function vendorTarget(){
  const team=hit.object.userData.vendorTeam;
  return VENDORS.find(v=>v.team===team)||null;
 }
+// Lightweight industrial wayfinding: three readable facade signs and a reception sign.
+let safetySigns=[];
+function clearSafetySigns(){for(const o of safetySigns){sc.remove(o);o.material.map?.dispose();o.material.dispose()}safetySigns=[]}
+function buildSafetySigns(){
+ clearSafetySigns();if(currentMap!=='safety_industry')return;
+ const signs=[
+  {x:-24,y:43.6,z:5.45,title:'NR 6',caption:'EQUIPAMENTOS DE PROTEÇÃO',color:'#ffd858'},
+  {x:24,y:43.6,z:5.45,title:'NR 10',caption:'SEGURANÇA ELÉTRICA',color:'#65d2ff'},
+  {x:0,y:43.6,z:-15.45,title:'NR 12',caption:'SEGURANÇA EM MÁQUINAS',color:'#63eb9c'},
+  {x:0,y:44.5,z:13.45,title:'OPERAÇÃO SEGURA',caption:'COMPLEXO INDUSTRIAL',color:'#f5f9fb'}
+ ];
+ for(const d of signs){
+  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=160;
+  const c=canvas.getContext('2d');c.fillStyle='#172733';c.fillRect(0,0,512,160);
+  c.strokeStyle=d.color;c.lineWidth=12;c.strokeRect(7,7,498,146);
+  c.fillStyle=d.color;c.textAlign='center';c.font='bold 54px Arial';c.fillText(d.title,256,77);
+  c.fillStyle='#fff';c.font='bold 21px Arial';c.fillText(d.caption,256,117);
+  const texture=new THREE.CanvasTexture(canvas);texture.minFilter=THREE.LinearFilter;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthWrite:false}));
+  sprite.position.set(d.x,d.y,d.z);sprite.scale.set(8.5,2.65,1);sc.add(sprite);safetySigns.push(sprite);
+ }
+}
 function loadMap(mapId,lobby=false,serverChunks=null){
  currentMap=MAPS[mapId]?mapId:'classic';const g=BW.gen(currentMap,lobby);worldMeta=g;B.set(g.B);pf.fill(0);
  activeChunks=new Set(serverChunks||g.activeChunks||[]);dirty.clear();
  Object.keys(M).forEach(k=>{if(!activeChunks.has(k)){sc.remove(M[k]);M[k].geometry.dispose();delete M[k]}});
- activeChunks.forEach(k=>dirty.add(k));updateGeneratorIcons(g);updateVendors(g,lobby);updateChests(g,lobby);syncBedVisuals(g);flush(999);
+ activeChunks.forEach(k=>dirty.add(k));updateGeneratorIcons(g);updateVendors(g,lobby);updateChests(g,lobby);syncBedVisuals(g);flush(999);buildSafetySigns();
 }
 function updateChunkLOD(){const max=lowEnd?155:330;for(const [k,m] of Object.entries(M)){const [cx,cz]=k.split(',').map(Number),x=cx*CS+CS/2,z=cz*CS+CS/2;m.visible=Math.hypot(pl.x-x,pl.z-z)<max}}
 activeChunks.forEach(k=>{const[a,b]=k.split(',').map(Number);build(a,b)});
