@@ -1,6 +1,6 @@
 'use strict';
 // Server-authoritative voxel navigation for the three training instructors.
-const START=[['nr6',-10,12],['nr10',12,11],['nr12',0,8]];
+const START=[['nr6',-24,10],['nr10',24,10],['nr12',0,-13]];
 function create(){return START.map(([id,x,z],i)=>({id,x,z,y:36.05,homeX:x,homeZ:z,heading:i*2.1,turn:1,wait:0,phase:i*1.7}));}
 function floorAt(R,x,z,hint){
  const gx=Math.floor(x),gz=Math.floor(z);
