@@ -666,6 +666,25 @@ function buildSafetyStations(){
    for(const z of [-1.03,1.03])add(g,4.8,.2,.14,0,1.6,z,bright);
    add(g,.85,1.2,.8,2.5,1.14,0,metal);add(g,.43,.43,.2,2.5,1.52,.49,red);
   }
+  // High-fidelity modular details, all sharing the same cube geometry and materials.
+  if(o.id==='locker'){
+   for(const x of [-.57,.57]){add(g,.77,.18,.09,x,2.38,.55,bright);add(g,.35,.25,.06,x,1.86,.56,green);}
+   for(const x of [-.86,.86])add(g,.08,.32,.13,x,2.45,.05,edge);
+   add(g,2.4,.12,1.15,0,.12,0,edge);
+  }else if(o.id==='extract'){
+   for(let i=0;i<4;i++)add(g,.17,.18,1.5,-1.1+i*.72,.54,0,edge);
+   for(const z of [-.82,.82])add(g,2.9,.10,.10,0,1.95,z,bright);
+   add(g,.8,.65,.20,1.17,1.1,.8,metal);add(g,.3,.18,.12,1.18,1.48,.91,green);
+  }else if(o.id==='electrical'){
+   for(let i=0;i<3;i++){add(g,.55,.07,.10,-.72+i*.72,2.65,.66,bright);add(g,.07,.53,.10,-.72+i*.72,1.82,.68,metal)}
+   for(let i=0;i<4;i++)add(g,.16,.16,.11,-.72+i*.48,1.48,.68,i%2?red:green);
+   add(g,2.1,.10,.19,0,.24,.72,bright);
+  }else{
+   for(let x=-2;x<=2;x+=.55){add(g,.09,.13,1.64,x,1.04,0,metal);}
+   for(let x of [-2.35,2.35])for(let z of [-.95,.95])add(g,.15,.12,.15,x,1.75,z,red);
+   add(g,.5,.12,.4,2.5,1.88,.33,bright);
+   for(let x of [-1.7,0,1.7])add(g,.1,.48,.12,x,1.28,-1.02,metal);
+  }
   sc.add(g);safetyStationMeshes.push(g);
  }
 }
