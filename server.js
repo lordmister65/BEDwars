@@ -1071,7 +1071,7 @@ setInterval(() => {
     if(R.st==='lobby'&&R.quickMatch)updateQuickCountdown(R,Date.now());
     R.t += dt;
     if (R.st === 'play') {
-      if(R.gameType==='safety')NPCNAV.tick(R,dt);
+      if(R.gameType==='safety'){R.safetyNpcAccumulator=(R.safetyNpcAccumulator||0)+dt;if(R.safetyNpcAccumulator>=.08){NPCNAV.tick(R,Math.min(.15,R.safetyNpcAccumulator));R.safetyNpcAccumulator=0;}}
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
