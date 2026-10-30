@@ -354,7 +354,10 @@ function buildSafetySigns(){
   {x:-24,y:43.6,z:5.45,title:'NR 6',caption:'EQUIPAMENTOS DE PROTEÇÃO',color:'#ffd858'},
   {x:24,y:43.6,z:5.45,title:'NR 10',caption:'SEGURANÇA ELÉTRICA',color:'#65d2ff'},
   {x:0,y:43.6,z:-15.45,title:'NR 12',caption:'SEGURANÇA EM MÁQUINAS',color:'#63eb9c'},
-  {x:0,y:44.5,z:13.45,title:'OPERAÇÃO SEGURA',caption:'COMPLEXO INDUSTRIAL',color:'#f5f9fb'}
+  {x:0,y:44.5,z:13.45,title:'OPERAÇÃO SEGURA',caption:'COMPLEXO INDUSTRIAL',color:'#f5f9fb'},
+  {x:-28,y:39.5,z:-.5,title:'EPI OBRIGATÓRIO',caption:'ZONA DE TREINAMENTO NR 6',color:'#ffd858'},
+  {x:24,y:39.5,z:-1.5,title:'RISCO ELÉTRICO',caption:'SIMULAÇÃO CONTROLADA',color:'#65d2ff'},
+  {x:0,y:39.5,z:-20.5,title:'ÁREA DE MÁQUINAS',caption:'NÃO ACESSE SEM MISSÃO',color:'#63eb9c'}
  ];
  for(const d of signs){
   const canvas=document.createElement('canvas');canvas.width=512;canvas.height=160;
@@ -364,7 +367,7 @@ function buildSafetySigns(){
   c.fillStyle='#fff';c.font='bold 21px Arial';c.fillText(d.caption,256,117);
   const texture=new THREE.CanvasTexture(canvas);texture.minFilter=THREE.LinearFilter;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthWrite:false}));
-  sprite.position.set(d.x,d.y,d.z);sprite.scale.set(8.5,2.65,1);sc.add(sprite);safetySigns.push(sprite);
+  sprite.position.set(d.x,d.y,d.z);sprite.scale.set(d.y<40?6.2:8.5,d.y<40?1.9:2.65,1);sc.add(sprite);safetySigns.push(sprite);
  }
 }
 function loadMap(mapId,lobby=false,serverChunks=null){
