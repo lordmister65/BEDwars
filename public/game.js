@@ -775,7 +775,7 @@ function nrAmbientSound(now){
   gain.gain.setValueAtTime(0,nrAmbientAudio.currentTime);
   gain.gain.linearRampToValueAtTime(.007,nrAmbientAudio.currentTime+.1);
   gain.gain.exponentialRampToValueAtTime(.0001,nrAmbientAudio.currentTime+1.4);
-  osc.connect(gain);gain.connect(nrAmbientAudio.destination);osc.start();osc.stop(nrAmbientAudio.currentTime+1.5);
+  osc.connect(gain);if(nrAmbientAudio.createStereoPanner&&source){panner=nrAmbientAudio.createStereoPanner();panner.pan.value=pan;gain.connect(panner);panner.connect(nrAmbientAudio.destination)}else gain.connect(nrAmbientAudio.destination);osc.start();osc.stop(nrAmbientAudio.currentTime+1.5);
   osc.onended=()=>{osc.disconnect();gain.disconnect()};
  }catch(e){}
 }
@@ -807,32 +807,39 @@ function animateNrBeacons(now){
 }
 // Reactive educational feedback. Only server-confirmed actions trigger success sounds.
 let nrFeedbackAt=0,nrFeedbackEnd=0,nrFeedbackType='',nrFeedbackPos=null;
-function nrSound(kind){
+function nrSound(kind,station=null){
  if(safetyGameType!=='safety'||!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
  const time=nrAmbientAudio.currentTime,osc=nrAmbientAudio.createOscillator(),gain=nrAmbientAudio.createGain();
+ const source=station&&NR_WORKSTATIONS.find(o=>o.id===station);
+ const dist=source?Math.hypot(pl.x-source.x,pl.z-source.z):0;
+ if(source&&dist>28)return;
+ const attenuation=source?Math.max(.08,1/(1+dist*.13)):1;
+ const pan=source?Math.max(-.8,Math.min(.8,((source.x-pl.x)*Math.cos(pl.yaw)-(source.z-pl.z)*Math.sin(pl.yaw))/Math.max(5,dist))):0;
+ let panner=null;
  const settings={equip:[620,.09,'triangle'],extract:[190,.19,'square'],electrical:[430,.14,'sine'],machine:[145,.24,'sawtooth'],alarm:[750,.22,'square'],success:[860,.22,'sine'],error:[180,.13,'triangle']};
  const spec=settings[kind]||settings.success;
  try{
   osc.type=spec[2];osc.frequency.setValueAtTime(spec[0],time);
   if(kind==='success')osc.frequency.linearRampToValueAtTime(1080,time+spec[1]);
   if(kind==='alarm')osc.frequency.linearRampToValueAtTime(530,time+spec[1]);
-  gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(.024,time+.018);
+  gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(.024*attenuation,time+.018);
   gain.gain.exponentialRampToValueAtTime(.0001,time+spec[1]);
   osc.connect(gain);gain.connect(nrAmbientAudio.destination);
-  osc.start(time);osc.stop(time+spec[1]+.01);osc.onended=()=>{osc.disconnect();gain.disconnect()};
- }catch(e){try{osc.disconnect();gain.disconnect()}catch(_){}}
+  osc.start(time);osc.stop(time+spec[1]+.01);osc.onended=()=>{osc.disconnect();gain.disconnect();if(panner)panner.disconnect()};
+ }catch(e){try{osc.disconnect();gain.disconnect();if(panner)panner.disconnect()}catch(_){}}
 }
 function nrActionFeedback(action,success,message){
  if(safetyGameType!=='safety'||!started)return;
  const now=performance.now();if(now-nrFeedbackAt<190)return;nrFeedbackAt=now;
  const text=String(message||'').toLowerCase();
  let kind=!success?'error':action==='equip'?'equip':action==='extract'?'extract':action==='electrical'?'electrical':action==='machine'?'machine':'success';
- if(!success&&/parada|risco|proteção/.test(text))kind='alarm';
+ if(!success&&/parada|risco|proteção|tensão|ordem/.test(text))kind='alarm';
  if(success&&/conclu|aprovad/.test(text))kind='success';
  nrFeedbackType=success?'success':'warning';nrFeedbackEnd=now+850;
- nrSound(kind);
  const active=safetyState?.mission;
- nrFeedbackPos=NR_WORKSTATIONS.find(o=>o.mission===active)||null;
+ const stationId=action==='equip'?'locker':action==='extract'?'extract':action==='electrical'?'electrical':action==='machine'?'machine':null;
+ nrSound(kind,stationId);
+ nrFeedbackPos=NR_WORKSTATIONS.find(o=>o.id===stationId)||null;
 }
 function animateNrActionFeedback(now){
  if(now>nrFeedbackEnd||!nrFeedbackPos)return;
@@ -852,8 +859,8 @@ function animateSafetyStations(now){
   if(id==='locker'&&root.userData.doors){
    const open=safetyState?.mission==='nr6'&&(safetyState?.epi?.goggles||safetyState?.epi?.gloves);
    const goal=open?1.12:0;const [left,right]=root.userData.doors;
-   left.rotation.y+=(goal-left.rotation.y)*Math.min(1,dt*4);
-   right.rotation.y+=(-goal-right.rotation.y)*Math.min(1,dt*4);
+   left.rotation.y+=(goal-left.rotation.y)*Math.min(1,dt*6);
+   right.rotation.y+=(-goal-right.rotation.y)*Math.min(1,dt*6);
   }
   if(id==='electrical'&&root.userData.indicator){
    root.userData.indicator.material.color.setHex(safetyState?.electrical?.completed?0x35df80:0xffc947);
@@ -861,7 +868,8 @@ function animateSafetyStations(now){
   }
   if(id==='machine'&&root.userData.rollers){
    const running=!!safetyState?.machine?.running;
-   root.userData.rollers.position.x=running?Math.sin(now*.012)*.09:0;
+   root.userData.rollers.position.x=running?Math.sin(now*.015)*.18:0;
+   root.userData.rollers.position.y=running?1.08+Math.sin(now*.022)*.035:1.08;
    root.userData.indicator.visible=true;root.userData.indicator.material.color.setHex(running?0x35df80:0xeb4e49);
   }
  }
