@@ -909,6 +909,20 @@ function buildSafetyNpcs(){
   cube(body,.73,.06,.67,0,2.03,.065,mats.helmet);
   for(const x of [-.12,.12])cube(body,.064,.066,.024,x,1.85,.247,mats.dark);
   cube(body,.17,.03,.025,0,1.69,.25,mats.dark);
+  // Role-specific safety equipment, made from shared voxel geometry.
+  if(n.id==='nr6'){
+   cube(body,.62,.11,.50,0,1.94,.03,mats.dark); // protective goggles
+   cube(body,.25,.17,.08,0,1.11,.23,mats.reflective); // ID badge
+   for(const x of [-.41,.41])cube(body,.12,.24,.23,x,1.11,-.04,mats.reflective);
+  }else if(n.id==='nr10'){
+   cube(body,.63,.12,.53,0,1.94,.03,mats.dark); // dielectric goggles
+   cube(body,.3,.4,.10,.25,1.04,.26,mats.dark); // tester pouch
+   cube(body,.21,.12,.13,.25,1.16,.33,mats.reflective);
+  }else{
+   cube(body,.81,.12,.48,0,1.40,-.02,mats.reflective); // high-visibility vest
+   cube(body,.18,.25,.09,-.24,1.07,.25,mats.dark); // safety radio
+   cube(body,.11,.09,.08,-.24,1.19,.31,mats.reflective);
+  }
   const arms=[],legs=[];
   for(const side of [-1,1]){
    const arm=new THREE.Group();arm.position.set(side*.47,1.43,0);body.add(arm);
@@ -927,15 +941,17 @@ function buildSafetyNpcs(){
   const texture=new THREE.CanvasTexture(canvas),label=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
   label.position.y=2.9;label.scale.set(3.7,1.05,1);root.add(label);
   root.position.set(n.x,36.05,n.z);sc.add(root);
-  safetyNpcs.push({...n,root,body,arms,legs,label});
+  safetyNpcs.push({...n,root,body,arms,legs,label,head:null,lastWave:0});
  }
 }
 function safetyNpcPos(n,now=Date.now()){
  const phase=now/2600+SAFETY_NPCS.findIndex(x=>x.id===n.id)*2.3;
  return {x:n.x+Math.sin(phase)*2,z:n.z+Math.cos(phase)*1.4};
 }
+let lastSafetyNpcVisual=0;
 function safetyNpcTick(){
- if(safetyGameType!=='safety'||!started)return;
+ if(safetyGameType!=='safety'||!started||document.hidden)return;
+ const frameAt=performance.now();if(frameAt-lastSafetyNpcVisual<33)return;lastSafetyNpcVisual=frameAt;
  const now=Date.now();let nearest=null,dist=4.5;
  for(const n of safetyNpcs){
   const target=n.serverPos||{x:n.x,y:36.05,z:n.z,heading:0};
@@ -948,7 +964,15 @@ function safetyNpcTick(){
   const moving=Math.hypot(n.root.position.x-oldX,n.root.position.z-oldZ)>.001;
   if(moving)n.root.rotation.y=target.heading;
   const stride=moving?Math.sin(now*.008+SAFETY_NPCS.findIndex(x=>x.id===n.id))*.48:0;
-  n.arms[0].rotation.x=stride;n.arms[1].rotation.x=-stride;
+  // Greet nearby players without adding NPC network traffic.
+  const playerDistance=Math.hypot(pl.x-n.root.position.x,pl.z-n.root.position.z);
+  const greeting=playerDistance<5.5&&!moving;
+  n.arms[0].rotation.x=greeting?-.7+Math.sin(now*.005)*.25:stride;
+  n.arms[1].rotation.x=-stride;
+  n.arms[0].rotation.z=greeting?.45:0;
+  // Animate labels only close to the player; far NPCs remain static.
+  n.label.visible=playerDistance<36;
+  n.label.position.y=2.9+(playerDistance<12?Math.sin(now*.002)*.07:0);
   n.legs[0].rotation.x=-stride;n.legs[1].rotation.x=stride;
   n.body.position.y=moving?Math.abs(stride)*.04:Math.sin(now*.0018)*.012;
   const d=Math.hypot(pl.x-n.root.position.x,pl.z-n.root.position.z);
