@@ -233,9 +233,40 @@ function updateGenerators(now){
 updateGeneratorIcons(gn);
 const tex=new THREE.TextureLoader().load('/assets/kai_hive_bedwars_atlas.png',()=>{dirty&&activeChunks&&activeChunks.forEach(k=>dirty.add(k))});
 tex.magFilter=tex.minFilter=THREE.NearestFilter;tex.generateMipmaps=false;tex.wrapS=tex.wrapT=THREE.ClampToEdgeWrapping;
+// 256x256 procedural industrial atlas; reuses the existing 16x16 voxel UV grid.
+// No network download, extra meshes, shaders, or draw calls.
+function createIndustrialAtlas(){
+ const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d');
+ const colors=['#939fa9','#947b5f','#c4b89a','#777f88','#c5a75a','#424b54','#b4c8d0','#657079','#858172','#3f6d62','#7b6455','#386d7d','#945e69','#43a5b0','#49ac76','#a8c7bf'];
+ for(let tile=0;tile<16;tile++){
+  const ox=tile*16,oy=0; // fill one row and replicate to all rows, matching standard atlas UV layout
+  for(let row=0;row<16;row++){
+   const x=tile*16,y=row*16;
+   ctx.fillStyle=colors[tile];ctx.fillRect(x,y,16,16);
+   for(let py=0;py<16;py++)for(let px=0;px<16;px++){
+    const hash=((px*73856093)^(py*19349663)^(tile*83492791))>>>0;
+    if(hash%11===0){ctx.fillStyle='rgba(0,0,0,.13)';ctx.fillRect(x+px,y+py,1,1)}
+    else if(hash%17===0){ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(x+px,y+py,1,1)}
+   }
+   if([3,7,11].includes(tile)){
+    ctx.strokeStyle='rgba(22,35,42,.48)';ctx.lineWidth=1;
+    ctx.strokeRect(x+.5,y+.5,15,15);
+    for(let p=3;p<=12;p+=5){ctx.fillStyle='#b9c2cb';ctx.fillRect(x+p,y+2,1,1);ctx.fillRect(x+p,y+13,1,1)}
+   }
+   if([13,14,15].includes(tile)){
+    ctx.fillStyle='rgba(255,255,255,.14)';
+    for(let p=-12;p<20;p+=8){ctx.beginPath();ctx.moveTo(x+p,y+16);ctx.lineTo(x+p+5,y);ctx.lineTo(x+p+8,y);ctx.lineTo(x+p+3,y+16);ctx.fill()}
+   }
+   if(tile===2||tile===8){ctx.strokeStyle='rgba(34,38,44,.24)';ctx.beginPath();ctx.moveTo(x,y+8.5);ctx.lineTo(x+16,y+8.5);ctx.moveTo(x+8.5,y);ctx.lineTo(x+8.5,y+16);ctx.stroke()}
+  }
+ }
+ const t=new THREE.CanvasTexture(c);t.magFilter=t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;
+}
+const industrialAtlas=createIndustrialAtlas();
 const PACK_NATIVE=new Set([5,6,7,12,13,15,16,23,24,26,27,28,30,31,32,33,34]);
 const tl=b=>isTeamWoolBlock(b)?0:b===5?1:b===6?7:b===7?6:isBedBlock(b)?0:b===12?2:b===13?4:b===14?15:b===15?13:b===16?5:b>=17&&b<=19?3:b===20?2:b===21?7:b===22||b===23?15:b===24||b===25?8:b===26?11:b===27?9:b===28?3:b===29?9:b===30?10:b===31?12:b===32?13:b===33?14:b===34?15:7;
 function blockTint(b,face){
+  if(currentMap==='safety_industry')return 0xffffff;
   if(PACK_NATIVE.has(b))return 0xffffff;
   if(b===25)return 0xa58a72;
   if(b===29)return 0x5a9f45;
@@ -372,7 +403,7 @@ function buildSafetySigns(){
 }
 function loadMap(mapId,lobby=false,serverChunks=null){
  currentMap=MAPS[mapId]?mapId:'classic';const g=BW.gen(currentMap,lobby);worldMeta=g;B.set(g.B);pf.fill(0);
- activeChunks=new Set(serverChunks||g.activeChunks||[]);dirty.clear();
+ activeChunks=new Set(serverChunks||g.activeChunks||[]);dirty.clear();if(mat.map!==(currentMap==='safety_industry'?industrialAtlas:tex)){mat.map=currentMap==='safety_industry'?industrialAtlas:tex;mat.needsUpdate=true;}
  Object.keys(M).forEach(k=>{if(!activeChunks.has(k)){sc.remove(M[k]);M[k].geometry.dispose();delete M[k]}});
  activeChunks.forEach(k=>dirty.add(k));updateGeneratorIcons(g);updateVendors(g,lobby);updateChests(g,lobby);syncBedVisuals(g);flush(999);buildSafetySigns();
 }
