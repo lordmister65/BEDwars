@@ -766,7 +766,7 @@ function buildSafetyStations(){
 // Lightweight campus ambience: no dynamic lights, no audio files and no per-frame allocations.
 let nrAmbientLast=0,nrAmbientAudio=null,nrBeacons=[],nrBeaconLast=0;
 function nrAmbientSound(now){
- if(safetyGameType!=='safety'||!started||over||now-nrAmbientLast<13500)return;
+ if(safetyGameType!=='safety'||!started||over||document.hidden||now-nrAmbientLast<13500)return;
  if(!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
  nrAmbientLast=now;
  try{
@@ -800,7 +800,7 @@ function buildNrBeacons(){
  }
 }
 function animateNrBeacons(now){
- if(safetyGameType!=='safety'||!started||now-nrBeaconLast<170)return;
+ if(safetyGameType!=='safety'||!started||document.hidden||now-nrBeaconLast<170)return;
  nrBeaconLast=now;const on=Math.floor(now/650)%2===0;
  for(const b of nrBeacons)b.mesh.visible=on;
  nrAmbientSound(now);
@@ -808,7 +808,7 @@ function animateNrBeacons(now){
 // Reactive educational feedback. Only server-confirmed actions trigger success sounds.
 let nrFeedbackAt=0,nrFeedbackEnd=0,nrFeedbackType='',nrFeedbackPos=null;
 function nrSound(kind,station=null){
- if(safetyGameType!=='safety'||!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
+ if(safetyGameType!=='safety'||document.hidden||!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
  const time=nrAmbientAudio.currentTime,osc=nrAmbientAudio.createOscillator(),gain=nrAmbientAudio.createGain();
  const source=station&&NR_WORKSTATIONS.find(o=>o.id===station);
  const dist=source?Math.hypot(pl.x-source.x,pl.z-source.z):0;
@@ -824,7 +824,9 @@ function nrSound(kind,station=null){
   if(kind==='alarm')osc.frequency.linearRampToValueAtTime(530,time+spec[1]);
   gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(.024*attenuation,time+.018);
   gain.gain.exponentialRampToValueAtTime(.0001,time+spec[1]);
-  osc.connect(gain);gain.connect(nrAmbientAudio.destination);
+  osc.connect(gain);
+  if(source&&nrAmbientAudio.createStereoPanner){panner=nrAmbientAudio.createStereoPanner();panner.pan.value=pan;gain.connect(panner);panner.connect(nrAmbientAudio.destination)}
+  else gain.connect(nrAmbientAudio.destination);
   osc.start(time);osc.stop(time+spec[1]+.01);osc.onended=()=>{osc.disconnect();gain.disconnect();if(panner)panner.disconnect()};
  }catch(e){try{osc.disconnect();gain.disconnect();if(panner)panner.disconnect()}catch(_){}}
 }
@@ -852,7 +854,7 @@ function animateNrActionFeedback(now){
 }
 let safetyStationAnimAt=0;
 function animateSafetyStations(now){
- if(safetyGameType!=='safety'||!started||now-safetyStationAnimAt<55)return;
+ if(safetyGameType!=='safety'||!started||document.hidden||now-safetyStationAnimAt<55)return;
  const dt=Math.min(.1,(now-safetyStationAnimAt)/1000||.05);safetyStationAnimAt=now;
  for(const root of safetyStationMeshes){
   const id=root.userData.stationId;
