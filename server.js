@@ -844,7 +844,7 @@ wss.on('connection', ws => {
         else if(action==='machine')result=SAFETY.machine(p,R,m.step);
         if(result.ok&&R.gameType==='safety'&&SAFETY.completeCurrent(p,R)){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
         if(result.ok&&R.gameType==='classic'){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
-        tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok});break;
+        tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok,action});break;
       }
       case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
