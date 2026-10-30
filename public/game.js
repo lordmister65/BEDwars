@@ -805,6 +805,44 @@ function animateNrBeacons(now){
  for(const b of nrBeacons)b.mesh.visible=on;
  nrAmbientSound(now);
 }
+// Reactive educational feedback. Only server-confirmed actions trigger success sounds.
+let nrFeedbackAt=0,nrFeedbackEnd=0,nrFeedbackType='',nrFeedbackPos=null;
+function nrSound(kind){
+ if(safetyGameType!=='safety'||!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
+ const time=nrAmbientAudio.currentTime,osc=nrAmbientAudio.createOscillator(),gain=nrAmbientAudio.createGain();
+ const settings={equip:[620,.09,'triangle'],extract:[190,.19,'square'],electrical:[430,.14,'sine'],machine:[145,.24,'sawtooth'],alarm:[750,.22,'square'],success:[860,.22,'sine'],error:[180,.13,'triangle']};
+ const spec=settings[kind]||settings.success;
+ try{
+  osc.type=spec[2];osc.frequency.setValueAtTime(spec[0],time);
+  if(kind==='success')osc.frequency.linearRampToValueAtTime(1080,time+spec[1]);
+  if(kind==='alarm')osc.frequency.linearRampToValueAtTime(530,time+spec[1]);
+  gain.gain.setValueAtTime(.0001,time);gain.gain.linearRampToValueAtTime(.024,time+.018);
+  gain.gain.exponentialRampToValueAtTime(.0001,time+spec[1]);
+  osc.connect(gain);gain.connect(nrAmbientAudio.destination);
+  osc.start(time);osc.stop(time+spec[1]+.01);osc.onended=()=>{osc.disconnect();gain.disconnect()};
+ }catch(e){try{osc.disconnect();gain.disconnect()}catch(_){}}
+}
+function nrActionFeedback(action,success,message){
+ if(safetyGameType!=='safety'||!started)return;
+ const now=performance.now();if(now-nrFeedbackAt<190)return;nrFeedbackAt=now;
+ const text=String(message||'').toLowerCase();
+ let kind=!success?'error':action==='equip'?'equip':action==='extract'?'extract':action==='electrical'?'electrical':action==='machine'?'machine':'success';
+ if(!success&&/parada|risco|proteção/.test(text))kind='alarm';
+ if(success&&/conclu|aprovad/.test(text))kind='success';
+ nrFeedbackType=success?'success':'warning';nrFeedbackEnd=now+850;
+ nrSound(kind);
+ const active=safetyState?.mission;
+ nrFeedbackPos=NR_WORKSTATIONS.find(o=>o.mission===active)||null;
+}
+function animateNrActionFeedback(now){
+ if(now>nrFeedbackEnd||!nrFeedbackPos)return;
+ const root=safetyStationMeshes.find(g=>g.userData.stationId===nrFeedbackPos.id);
+ if(!root)return;
+ // Brief pulse through existing geometry and status indicator, no lights/particles.
+ if(root.userData.indicator){
+  root.userData.indicator.visible=Math.floor(now/110)%2===0;
+ }
+}
 let safetyStationAnimAt=0;
 function animateSafetyStations(now){
  if(safetyGameType!=='safety'||!started||now-safetyStationAnimAt<55)return;
@@ -1049,7 +1087,7 @@ function syncDrops(l){const seen=new Set();l.forEach(d=>{seen.add(d.id);let o=DR
 let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){const gap=lowEnd?66:qualityMode==='medium'?44:33;if(dropVisualDisabled||now-dropVisualAt<gap)return;dropVisualAt=now;const t=now*.001;try{DROP.forEach(o=>{o.m.rotation.y=t*1.8+o.phase;o.m.rotation.z=Math.sin(t*.9+o.phase)*.08;const d=Math.hypot(o.m.position.x-pl.x,o.m.position.z-pl.z);if(me.alive&&d<3.2){const a=(3.2-d)/3.2*.14;o.m.position.x+=(pl.x-o.m.position.x)*a;o.m.position.z+=(pl.z-o.m.position.z)*a;o.baseY+=(pl.y+.65-o.baseY)*a}o.m.position.y=o.baseY+.15+Math.sin(t*2.6+o.phase)*.08})}catch(err){dropVisualDisabled=true;console.warn('Drops visuais desativados para preservar gameplay',err)}}
 function on(m){switch(m.t){
 case'safetyComplete':clearNrBeacons();closeNrNpcDialogue();toggleNrMissionMenu(false);clearSafetyNpcs();over=1;started=0;clearSafetyStations();showEventBanner('🏆 OPERAÇÃO SEGURA CONCLUÍDA!','start',6500);msg(m.message||'Treinamento concluído!');$('end').style.display='flex';$('et').textContent='Missão concluída!';$('endSub').textContent='Você concluiu os desafios NR 6, NR 10 e NR 12.';$('endStats').textContent='Treinamento individual finalizado.';break;
-case'safetyState':safetyState=m.state||safetyState;if(m.message)msg(m.message);safetyDraw();renderNrMissionJournal();break;
+case'safetyState':safetyState=m.state||safetyState;if(m.message)msg(m.message);if(m.message)nrActionFeedback(safetyState?.mission==='nr6'?'equip':safetyState?.mission==='nr10'?'electrical':safetyState?.mission==='nr12'?'machine':'npc',m.ok!==false,m.message);safetyDraw();renderNrMissionJournal();break;
 case'init':safetyGameType=m.gameType||'classic';safetyState=null;me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;blockOpSeq=Math.max(blockOpSeq,Number(m.placeOpSeq)||0);placementQueue.length=0;BRIDGE_PRED.clear();reconnectToken=m.token||reconnectToken;if($('rc'))$('rc').textContent=roomCode;if(m.party!=null)setPartyCode(m.party,false);myProfile=m.profile||myProfile;rankingData=m.ranking||rankingData;drawProfile();drawRanking();saveReconnect();loadMap(m.mapId||'classic',true,m.activeChunks);BLOCK_SEQ.clear();lastBlockSeq=0;(m.ed||[]).forEach(applyServerBlock);flush(999);syncDrops(m.drops||[]);pl.yaw=0;$('er').textContent=m.quick?'Partida encontrada!':'';break;
 case'reconnected':
  safetyGameType=m.gameType||'classic';safetyState=null;setTimeout(()=>send({t:'safetySync'}),200);
@@ -1250,7 +1288,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70,lastRenderAt=0;hud();
-function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started){safetyNpcTick();animateSafetyStations(now);animateNrBeacons(now)}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
+function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started){safetyNpcTick();animateSafetyStations(now);animateNrBeacons(now);animateNrActionFeedback(now)}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
 if(serverCorrection&&me.alive){const a=Math.min(1,dt/Math.max(.001,serverCorrection.t));pl.x+=(serverCorrection.x-pl.x)*a;pl.y+=(serverCorrection.y-pl.y)*a;pl.z+=(serverCorrection.z-pl.z)*a;serverCorrection.t-=dt;if(serverCorrection.t<=0)serverCorrection=null}
 if((started||lobbyExplore)&&!over&&(me.alive||spectator)){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
