@@ -3,7 +3,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bed Wars Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=hotbar-assets-v1-20261012"><!-- MOBILE_DPAD_CRITICAL_V4 -->
+<link rel="stylesheet" href="/style.css?v=hotbar-assets-v1-20261012">
+<!-- HOTBAR_EMPTY_ICON_FIX_V1 -->
+<style id="hotbar-empty-icon-fix-v1">
+.s.empty.has-icon .hotbar-icon{opacity:.22!important}
+.s.empty.has-icon:hover .hotbar-icon{opacity:.34!important}
+.s.has-icon:not(.empty) .hotbar-icon{opacity:1!important}
+</style>
+<!-- MOBILE_DPAD_CRITICAL_V4 -->
 <style id="mobile-dpad-critical-v4">
 @media (pointer:coarse),(max-width:800px){
   #joy,#knob,#actBtn,#placeBtn,#useBtn,#jumpBtn{display:none!important}
@@ -20,10 +27,6 @@
   #mobile #dpad .right{grid-column:3!important;grid-row:2!important}
   #mobile #dpad .back{grid-column:2!important;grid-row:3!important}
   #mobile #dpad .jump-pad span{font-size:17px!important;line-height:1!important}
-  #mobile #jumpPadBtn{position:fixed!important;right:18px!important;left:auto!important;bottom:18px!important;top:auto!important;width:48px!important;height:48px!important;min-width:48px!important;max-width:48px!important;min-height:48px!important;max-height:48px!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;touch-action:none!important;z-index:110!important;border-radius:4px!important;background:rgba(103,124,96,.86)!important;border-top:2px solid rgba(190,210,178,.92)!important;border-left:2px solid rgba(190,210,178,.92)!important;border-right:2px solid rgba(37,52,36,.96)!important;border-bottom:2px solid rgba(37,52,36,.96)!important;box-shadow:0 0 0 1px rgba(20,29,20,.72)!important;color:#eef5e9!important;font:900 18px/1 Arial,sans-serif!important;text-align:center!important}
-  #mobile #jumpPadBtn span{font-size:20px!important;line-height:1!important;pointer-events:none!important}
-  #mobile #jumpPadBtn.touch-active,#mobile #jumpPadBtn:active{transform:translateY(1px)!important;background:rgba(145,166,136,.96)!important}
-  body.mobile-left-handed #mobile #jumpPadBtn{right:auto!important;left:18px!important}
   body.mobile-left-handed #mobile #dpad{left:auto!important;right:12px!important}
   #mobileSettingsBtn,#mobileChatBtn{width:34px!important;height:34px!important;min-width:34px!important;max-width:34px!important;min-height:34px!important;max-height:34px!important;padding:0!important;margin:0!important}
   #prevItemBtn,#nextItemBtn{width:32px!important;height:32px!important;min-width:32px!important;max-width:32px!important;min-height:32px!important;max-height:32px!important;padding:0!important}
@@ -32,8 +35,6 @@
   #mobile #dpad{left:8px!important;bottom:8px!important;width:96px!important;height:96px!important;min-width:96px!important;max-width:96px!important;min-height:96px!important;max-height:96px!important;grid-template-columns:30px 30px 30px!important;grid-template-rows:30px 30px 30px!important;gap:3px!important}
   #mobile #dpad .move-btn{width:30px!important;height:30px!important;min-width:30px!important;max-width:30px!important;min-height:30px!important;max-height:30px!important;font-size:13px!important}
   body.mobile-left-handed #mobile #dpad{left:auto!important;right:8px!important}
-  #mobile #jumpPadBtn{right:12px!important;bottom:12px!important;width:42px!important;height:42px!important;min-width:42px!important;max-width:42px!important;min-height:42px!important;max-height:42px!important}
-  body.mobile-left-handed #mobile #jumpPadBtn{right:auto!important;left:12px!important}
 }
 </style>
 <!-- HOTBAR_EMPTY_ICON_FIX_V1 -->
