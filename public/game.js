@@ -763,6 +763,48 @@ function buildSafetyStations(){
  }
 }
 
+// Lightweight campus ambience: no dynamic lights, no audio files and no per-frame allocations.
+let nrAmbientLast=0,nrAmbientAudio=null,nrBeacons=[],nrBeaconLast=0;
+function nrAmbientSound(now){
+ if(safetyGameType!=='safety'||!started||over||now-nrAmbientLast<13500)return;
+ if(!nrAmbientAudio||nrAmbientAudio.state!=='running')return;
+ nrAmbientLast=now;
+ try{
+  const osc=nrAmbientAudio.createOscillator(),gain=nrAmbientAudio.createGain();
+  osc.type='sine';osc.frequency.setValueAtTime(88,nrAmbientAudio.currentTime);
+  gain.gain.setValueAtTime(0,nrAmbientAudio.currentTime);
+  gain.gain.linearRampToValueAtTime(.007,nrAmbientAudio.currentTime+.1);
+  gain.gain.exponentialRampToValueAtTime(.0001,nrAmbientAudio.currentTime+1.4);
+  osc.connect(gain);gain.connect(nrAmbientAudio.destination);osc.start();osc.stop(nrAmbientAudio.currentTime+1.5);
+  osc.onended=()=>{osc.disconnect();gain.disconnect()};
+ }catch(e){}
+}
+function enableNrAmbient(){
+ if(safetyGameType!=='safety')return;
+ try{const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioContextClass)return;if(!nrAmbientAudio)nrAmbientAudio=new AudioContextClass();
+  if(nrAmbientAudio.state==='suspended')nrAmbientAudio.resume().catch(()=>{});
+ }catch(e){}
+}
+document.addEventListener('pointerdown',enableNrAmbient,{passive:true});
+document.addEventListener('keydown',enableNrAmbient);
+function clearNrBeacons(){
+ for(const b of nrBeacons){sc.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose()}
+ nrBeacons=[];
+}
+function buildNrBeacons(){
+ clearNrBeacons();if(safetyGameType!=='safety'||!started)return;
+ for(const [x,z,shade] of [[-24,6,0xffd34a],[24,6,0x5bd3ff],[0,-16,0x55ed88]]){
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(.55,.28,.55),new THREE.MeshBasicMaterial({color:shade}));
+  mesh.position.set(x,42.7,z);sc.add(mesh);nrBeacons.push({mesh,shade});
+ }
+}
+function animateNrBeacons(now){
+ if(safetyGameType!=='safety'||!started||now-nrBeaconLast<170)return;
+ nrBeaconLast=now;const on=Math.floor(now/650)%2===0;
+ for(const b of nrBeacons)b.mesh.visible=on;
+ nrAmbientSound(now);
+}
 let safetyStationAnimAt=0;
 function animateSafetyStations(now){
  if(safetyGameType!=='safety'||!started||now-safetyStationAnimAt<55)return;
@@ -1006,7 +1048,7 @@ function releaseDrop(k,m){m.visible=false;const pool=DROP_POOL.get(k)||[];if(poo
 function syncDrops(l){const seen=new Set();l.forEach(d=>{seen.add(d.id);let o=DROP.get(d.id);if(!o){const m=acquireDrop(d.k);if(!m.parent)sc.add(m);o={m,k:d.k,baseY:d.y,phase:(d.id%17)*.37};DROP.set(d.id,o)}o.baseY=d.y;o.m.position.set(d.x,d.y,d.z);o.n=d.n});DROP.forEach((o,id)=>{if(!seen.has(id)){releaseDrop(o.k,o.m);DROP.delete(id)}})}
 let dropVisualAt=0,dropVisualDisabled=false;function updateDropVisuals(now){const gap=lowEnd?66:qualityMode==='medium'?44:33;if(dropVisualDisabled||now-dropVisualAt<gap)return;dropVisualAt=now;const t=now*.001;try{DROP.forEach(o=>{o.m.rotation.y=t*1.8+o.phase;o.m.rotation.z=Math.sin(t*.9+o.phase)*.08;const d=Math.hypot(o.m.position.x-pl.x,o.m.position.z-pl.z);if(me.alive&&d<3.2){const a=(3.2-d)/3.2*.14;o.m.position.x+=(pl.x-o.m.position.x)*a;o.m.position.z+=(pl.z-o.m.position.z)*a;o.baseY+=(pl.y+.65-o.baseY)*a}o.m.position.y=o.baseY+.15+Math.sin(t*2.6+o.phase)*.08})}catch(err){dropVisualDisabled=true;console.warn('Drops visuais desativados para preservar gameplay',err)}}
 function on(m){switch(m.t){
-case'safetyComplete':closeNrNpcDialogue();toggleNrMissionMenu(false);clearSafetyNpcs();over=1;started=0;clearSafetyStations();showEventBanner('🏆 OPERAÇÃO SEGURA CONCLUÍDA!','start',6500);msg(m.message||'Treinamento concluído!');$('end').style.display='flex';$('et').textContent='Missão concluída!';$('endSub').textContent='Você concluiu os desafios NR 6, NR 10 e NR 12.';$('endStats').textContent='Treinamento individual finalizado.';break;
+case'safetyComplete':clearNrBeacons();closeNrNpcDialogue();toggleNrMissionMenu(false);clearSafetyNpcs();over=1;started=0;clearSafetyStations();showEventBanner('🏆 OPERAÇÃO SEGURA CONCLUÍDA!','start',6500);msg(m.message||'Treinamento concluído!');$('end').style.display='flex';$('et').textContent='Missão concluída!';$('endSub').textContent='Você concluiu os desafios NR 6, NR 10 e NR 12.';$('endStats').textContent='Treinamento individual finalizado.';break;
 case'safetyState':safetyState=m.state||safetyState;if(m.message)msg(m.message);safetyDraw();renderNrMissionJournal();break;
 case'init':safetyGameType=m.gameType||'classic';safetyState=null;me.id=m.id;me.team=m.team;roomCode=m.room||roomCode;blockOpSeq=Math.max(blockOpSeq,Number(m.placeOpSeq)||0);placementQueue.length=0;BRIDGE_PRED.clear();reconnectToken=m.token||reconnectToken;if($('rc'))$('rc').textContent=roomCode;if(m.party!=null)setPartyCode(m.party,false);myProfile=m.profile||myProfile;rankingData=m.ranking||rankingData;drawProfile();drawRanking();saveReconnect();loadMap(m.mapId||'classic',true,m.activeChunks);BLOCK_SEQ.clear();lastBlockSeq=0;(m.ed||[]).forEach(applyServerBlock);flush(999);syncDrops(m.drops||[]);pl.yaw=0;$('er').textContent=m.quick?'Partida encontrada!':'';break;
 case'reconnected':
@@ -1033,7 +1075,7 @@ case'lobby':{
  $('mapPick').innerHTML=(m.maps||Object.values(MAPS)).map(mp=>`<button class="map-card${mp.id===m.mapId?' active':''}${myVote===mp.id?' voted':''}" onclick="send({t:'mapVote',map:'${mp.id}'})"><b>${mp.name}</b><small>${mp.description||''}</small><em class="map-votes">🗳 ${votes[mp.id]||0}${myVote===mp.id?' · SEU VOTO':''}</em></button>`).join('');
  $('st').style.display=m.quick?'none':me.id===m.host?'block':'none';if(m.quick){const q=m.queue||{},cd=q.countdown>0?' · inicia em '+q.countdown+'s':q.ready?' · preparando partida':' · mínimo '+(q.min||2)+' jogadores';$('wt').textContent='⚡ PARTIDA RÁPIDA · '+(q.count||m.l.length)+'/'+(q.max||'?')+cd}else $('wt').textContent=me.id===m.host?(soloMode?`Modo SOLO · cada jogador ocupa uma base diferente · vote no mapa.`:`Modo ${currentMode.toUpperCase()} · organize os times e vote no mapa.`):'Aguardando o anfitrião · você já pode votar no mapa.';renderPartyStatus();scr('lobby');hud();break}
 case'map':loadMap(m.mapId||'classic',true,m.activeChunks);break;
-case'start':safetyGameType=m.gameType||safetyGameType;safetyState=null;if(safetyGameType==='safety')setTimeout(()=>send({t:'safetySync'}),250);HELD_CACHE.clear();setTimeout(preloadHeld,50);currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;nrJournalCache='';setTimeout(()=>{buildSafetyStations();buildSafetyNpcs();renderNrMissionJournal()},100);queueState={quick:false,count:0,min:0,max:0,countdown:0};bed=m.bed;syncBedVisuals(worldMeta,bed);matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();showEventBanner('⚔ '+String(currentMode||'BED WARS').toUpperCase()+' · '+((MAPS[currentMap]||{}).name||currentMap),'start',2100);scr(safetyGameType==='safety'||touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);renderMatchStatus();break;
+case'start':safetyGameType=m.gameType||safetyGameType;safetyState=null;if(safetyGameType==='safety')setTimeout(()=>send({t:'safetySync'}),250);HELD_CACHE.clear();setTimeout(preloadHeld,50);currentMode=m.modeId||currentMode;loadMap(m.mapId||currentMap,false,m.activeChunks);started=1;nrJournalCache='';setTimeout(()=>{buildSafetyStations();buildSafetyNpcs();buildNrBeacons();renderNrMissionJournal()},100);queueState={quick:false,count:0,min:0,max:0,countdown:0};bed=m.bed;syncBedVisuals(worldMeta,bed);matchTime=0;matchPlayers.clear();myMatchStats={kills:0,finalKills:0};clearRespawn();showEventBanner('⚔ '+String(currentMode||'BED WARS').toUpperCase()+' · '+((MAPS[currentMap]||{}).name||currentMap),'start',2100);scr(safetyGameType==='safety'||touchMode||document.pointerLockElement?null:'ov');hud();renderScoreboard(true);renderMatchStatus();break;
 case's':{if(Array.isArray(m.npcs)){for(const data of m.npcs){const n=safetyNpcs.find(q=>q.id===data[0]);if(n)n.serverPos={x:data[1],y:data[2],z:data[3],heading:data[4]}}}if(Number.isInteger(m.seq)){if(m.seq<=lastSnapshotSeq)break;lastSnapshotSeq=m.seq;diag.snapshotSeq=m.seq}syncProjectiles(m.pr||[]);if(m.time!=null)matchTime=m.time;if(m.bed)bed=m.bed;if(m.gen)genState=m.gen;if(m.phase)matchPhase=m.phase;const seen=new Set();m.p.forEach(([id,x,y,z,yw,pt,hp,al,tm,iv,hs,rsw,rar,disc,radmin,out,rt,kills,finalKills,spawnProt])=>{seen.add(id);matchPlayers.set(id,{id,team:tm,alive:!!al,out:!!out,admin:!!radmin,kills:kills||0,finalKills:finalKills||0,rt:rt||0});if(id===me.id){me.hp=hp;me.alive=al;me.out=!!out;me.spawnProtect=!!spawnProt;myMatchStats={kills:kills||0,finalKills:finalKills||0};return}
 let r=PL.get(id);if(!r)PL.set(id,r=mkp(id,tm));r.speed=Math.hypot(x-r.tx,z-r.tz);r.lx=r.tx;r.lz=r.tz;r.tx=x;r.ty=y;r.tz=z;r.yaw=yw;r.al=al;r.iv=iv;r.disc=disc;r.m.visible=!radmin;remoteHeld(r,hs||0,tm,rsw||0);syncRemoteArmor(r,rar||0);if(!r.init){r.init=1;r.m.position.set(x,y,z)}});
 PL.forEach((r,id)=>{if(!seen.has(id)){sc.remove(r.m);PL.delete(id);matchPlayers.delete(id)}});renderScoreboard();break}
@@ -1208,7 +1250,7 @@ if(touchMode){
 }
 const size=()=>{R.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',size);size();
 let last=performance.now(),ls=0,acc=0,lodAcc=0,bobPhase=0,bobX=0,bobY=0,targetFov=70,lastRenderAt=0;hud();
-function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started){safetyNpcTick();animateSafetyStations(now)}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
+function tick(now){requestAnimationFrame(tick);if(safetyGameType==='safety'&&started){safetyNpcTick();animateSafetyStations(now);animateNrBeacons(now)}const dt=Math.min((now-last)/1000,.05);last=now;updateDiag(now);updateRespawnUI();if(started&&!over&&((now|0)%500<17))renderMatchStatus();if(comboHudUntil&&now>comboHudUntil){comboHudUntil=0;$('comboHud').classList.remove('show')}if(bowCharging)drawBowTrajectory();acc+=dt;lodAcc+=dt;if(lodAcc>(lowEnd?.72:.45)){lodAcc=0;updateChunkLOD()}fxs.speed=Math.max(0,fxs.speed-dt);fxs.jump=Math.max(0,fxs.jump-dt);fxs.invis=Math.max(0,fxs.invis-dt);fxs.slow=Math.max(0,(fxs.slow||0)-dt);fxs.fatigue=Math.max(0,(fxs.fatigue||0)-dt);fxs.blind=Math.max(0,(fxs.blind||0)-dt);fxs.milk=Math.max(0,(fxs.milk||0)-dt);$('blindOverlay').style.opacity=fxs.blind>0?String(Math.min(.82,.38+fxs.blind*.055)):'0';
 if(serverCorrection&&me.alive){const a=Math.min(1,dt/Math.max(.001,serverCorrection.t));pl.x+=(serverCorrection.x-pl.x)*a;pl.y+=(serverCorrection.y-pl.y)*a;pl.z+=(serverCorrection.z-pl.z)*a;serverCorrection.t-=dt;if(serverCorrection.t<=0)serverCorrection=null}
 if((started||lobbyExplore)&&!over&&(me.alive||spectator)){
 const fx_=-Math.sin(pl.yaw),fz=-Math.cos(pl.yaw),rx=Math.cos(pl.yaw),rz=-Math.sin(pl.yaw),mf=((K.KeyW?1:0)-(K.KeyS?1:0))+my,mr=((K.KeyD?1:0)-(K.KeyA?1:0))+mx,l=Math.hypot(mf,mr)||1;
