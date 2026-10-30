@@ -191,6 +191,27 @@
  for(const x of [-4,-2,0,2,4])set(x,BASE_Y+9,12,34);
  // Centerline light markers reinforce direction without obstructing movement.
  for(let z=-28;z<=9;z+=5){for(const x of [-3,3])set(x,BASE_Y+2,z,34);}
+ // Industrial surface treatment: painted safety zones and high-contrast floor stripes.
+ // One-block-thick paint changes existing floor voxels only: no added draw calls or collision.
+ const paint=(x,z,id)=>set(x,floor,z,id);
+ for(const h of halls){
+  const outerZ=h.cz+h.hz-3;
+  for(let x=h.cx-h.hx+2;x<=h.cx+h.hx-2;x++) {
+   if(Math.abs(x-h.cx)>3)paint(x,outerZ,(x-h.cx)%4===0?21:h.accent);
+  }
+  for(let z=h.cz-h.hz+2;z<=h.cz+h.hz-4;z+=3){
+   paint(h.cx-h.hx+2,z,h.accent);paint(h.cx+h.hx-2,z,h.accent);
+  }
+ }
+ // Reinforced longitudinal lane markings, inset from the pedestrian corridor.
+ for(let z=-30;z<=12;z++){if(z%4<2){paint(-3,z,14);paint(3,z,14)}}
+ for(let x=-27;x<=27;x++){if(x%4<2){paint(x,8,14);paint(x,11,14)}}
+ // Distinct pad markings where the operator stands in front of each workstation.
+ for(const [x,z,accent] of [[-27,-1,32],[-24,-3,32],[24,-3,34],[0,-21,33]]){
+  for(let dx=-2;dx<=2;dx++)for(let dz=0;dz<=2;dz++){
+   if(dx===-2||dx===2||dz===0||dz===2)paint(x+dx,z+dz,accent);
+  }
+ }
  // Priority collision cleanup: the entire route from reception to each station.
  const clearWalk=(x,z)=>{for(let y=BASE_Y+2;y<=BASE_Y+5;y++)set(x,y,z,0);};
  for(let z=-27;z<=17;z++)for(let x=-2;x<=2;x++)clearWalk(x,z);
