@@ -60,7 +60,7 @@
 #nrMissionActions{margin-top:12px;border-top:1px solid #406371;padding-top:12px;display:flex;gap:7px;flex-wrap:wrap}
 #nrMissionActions button{padding:8px 10px}
 </style>
-</head><body>
+<link rel="stylesheet" href="/lobby-ui.css?v=1"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="eventBanner"></div><div id="matchStatus"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
@@ -109,11 +109,27 @@
 <div class="hud" id="tm"></div><div class="hud" id="res"></div><div class="hud" id="hp"></div>
 <div id="chatLog"></div>
 <form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
-<div class="ov" id="menu" style="display:flex"><div><h1>Bed Wars Online</h1>
-<p><b>Modo de jogo</b></p><select id="gameType" style="width:100%;padding:10px;margin:5px 0 12px"><option value="classic">⚔ BedWars Clássico</option><option value="safety">🦺 Operação Segura · NR 6, NR 10 e NR 12</option></select><p>Seu nome</p><input id="nm" maxlength="14" value="Jogador">
-<p>Código da sala (todos digitam o mesmo)</p><input id="rm" maxlength="12" value="sala1">
-<button id="go" style="text-align:center;margin-top:12px">Entrar na sala</button>
-<hr><p><b>PARTIDA RÁPIDA</b></p><select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>2v2</option><option value="3v3">3v3</option><option value="4v4">4v4</option><option value="solo">Solo / FFA</option></select><input id="partyCode" maxlength="8" placeholder="Código da Party (opcional)"><div class="meta-actions party-tools"><button type="button" onclick="quickPlay()">⚡ Jogar agora</button><button type="button" onclick="createPartyCode()">Criar Party</button><button type="button" onclick="copyPartyCode()">Copiar código</button><button type="button" onclick="leavePartyCode()">Sair da Party</button></div><p id="partyStatus" class="party-status"></p><p id="er"></p></div></div>
+<div class="ov bw-modern" id="menu" style="display:flex">
+  <div class="bw-shell">
+    <header class="bw-head"><div class="bw-logo">⚔ Bed <span>Wars</span> Online</div><div class="bw-head-right"><span class="bw-server-pill">● Multiplayer online</span><div class="bw-account"><label for="nm" class="bw-muted">Convidado</label><input id="nm" maxlength="14" value="Jogador" aria-label="Nome do jogador" autocomplete="nickname"></div></div></header>
+    <div class="bw-frame">
+      <nav class="bw-sidebar" aria-label="Navegação principal"><button type="button" data-nav="home" class="is-active">⌂ Início</button><button type="button" data-nav="rooms">⚔ Salas multiplayer</button><button type="button" id="bwSettings">⚙ Configurações</button><div class="bw-side-note">Jogue online com amigos usando salas e códigos de party. Cadastro com senha não está disponível nesta versão.</div></nav>
+      <main class="bw-main">
+        <div class="bw-view is-active" data-view="home">
+          <section class="bw-hero"><div><div class="bw-eyebrow">TEAM PVP · DEFENDA SUA CAMA</div><h1>Bed Wars<br>Online</h1><p>Proteja sua cama, reúna recursos, construa defesas e dispute partidas multiplayer com seus amigos.</p><div class="bw-actions"><button type="button" id="bwPlayNow" class="bw-primary">▶ JOGAR MULTIPLAYER</button><button type="button" class="bw-secondary" onclick="openRanking()">🏆 Ranking</button></div></div><div class="bw-hero-art" aria-hidden="true">🛏️</div></section>
+          <section class="bw-card" style="margin-top:16px"><h3>🎮 Modos disponíveis</h3><p>Clássico, duplas, trio, 4v4 e modo educativo. Crie uma sala ou entre usando o código enviado por um amigo.</p><button type="button" class="bw-secondary" data-nav="rooms">Criar ou entrar em uma sala</button></section>
+        </div>
+        <div class="bw-view" data-view="rooms">
+          <section class="bw-card"><span class="bw-eyebrow">MULTIPLAYER · SALAS</span><h2>Criar ou entrar em uma sala</h2><p>Escolha um modo, combine um código com seus amigos ou entre numa partida rápida.</p><label class="bw-field" for="gameType">Modo de jogo<select id="gameType"><option value="classic">⚔ BedWars Clássico</option><option value="safety">🦺 Operação Segura · Educativo</option></select></label><label class="bw-field" for="quickMode">Formato de partida<select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>Duplas 2v2</option><option value="3v3">Trio 3v3</option><option value="4v4">4v4</option><option value="solo">Solo</option></select></label></section>
+          <div class="bw-rooms-grid">
+            <section class="bw-card"><h3>⚡ Partida rápida</h3><p>Encontre uma partida pelo servidor existente ou jogue com sua party.</p><label class="bw-field" for="partyCode">Código da party (opcional)<input id="partyCode" maxlength="8" autocomplete="off" placeholder="Ex.: BWD42"></label><button class="bw-primary" type="button" onclick="quickPlay()">▶ JOGAR AGORA</button><div class="bw-party-row" style="margin-top:14px"><button class="bw-secondary" type="button" onclick="createPartyCode()">Criar Party</button><button class="bw-secondary" type="button" onclick="copyPartyCode()">Copiar código</button><button class="bw-secondary" type="button" onclick="leavePartyCode()">Sair</button></div><p id="partyStatus" class="party-status"></p></section>
+            <section class="bw-card"><h3>＋ Sala personalizada</h3><p>Crie um código de sala e compartilhe com seus amigos; quem entrar com o mesmo código ficará na mesma sala.</p><label class="bw-field" for="rm">Código da sala<input id="rm" maxlength="12" value="sala1" autocomplete="off"></label><div class="bw-party-row"><button id="bwGenerateRoom" class="bw-secondary" type="button">Gerar código</button><button id="go" class="bw-primary" type="button">CRIAR / ENTRAR</button></div><p id="er" role="status" aria-live="polite"></p></section>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
 <div class="ov" id="lobby"><div class="lobby-panel"><h1>Sala <span id="rc"></span></h1>
 <div class="lobby-grid">
   <section><h2>Jogadores</h2><div id="pl"></div></section>
@@ -137,4 +153,4 @@
 <script src="/blockbench-models.js"></script>
 <script src="/game.js?v=npc-improvements-v12-20261029"></script>
 <script src="/cloud-system.js?v=clouds-v1-20261012"></script>
-</body></html>
+<script src="/lobby-ui.js?v=1"></script></body></html>
