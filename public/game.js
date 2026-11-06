@@ -618,7 +618,7 @@ function connectSocket(mode='join'){
     if(ws!==sock||seq!==netSeq)return;stopConnectTimeout();socketOpenedAt=Date.now();lastNetMessageAt=Date.now();
     if(mode==='reconnect')send({t:'reconnect',room:roomCode,token:reconnectToken});
     else if(mode==='matchmake'){const modeId=$('quickMode')?.value||'2v2',party=String($('partyCode')?.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);send({t:'matchmake',name:$('nm').value||'Jogador',modeId,party,profileId:localProfileId})}
-    else{roomCode=($('rm').value||'sala').slice(0,12).toLowerCase();$('rc').textContent=roomCode;send({t:'join',name:$('nm').value||'Jogador',room:roomCode,profileId:localProfileId})}
+    else{roomCode=($('rm').value||'sala').slice(0,12).toLowerCase();$('rc').textContent=roomCode;send({t:'join',name:$('nm').value||'Jogador',room:roomCode,modeId:$('quickMode')?.value||'2v2',profileId:localProfileId})}
   };
   sock.onmessage=e=>{if(ws!==sock||seq!==netSeq)return;lastNetMessageAt=Date.now();try{const m=JSON.parse(e.data);on(m)}catch(err){console.error('Pacote de rede ignorado sem travar o jogo',err);msg('Sincronização recuperada automaticamente')}};
   sock.onerror=e=>{if(ws!==sock)return;console.warn('[NET] WebSocket error',e);if(!reconnecting)$('er').textContent='Não consegui conectar ao servidor.'};
