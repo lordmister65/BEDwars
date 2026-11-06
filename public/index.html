@@ -42,7 +42,7 @@
 .s.empty.has-icon:hover .hotbar-icon{opacity:.34!important}
 .s.has-icon:not(.empty) .hotbar-icon{opacity:1!important}
 </style>
-<link rel="stylesheet" href="/lobby-ui.css?v=neonhub-20261106"></head><body>
+<link rel="stylesheet" href="/lobby-ui.css?v=portal-20261106"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="eventBanner"></div><div id="matchStatus"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
 <div id="audioSettingsPanel" aria-label="Configurações de áudio">
@@ -86,7 +86,32 @@
 <div id="chatLog"></div>
 <form id="chatForm"><select id="chatScope"><option value="global">GLOBAL</option><option value="team">TIME</option></select><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Mensagem..."><button type="submit">Enviar</button></form>
 
-<div class="ov bw-modern" id="menu" style="display:flex">
+<div id="bwPortal" class="bw-portal" role="region" aria-label="Portal de acesso do BedWars">
+ <div class="bw-portal-content">
+  <div class="bw-portal-logo"><div class="bw-portal-mark">🛏️</div><h1>BED <span>WARS</span></h1><p>ONLINE</p></div>
+  <div class="bw-portal-card">
+   <div class="bw-portal-kicker">⚔ PREPARE-SE PARA A BATALHA</div>
+   <h2>Bem-vindo ao BedWars</h2><p>Escolha como deseja começar sua aventura.</p>
+   <button id="bwGuestStart" class="bw-portal-primary" type="button">▶ JOGAR AGORA <small>Como Convidado</small></button>
+   <button id="bwRegisterStart" class="bw-portal-secondary" type="button">＋ CRIAR CONTA</button>
+   <button id="bwLoginStart" class="bw-portal-secondary" type="button">↪ ENTRAR (LOGIN)</button>
+   <span class="bw-portal-footer">Proteja sua cama. Domine as ilhas. Vença.</span>
+  </div>
+ </div>
+</div>
+<div id="bwAuthModal" class="bw-auth-modal" role="dialog" aria-modal="true" aria-labelledby="bwAuthTitle" style="display:none">
+ <form id="bwAuthForm" class="bw-auth-dialog">
+  <button type="button" id="bwAuthClose" class="bw-auth-close" aria-label="Fechar">✕</button>
+  <span class="bw-eyebrow">BEDWARS · CONTA DE JOGADOR</span>
+  <h2 id="bwAuthTitle">Entrar</h2><p id="bwAuthIntro">Entre para acessar seu perfil e ranking.</p>
+  <label for="bwAuthName">Nome de usuário<input id="bwAuthName" name="name" minlength="3" maxlength="14" autocomplete="username" required placeholder="Seu nick"></label>
+  <label for="bwAuthPassword">Senha<input id="bwAuthPassword" name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required placeholder="Mínimo de 8 caracteres"></label>
+  <p id="bwAuthError" role="alert" aria-live="polite"></p>
+  <button class="bw-portal-primary" type="submit" id="bwAuthSubmit">ENTRAR</button>
+  <button type="button" class="bw-auth-swap" id="bwAuthSwap">Ainda não tenho conta</button>
+ </form>
+</div>
+<div class="ov bw-modern bw-portal-locked" id="menu" style="display:none">
  <div class="bw-shell">
   <header class="bw-head">
    <div class="bw-account bw-profile-card">
@@ -94,17 +119,18 @@
     <div><label for="nm" class="bw-muted">SEU JOGADOR · CONVIDADO</label><input id="nm" maxlength="14" value="Jogador" aria-label="Nome do jogador" autocomplete="nickname"><small>Escolha seu nick antes de jogar</small></div>
    </div>
    <div class="bw-brand"><span class="bw-brand-icon" aria-hidden="true">🛏</span><div>BED<span>WARS</span><small>ONLINE</small></div></div>
-   <div class="bw-head-actions"><span class="bw-server-pill"><span class="bw-dot"></span> MULTIPLAYER</span><button id="bwSettings" class="bw-icon-button" type="button" title="Configurações de áudio" aria-label="Configurações de áudio">⚙</button></div>
+   <div class="bw-head-actions"><button type="button" class="bw-signout" id="bwSignout">Sair</button><span class="bw-server-pill"><span class="bw-dot"></span> MULTIPLAYER</span><button id="bwSettings" class="bw-icon-button" type="button" title="Configurações de áudio" aria-label="Configurações de áudio">⚙</button></div>
   </header>
   <div class="bw-frame">
    <nav class="bw-sidebar" aria-label="Menu principal">
     <button class="is-active" type="button" data-nav="home">⌂ <span>Início</span></button>
     <button type="button" data-nav="rooms">⚔ <span>Jogar / Criar sala</span></button>
-    <button type="button" data-nav="help">? <span>Como jogar</span></button>
+    <button type="button" data-nav="ranking" data-member-only="true">🏆 <span>Ranking</span></button><button type="button" data-nav="achievements" data-member-only="true">✦ <span>Conquistas</span></button><button type="button" data-nav="store" data-member-only="true">♢ <span>Loja</span></button><button type="button" data-nav="profile" data-member-only="true">♙ <span>Perfil</span></button><button type="button" data-nav="help">? <span>Como jogar</span></button>
     <div class="bw-side-note"><b>BEDWARS ONLINE</b><p>Defenda sua cama, construa pontes e vença as equipes rivais.</p><span>★ 100% multiplayer</span></div>
    </nav>
    <main class="bw-main">
     <div class="bw-top-tabs"><button type="button" class="is-active" data-nav="home">⌂ Início</button><button type="button" data-nav="rooms">▶ Jogar</button><button type="button" data-nav="help">◎ Guia</button></div>
+    <p class="bw-member-notice" id="bwMemberNotice" role="status" aria-live="polite" style="display:none">Disponível apenas para contas cadastradas. <button type="button" id="bwMemberLogin">Criar conta / Entrar</button></p>
     <section class="bw-view is-active" data-view="home">
      <div class="bw-hero"><div><span class="bw-eyebrow">TEAM PVP · DEFENDA SUA CAMA</span><h1>PREPARE-SE<br><em>PARA A BATALHA</em></h1><p>Explore ilhas, colete recursos, proteja sua cama e domine as batalhas com seus amigos.</p><div class="bw-actions"><button class="bw-primary" id="bwPlayNow" type="button">▶ JOGAR MULTIPLAYER</button><button type="button" class="bw-secondary" data-nav="rooms">＋ CRIAR UMA SALA</button></div></div><div class="bw-hero-art" aria-hidden="true"><div class="bw-hero-island"><div>🛏️</div><span>⚔️</span></div></div></div>
      <div class="bw-feature-grid"><div class="bw-feature"><span>⚔</span><b>Combate competitivo</b><small>Duelo, duplas, trios, 4v4 e solo</small></div><div class="bw-feature"><span>🧱</span><b>Construa sua defesa</b><small>Pontes, blocos e estratégias</small></div><div class="bw-feature"><span>🏆</span><b>Progrida e vença</b><small>XP, estatísticas e ranking</small></div></div>
@@ -128,6 +154,10 @@
       <div class="bw-card"><h3>🤝 JOGAR EM PARTY</h3><p>Compartilhe um código para entrar na mesma equipe dos amigos.</p><label class="bw-field" for="partyCode">Código da party<input id="partyCode" maxlength="8" autocomplete="off" placeholder="Ex.: BWD42"></label><div class="bw-party-row"><button class="bw-secondary" type="button" onclick="createPartyCode()">Criar</button><button class="bw-secondary" type="button" onclick="copyPartyCode()">Copiar</button><button class="bw-secondary" type="button" onclick="leavePartyCode()">Sair</button></div><p id="partyStatus" class="party-status"></p></div>
      </div>
     </section>
+    <section class="bw-view" data-view="ranking"><div class="bw-card"><h2>🏆 Ranking</h2><p>Veja a classificação dos jogadores cadastrados.</p><button type="button" class="bw-primary" id="bwOpenRanking">ABRIR RANKING</button></div></section>
+    <section class="bw-view" data-view="achievements"><div class="bw-card"><h2>✦ Conquistas</h2><p>Conquistas e recompensas serão adicionadas em uma próxima atualização.</p></div></section>
+    <section class="bw-view" data-view="store"><div class="bw-card"><h2>♢ Loja</h2><p>A loja de personalização ainda não está disponível. A loja de itens permanece dentro das partidas.</p></div></section>
+    <section class="bw-view" data-view="profile"><div class="bw-card"><h2>♙ Meu Perfil</h2><p>Entre em uma sala para consultar suas estatísticas atualizadas.</p><button type="button" class="bw-primary" id="bwOpenProfile">ABRIR PERFIL</button></div></section>
     <section class="bw-view" data-view="help"><div class="bw-card"><span class="bw-eyebrow">GUIA PARA INICIANTES</span><h2>COMO JOGAR BEDWARS</h2><div class="bw-guide-grid"><div><b>1. Proteja sua cama</b><p>Enquanto sua cama existir, você poderá renascer.</p></div><div><b>2. Colete recursos</b><p>Use os geradores e a loja para comprar equipamentos.</p></div><div><b>3. Construa pontes</b><p>Conecte as ilhas para alcançar os adversários.</p></div><div><b>4. Vença a partida</b><p>Destrua as camas rivais e elimine os jogadores.</p></div></div><p class="bw-help-hint">Teclado: WASD para andar · Espaço para pular · Mouse para atacar ou colocar blocos.</p><button class="bw-primary" data-nav="rooms" type="button">▶ COMEÇAR A JOGAR</button></div></section>
    </main>
    <aside class="bw-right">
@@ -160,4 +190,4 @@
 <script src="/blockbench-models.js"></script>
 <script src="/game.js?v=npc-improvements-v12-20261029"></script>
 <script src="/cloud-system.js?v=clouds-v1-20261012"></script>
-<script src="/lobby-ui.js?v=neonhub-20261106"></script></body></html>
+<script src="/lobby-ui.js?v=portal-20261106"></script></body></html>

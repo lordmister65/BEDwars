@@ -1,6 +1,7 @@
 // Servidor autoritativo do Bed Wars: blocos, dano, camas, recursos e loja são decididos aqui.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { WebSocketServer } = require('ws');
+const AUTH=require('./auth.js');
 const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND='/calopsita';
@@ -137,7 +138,39 @@ function getStaticFile(f){
 for (const f of ['index.html','shared.js','blockbench-models.js','game.js','style.css','mobile-minecraft-controls.css','assets/vendor_blue_atlas.png','assets/kai_hive_bedwars_atlas.png']) cacheStaticFile(f);
 function cacheStaticDir(rel){const abs=path.join(__dirname,'public',rel);if(!fs.existsSync(abs))return;for(const ent of fs.readdirSync(abs,{withFileTypes:true})){const child=(rel+'/'+ent.name).replace(/\\/g,'/');if(ent.isDirectory())cacheStaticDir(child);else cacheStaticFile(child)}}
 cacheStaticDir('assets/sounds');
+const AUTH_ATTEMPTS=new Map();
+function authLimited(q){
+ const ip=String(q.headers['x-forwarded-for']||q.socket.remoteAddress||'').split(',')[0].slice(0,80);
+ const now=Date.now(),entry=AUTH_ATTEMPTS.get(ip)||{count:0,until:now+60000};
+ if(now>entry.until){entry.count=0;entry.until=now+60000}
+ entry.count++;AUTH_ATTEMPTS.set(ip,entry);
+ if(AUTH_ATTEMPTS.size>2000)for(const [k,v] of AUTH_ATTEMPTS)if(v.until<now)AUTH_ATTEMPTS.delete(k);
+ return entry.count>15;
+}
+function bodyJSON(req){
+ return new Promise((resolve,reject)=>{
+  let text='';req.on('data',chunk=>{text+=chunk;if(text.length>4096){reject(Error('Requisição muito grande'));req.destroy()}});
+  req.on('end',()=>{try{resolve(JSON.parse(text))}catch(e){reject(Error('JSON inválido'))}});
+  req.on('error',reject);
+ });
+}
+async function handleAuth(req,res,endpoint){
+ const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data))};
+ if(req.method!=='POST')return json(405,{error:'Método não permitido'});
+ if(authLimited(req))return json(429,{error:'Muitas tentativas. Tente novamente em um minuto.'});
+ try{
+  const body=await bodyJSON(req),token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
+  if(endpoint==='session')return json(200,{user:AUTH.session(token)});
+  if(endpoint==='logout'){AUTH.logout(token);return json(200,{ok:true})}
+  if(endpoint==='register'||endpoint==='login'){
+   const result=endpoint==='register'?AUTH.register(body.name,body.password):AUTH.login(body.name,body.password);
+   ensureProfile(result.user.profileId,result.user.name);saveProfiles();return json(200,result)
+  }
+  return json(404,{error:'Não encontrado'});
+ }catch(e){return json(400,{error:e.message||'Falha na autenticação'})}
+}
 const srv = http.createServer((q, r) => {
+  if((q.url||'').startsWith('/api/auth/'))return void handleAuth(q,r,(q.url||'').slice('/api/auth/'.length).split('?')[0]);
   const clean=(q.url||'/').split('?')[0], f=clean==='/'?'index.html':clean.slice(1);
   const data=getStaticFile(f);if(!data){r.writeHead(404);return r.end('não encontrado')}
   const type=f.endsWith('.js')?'text/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':f.endsWith('.png')?'image/png':f.endsWith('.ogg')?'audio/ogg':f.endsWith('.txt')?'text/plain; charset=utf-8':f.endsWith('.mcmeta')?'application/json; charset=utf-8':'text/html; charset=utf-8';
@@ -815,8 +848,8 @@ wss.on('connection', ws => {
       let team=mc.activeTeams.reduce((best,t)=>counts[t]<counts[best]?t:best,mc.activeTeams[0]);
       if(partyId&&!mc.solo&&mc.teamCap>1){const mate=partyMembers.find(q=>mc.activeTeams.includes(q.team)&&counts[q.team]<mc.teamCap);if(mate)team=mate.team}
       if(counts[team]>=mc.teamCap)return tx({ws},{t:'err',s:'Os times desse modo estão cheios.'});
-      const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
-      p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
+      const account=AUTH.session(m.authToken), safeProfile=account?account.profileId:crypto.randomBytes(16).toString('hex');
+      p = mkp(ws, safePlayerName(account?account.name:m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.authToken=account?String(m.authToken):'';p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
       tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
     }
@@ -825,7 +858,7 @@ wss.on('connection', ws => {
     switch (m.t) {
       case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
-      case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
+      case 'ranking': if(!AUTH.session(p.authToken)){tx(p,{t:'m',s:'Disponível apenas para contas cadastradas.'});break}tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
         const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
