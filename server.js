@@ -2,8 +2,6 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const S = require('./public/shared.js');
-const SAFETY = require('./safety-mode.js');
-const NPCNAV = require('./safety-navigation.js');
 const PORT = process.env.PORT || 3000, DMG = [3, 5, 7, 9], rooms = new Map();
 const ADMIN_COMMAND='/calopsita';
 const ADMIN_ITEMS=new Set(['wool','planks','endstone','glass','obsidian','tnt','tntImpulse','tntSlow','tntDamage','apple','bow','arrow','fireball','snowball','pearl','speedPotion','jumpPotion','invisPotion','compass','magicMilk','bridgeEgg','popupTower','knockbackStick','iron','gold','dia','em']);
@@ -199,7 +197,7 @@ function room(code) {
   let R = rooms.get(code);
   if (!R) {
     const g = S.gen('classic',true);
-    R = { code, gameType:'classic', safety:SAFETY.newRoom(), mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, BASEPOS:g.BASEPOS, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: teamArray(()=>0), teamChest:teamArray(()=>emptyChest()), genTier:teamArray(()=>0), traps:teamArray(()=>[]), trapInside:teamArray(()=>new Set()), suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
+    R = { code, mapId:'classic', modeId:'2v2', B: g.B, BD: g.BD, SHOP:g.SHOP, GEN:g.GEN, SPAWN:g.SPAWN, BASEPOS:g.BASEPOS, DIGEN:g.DIGEN, EMGEN:g.EMGEN, activeChunks:g.activeChunks, pf: new Uint8Array(g.B.length), ps: new Map(), ed: new Map(), q: [], tnt: [], drops: [], dropSeq: 0, projectiles: [], projSeq: 0, snapAcc: 0, pickupAcc: 0, netSeq:0, bed: teamArray(()=>0), teamChest:teamArray(()=>emptyChest()), genTier:teamArray(()=>0), traps:teamArray(()=>[]), trapInside:teamArray(()=>new Set()), suddenDeath:false,collapseAt:0,lastCollapse:0,blockSeq:0,syncAcc:0, st: 'lobby', t: 0, host: null, final:null, quickMatch:false,quickReadyAt:0,lastLobbyBroadcast:0,mapVotes:new Map(),
       g: {
         base: teamArray(() => ({ iron:0, gold:0, dia:0 })),
         dia: S.DI.map(() => ({ t:0 })),
@@ -209,7 +207,7 @@ function room(code) {
   }
   return R;
 }
-const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, safety:SAFETY.newPlayer(), x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
+const mkp = (ws, name, team, profileId) => ({ ws, name, team, profileId, x: 0, y: 11.02, z: 0, px:0, py:11.02, pz:0, yaw: 0, pitch: 0, hp: 20, alive: 1, out: 0, rt: 0, ih: 0, dy: 0, lt: Date.now(), src: null, st: -99, k: 0, sw: 0, ar: 0, held:1, admin:false, invSeq:0, openChestKind:'', ac:{total:0,movement:0,reach:0,rate:0,item:0,resource:0,projectile:0,place:0,autoclick:0,last:'',click:{cps:0,score:0,cv:0,dup:0,entropy:0,samples:0}},
   attackQueue:[],lastAttackSeq:0,legacyAttackSeq:0,attackNetTokens:COMBAT_CONFIG.NETWORK_BUCKET_CAPACITY,attackNetAt:Date.now(),attackUsefulTokens:COMBAT_CONFIG.USEFUL_BUCKET_CAPACITY,attackUsefulAt:Date.now(),combatHistory:[],clickAc:{iats:[],score:0,lastEventTime:0,lastFlagAt:0,lastEvalSize:0,total:0},moveV2:{vx:0,vy:0,vz:0,speed:0,lastSeq:0,lastAt:Date.now(),suspicion:0,corrections:0,lastFlagAt:0,kbUntil:0,kbH:0,kbV:0,clientError:0},blockV5:{lastOpSeq:0,pending:new Map(),queue:[],recentResults:new Map(),networkTokens:PLACEMENT_V5.NETWORK_CAPACITY,networkAt:Date.now(),usefulTokens:PLACEMENT_V5.USEFUL_CAPACITY,usefulAt:Date.now(),autoY:null,autoAt:0,metrics:{accepted:0,rejected:0,lastReason:'',lastRewind:0,lastDist:0}},
   token: crypto.randomBytes(18).toString('hex'), disconnected:false, disconnectedAt:0, reconnectDeadline:0, roomCode:'', partyId:'', spectator:false,spawnProtect:0,hspeed:0,grounded:false,wasGrounded:false,fallVyMin:0,envIh:0,lastCombatAt:0,lastComboHitAt:0,comboTarget:0,comboCount:0,
   stats:{kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0},
@@ -440,17 +438,17 @@ function spawn(p) { const sp=p.roomSpawn||[S.IS[p.team][0]+.5,S.BASE_Y+2.02,S.IS
 function spawnLobby(p,i=0){const a=(i%8)/8*Math.PI*2,r=5.2;p.x=S.LOBBY[0]+.5+Math.cos(a)*r;p.z=S.LOBBY[2]+.5+Math.sin(a)*r;p.y=S.LOBBY[1]+1.02;p.px=p.x;p.py=p.y;p.pz=p.z;p.hp=20;p.alive=1;p.out=0;p.lt=Date.now();tx(p,{t:'tp',x:p.x,y:p.y,z:p.z});}
 function mapVoteSummary(R){const votes=R.mapVotes||(R.mapVotes=new Map()),counts={};for(const [id,mapId] of votes){if(!R.ps.has(id)||!S.MAPS[mapId])continue;counts[mapId]=(counts[mapId]||0)+1}return counts}
 function resolveMapVote(R){const counts=mapVoteSummary(R),ids=Object.keys(S.MAPS),top=Math.max(0,...ids.map(id=>counts[id]||0));if(top<=0)return S.MAPS[R.mapId]?R.mapId:ids[0];const tied=ids.filter(id=>(counts[id]||0)===top),hostVote=R.mapVotes?.get(R.host);if(hostVote&&tied.includes(hostVote))return hostVote;if(tied.includes(R.mapId))return R.mapId;return tied[0]}
-const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,gameType:R.gameType,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
+const lobby = R => { const mc=modeCfg(R),votes=mapVoteSummary(R),players=[...R.ps.values()],now=Date.now(),count=players.filter(q=>!q.admin).length,min=R.quickMatch?(mc.quickMinPlayers||mc.minPlayers||2):(mc.minPlayers||2),countdown=R.quickReadyAt?Math.max(0,Math.ceil((R.quickReadyAt-now)/1000)):0;R.lastLobbyBroadcast=now;R.ps.forEach(viewer=>tx(viewer,{t:'lobby',host:R.host,mapId:R.mapId,maps:Object.values(S.MAPS),modeId:R.modeId,modes:Object.values(MODES),teamCap:mc.teamCap,activeTeams:mc.activeTeams,solo:!!mc.solo,quick:!!R.quickMatch,party:viewer.partyId||'',myVote:R.mapVotes?.get(viewer.id)||'',votes,queue:{count,min,max:mc.maxPlayers,countdown,ready:count>=min?1:0},l:players.map(q=>[q.id,q.name,q.team,q.disconnected?1:0,viewer.partyId&&q.partyId===viewer.partyId?1:0])})) };
 function applyLobbyMap(R,mapId,announce=true){if(R.st!=='lobby'||!S.MAPS[mapId])return false;R.mapId=mapId;const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];if(announce){bc(R,{t:'map',mapId:R.mapId,activeChunks:R.activeChunks});R.ps.forEach((q,i)=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawnLobby(q,i)});lobby(R)}return true}
 function matchStartError(requester,text){if(requester)tx(requester,{t:'m',s:text});return false}
 function startMatch(R,requester=null){
   if(R.st!=='lobby')return false;const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),teams=new Set(active.map(q=>q.team)),needed=requester?(mc.minPlayers||2):(mc.quickMinPlayers||mc.minPlayers||2);
-  if(R.gameType!=='safety'&&active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
-  if(R.gameType==='safety'){}else if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
-  R.mapId=R.gameType==='safety'?'safety_industry':resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
-  R.st='play';R.safety=SAFETY.newRoom();if(R.gameType==='safety')R.safety.npcs=NPCNAV.create();R.ps.forEach(q=>q.safety=SAFETY.newPlayer());R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
+  if(active.length<needed)return matchStartError(requester,'Este modo precisa de pelo menos '+needed+' jogadores.');
+  if(mc.solo){if(teams.size!==active.length)return matchStartError(requester,'Cada jogador precisa estar em uma base diferente no Solo.')}else{if(teams.size<2)return matchStartError(requester,'É necessário ter jogadores nos times Azul e Vermelho.');if(active.some(q=>active.filter(x=>x.team===q.team).length>mc.teamCap))return matchStartError(requester,'Um time excede a capacidade do modo escolhido.')}
+  R.mapId=resolveMapVote(R);const gg=S.gen(R.mapId,false);R.B=gg.B;R.BD=gg.BD;R.SHOP=gg.SHOP;R.GEN=gg.GEN;R.SPAWN=gg.SPAWN;R.BASEPOS=gg.BASEPOS;R.DIGEN=gg.DIGEN;R.EMGEN=gg.EMGEN;R.activeChunks=gg.activeChunks;R.pf=new Uint8Array(gg.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.genTier=teamArray(()=>0);R.teamChest=teamArray(()=>emptyChest());R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:gg.DIGEN.map(()=>({t:0})),em:{t:0}};R.ps.forEach(q=>q.trapQueue=[]);
+  R.st='play';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.quickReadyAt=0;R.mapVotes=new Map();
   for(let t=0;t<TEAM_COUNT;t++){R.bed[t]=[...R.ps.values()].some(q=>!q.admin&&q.team===t)?1:0;if(!R.bed[t]){const b=R.BD[t];if(b)setb(R,b[0],b[1],b[2],0)}}
-  R.ps.forEach(q=>{if(R.gameType==='safety'){q.team=0;q.inv=Object.fromEntries(Object.keys(q.inv).map(k=>[k,0]));q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};}q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,gameType:R.gameType,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
+  R.ps.forEach(q=>{q.roomShop=R.SHOP[q.team];q.roomSpawn=R.SPAWN?.[q.team];spawn(q)});R.ps.forEach(pinv);bc(R,{t:'start',bed:R.bed,mapId:R.mapId,modeId:R.modeId,activeChunks:R.activeChunks,quick:R.quickMatch?1:0});return true
 }
 function quickStartEligible(R){const mc=modeCfg(R),active=[...R.ps.values()].filter(q=>!q.admin&&mc.activeTeams.includes(q.team)),min=mc.quickMinPlayers||mc.minPlayers||2;if(active.length<min)return false;if(mc.solo)return new Set(active.map(q=>q.team)).size===active.length;return mc.activeTeams.filter(t=>active.some(q=>q.team===t)).length>=2}
 function updateQuickCountdown(R,now=Date.now()){
@@ -465,7 +463,7 @@ function finalizeProfiles(R,winnerTeam,winnerId){
   R.ps.forEach(p=>{if(p.admin||!p.profileId)return;const rec=ensureProfile(p.profileId,p.name),won=R.modeId==='solo'?p.id===winnerId:p.team===winnerTeam,xpGain=25+(won?100:0)+(p.stats.kills||0)*10+(p.stats.finalKills||0)*25+(p.stats.bedsDestroyed||0)*40;rec.matches=(rec.matches||0)+1;rec.wins=(rec.wins||0)+(won?1:0);rec.losses=(rec.losses||0)+(won?0:1);for(const k of ['kills','finalKills','bedsDestroyed','deaths','resourcesCollected'])rec[k]=(rec[k]||0)+(p.stats[k]||0);rec.xp=(rec.xp||0)+xpGain;progress[p.id]={xpGain,profile:publicProfile(rec)};tx(p,{t:'profileUpdate',xpGain,profile:progress[p.id].profile})});saveProfiles();return progress
 }
 function win(R) {
-  if (R.st !== 'play'||R.gameType==='safety') return;
+  if (R.st !== 'play') return;
   const live = [...R.ps.values()].filter(q => !q.out&&!q.admin), teams = new Set(live.map(q => q.team));
   if (teams.size <= 1) {
     const winnerTeam=live[0]?.team ?? -1,winnerId=live[0]?.id??-1,winnerName=live[0]?.name||'';
@@ -798,18 +796,15 @@ wss.on('connection', ws => {
       const found=rr&&[...rr.ps.values()].find(q=>q.token===m.token&&q.disconnected&&Date.now()<q.reconnectDeadline);
       if(!found)return tx({ws},{t:'reconnectFail'});
       R=rr;p=found;const downtime=p.disconnectedAt?Date.now()-p.disconnectedAt:0;p.ws=ws;p.disconnected=false;p.disconnectedAt=0;p.reconnectDeadline=0;p.lt=Date.now();resetMovementV2(p);resetPlacementInput(p);recordCombatHistory(p,Date.now());ws.playerId=p.id;p.roomCode=R.code;netLog(p,'reconectado',`downtime=${downtime}ms`);
-      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,gameType:R.gameType,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,placeOpSeq:p.blockV5?.lastOpSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
+      tx(p,{t:'reconnected',id:p.id,team:p.team,token:p.token,room:R.code,mapId:R.mapId,modeId:R.modeId,party:p.partyId||'',activeChunks:R.activeChunks,ed:[...R.ed.values()],drops:R.drops,bed:R.bed,st:R.st,inv:p.inv,invSeq:p.invSeq||0,blockSeq:R.blockSeq||0,placeOpSeq:p.blockV5?.lastOpSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[],admin:p.admin?1:0,alive:p.alive?1:0,out:p.out?1:0,spectator:p.spectator?1:0,x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,rt:p.rt||0,time:+R.t.toFixed(2),phase:R.suddenDeath?'sudden':'normal',gen:genSnapshot(R),projectiles:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)]),adminPlayers:[...R.ps.values()].filter(q=>q!==p&&!q.admin).map(q=>[q.id,q.name,q.team]),roster:[...R.ps.values()].map(q=>[q.id,q.name,q.team]),final:R.final});
       if(R.final)tx(p,R.final);
       feed(R,`${p.name} reconectou.`,p.team,-1,'reconnect');return;
-    }
-    if (m.t === 'matchmake' && !p && m.gameType==='safety') {
-      m.t='join';m.room='training'+crypto.randomBytes(3).toString('hex');m.quick=0;m.modeId='2v2';
     }
     if (m.t === 'matchmake' && !p) {
       const modeId=MODES[m.modeId]?m.modeId:'2v2',party=sanitizePartyCode(m.party),rr=quickMatchRoom(modeId,party);m.t='join';m.room=rr.code;m.party=party;m.quick=1;
     }
     if (m.t === 'join' && !p) {
-      const gameType=m.gameType==='safety'?'safety':'classic';const code = gameType==='safety'?'solo_'+crypto.randomBytes(5).toString('hex'):String(m.room || 'sala').trim().slice(0,12).toLowerCase()||'sala'; R = room(gameType==='safety'?'s_'+code:(m.quick?code:'c_'+code));if(R.ps.size===0){R.gameType=gameType;if(gameType==='safety'){R.mapId='safety_industry';applyLobbyMap(R,'safety_industry',false)}}if(gameType==='safety'&&R.modeId!=='2v2'&&m.quick){R.modeId='2v2';}
+      const code=String(m.room||'sala').trim().slice(0,12).toLowerCase()||'sala'; R=room(m.quick?code:'c_'+code);
       if (R.st !== 'lobby') return tx({ ws }, { t: 'err', s: 'Partida em andamento nessa sala.' });
       for(const [id,q] of R.ps){if(!q.ws||q.ws.readyState!==1)R.ps.delete(id)}
       if(R.host&&!R.ps.has(R.host))R.host=[...R.ps.keys()][0]||null;
@@ -823,36 +818,16 @@ wss.on('connection', ws => {
       const safeProfile=String(m.profileId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64)||crypto.randomBytes(12).toString('hex');
       p = mkp(ws, safePlayerName(m.name), team, safeProfile); p.id = ++uid;p.roomCode=R.code;p.partyId=partyId||'';ws.playerId=p.id;ensureProfile(safeProfile,p.name);
       p.roomShop=R.SHOP[p.team];p.roomSpawn=R.SPAWN?.[p.team];R.ps.set(p.id, p); if (!R.host) R.host = p.id; spawnLobby(p,R.ps.size-1);netLog(p,'conectado ao lobby');
-      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId,gameType:R.gameType, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); if(R.gameType==='safety'){if(!startMatch(R,p))tx(p,{t:'err',s:'Falha ao iniciar treinamento solo.'});}else lobby(R); return;
+      tx(p, { t:'init', id:p.id, team:p.team, token:p.token, room:R.code, mapId:R.mapId, modeId:R.modeId, party:p.partyId||'', quick:m.quick?1:0, placeOpSeq:p.blockV5?.lastOpSeq||0, activeChunks:R.activeChunks, ed:[...R.ed.values()], drops:R.drops, profile:publicProfile(ensureProfile(p.profileId,p.name)), ranking:rankingPayload() }); lobby(R); return;
     }
     if (!p) return;
     const play = R.st === 'play' && p.alive;
-    // A modalidade educativa não aceita equipamentos, inventário, loja ou combate do BedWars.
-    const classicOnlyActions=new Set(['buy','place','placeBatch','breakStart','breakStop','shoot','use','apple','attackBatch','hit','chestOpen','chestMove','genUpgrade','adminGive','adminSetGear']);
-    if(R.gameType==='safety'&&classicOnlyActions.has(m.t)){
-      if(m.t==='buy')tx(p,{t:'m',s:'A loja BedWars não existe na Operação Segura.'});
-      return;
-    }
-    switch (m.t) {
-      case 'safetyAction': {
-        if(R.gameType!=='safety'||!play||p.disconnected||!allow(p,'safetyAction',200))break;
-        let result={ok:false,message:'Ação desconhecida.'};const action=String(m.action||'');
-        if(action==='npc')result=SAFETY.interact(p,String(m.id||''),Date.now(),R);
-        else if(action==='equip')result=SAFETY.equipment(p,m.item,m.on,R);
-        else if(action==='extract')result=SAFETY.extract(p,R);
-        else if(action==='electrical')result=SAFETY.electrical(p,R,m.step);
-        else if(action==='machine')result=SAFETY.machine(p,R,m.step);
-        if(result.ok&&R.gameType==='safety'&&SAFETY.completeCurrent(p,R)){R.st='ended';tx(p,{t:'safetyComplete',message:'Treinamento concluído! NR 6, NR 10 e NR 12 aprovadas.'})}
-        if(result.ok&&R.gameType==='classic'){if(result.iron)p.inv.iron=(p.inv.iron||0)+result.iron;if(result.gold)p.inv.gold=(p.inv.gold||0)+result.gold;if(result.iron||result.gold)pinv(p)}
-        tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),message:result.message,ok:result.ok,action});break;
-      }
       case 'netPing': tx(p,{t:'netPong',at:Number(m.at)||0,serverAt:Date.now(),buffer:p.ws?.bufferedAmount||0,ac:p.ac||null,metrics:serverMetricsSnapshot(p)}); break;
       case 'stateSync': tx(p,{t:'stateSync',ed:[...R.ed.values()],blockSeq:R.blockSeq||0,inv:p.inv,invSeq:p.invSeq||0,sw:p.sw,ar:p.ar,tools:p.tools,up:p.up,fx:p.fx,traps:p.trapQueue||[]}); break;
-      case 'safetySync': if(R.gameType==='safety')tx(p,{t:'safetyState',state:SAFETY.snapshot(p,R),ok:true});break;
       case 'ranking': tx(p,{t:'ranking',ranking:rankingPayload(),profile:publicProfile(ensureProfile(p.profileId,p.name))}); break;
       case 'replay': {
         if(R.st!=='ended')break;
-        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.safety=SAFETY.newRoom();R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
+        const g=S.gen(R.mapId,true);R.B=g.B;R.BD=g.BD;R.SHOP=g.SHOP;R.GEN=g.GEN;R.SPAWN=g.SPAWN;R.BASEPOS=g.BASEPOS;R.DIGEN=g.DIGEN;R.EMGEN=g.EMGEN;R.activeChunks=g.activeChunks;R.pf=new Uint8Array(g.B.length);R.ed.clear();R.q=[];R.drops=[];R.tnt=[];R.projectiles=[];R.blockSeq=0;R.mapVotes=new Map();R.quickReadyAt=0;R.final=null;R.st='lobby';R.t=0;R.suddenDeath=false;R.collapseAt=0;R.lastCollapse=0;R.teamChest=teamArray(()=>emptyChest());R.genTier=teamArray(()=>0);R.traps=teamArray(()=>[]);R.trapInside=teamArray(()=>new Set());R.bed=teamArray(()=>0);R.g={base:teamArray(()=>({iron:0,gold:0,dia:0})),dia:g.DIGEN.map(()=>({t:0})),em:{t:0}};
         R.ps.forEach((q,i)=>{
  q.out=0;q.spectator=false;q.alive=1;q.hp=20;q.breaking=null;q.openChestKind='';q.stats={kills:0,finalKills:0,bedsDestroyed:0,deaths:0,resourcesCollected:0};q.trapQueue=[];q.enderChest=emptyChest();
  if(!q.admin){q.sw=0;q.ar=0;q.tools={pick:0,axe:0,shears:0};q.fx={speed:0,jump:0,invis:0,slow:0,fatigue:0,blind:0,milk:0};q.up={sharp:0,prot:0,forge:0,haste:0,regen:0,trap:0,trapMiner:0,trapSlow:0,trapCounter:0};q.inv={wool:24,planks:0,endstone:0,glass:0,obsidian:0,tnt:0,tntImpulse:0,tntSlow:0,tntDamage:0,apple:0,bow:0,arrow:0,fireball:0,snowball:0,pearl:0,speedPotion:0,jumpPotion:0,invisPotion:0,compass:0,magicMilk:0,bridgeEgg:0,popupTower:0,knockbackStick:0,iron:0,gold:0,dia:0,em:0}}
@@ -896,10 +871,10 @@ wss.on('connection', ws => {
         R.ps.forEach((q,i)=>spawnLobby(q,i));lobby(R);break;
       }
       case 'map': {
-        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map]||R.gameType==='safety')break;R.mapVotes=new Map();applyLobbyMap(R,m.map,true);break;
+        if(R.st!=='lobby'||p.id!==R.host||!S.MAPS[m.map])break;R.mapVotes=new Map();applyLobbyMap(R,m.map,true);break;
       }
       case 'mapVote': {
-        if(R.st!=='lobby'||!S.MAPS[m.map]||R.gameType==='safety')break;R.mapVotes=R.mapVotes||new Map();R.mapVotes.set(p.id,m.map);const winner=resolveMapVote(R);if(winner!==R.mapId)applyLobbyMap(R,winner,true);else lobby(R);break;
+        if(R.st!=='lobby'||!S.MAPS[m.map])break;R.mapVotes=R.mapVotes||new Map();R.mapVotes.set(p.id,m.map);const winner=resolveMapVote(R);if(winner!==R.mapId)applyLobbyMap(R,winner,true);else lobby(R);break;
       }
       case 'party': {
         if(R.st!=='lobby')break;const next=sanitizePartyCode(m.code),old=p.partyId||'',mc=modeCfg(R),members=next?[...R.ps.values()].filter(q=>q!==p&&q.partyId===next):[];
@@ -928,7 +903,7 @@ wss.on('connection', ws => {
         break;
       }
       case 'start':
-        if(R.st!=='lobby'||p.id!==R.host)break;if(R.gameType==='safety'){startMatch(R,p);break}if(R.quickMatch){tx(p,{t:'m',s:'A Partida Rápida inicia automaticamente quando estiver pronta.'});break}startMatch(R,p);break;
+        if(R.st!=='lobby'||p.id!==R.host)break;if(R.quickMatch){tx(p,{t:'m',s:'A Partida Rápida inicia automaticamente quando estiver pronta.'});break}startMatch(R,p);break;
       case 'mv': {
         const spectating=!!p.spectator&&p.out;if((!p.alive&&!spectating)||!allow(p,'mv',15))break;
         const n=Date.now(),dt=Math.max(.02,Math.min(.5,(n-p.lt)/1000));p.lt=n,check=inspectMovementPacket(p,m,dt,n,spectating);if(check.drop)break;
@@ -1071,7 +1046,6 @@ setInterval(() => {
     if(R.st==='lobby'&&R.quickMatch)updateQuickCountdown(R,Date.now());
     R.t += dt;
     if (R.st === 'play') {
-      if(R.gameType==='safety'){R.safetyNpcAccumulator=(R.safetyNpcAccumulator||0)+dt;if(R.safetyNpcAccumulator>=.08){NPCNAV.tick(R,Math.min(.15,R.safetyNpcAccumulator));R.safetyNpcAccumulator=0;}}
       const players = [...R.ps.values()];
       R.ps.forEach(p => {
         p.ih=Math.max(0,p.ih-dt);p.envIh=Math.max(0,(p.envIh||0)-dt);p.spawnProtect=Math.max(0,(p.spawnProtect||0)-dt);
@@ -1097,10 +1071,10 @@ setInterval(() => {
           if (p.y <= -20 && !p.admin) die(R, p, 'void');
         } else if (!p.out && (p.rt -= dt) <= 0) { spawn(p);tx(p,{t:'respawn'}); }
       });
-      if(R.gameType!=='safety'&&!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<TEAM_COUNT;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
-      if(R.gameType!=='safety'&&R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
-      if(R.gameType!=='safety')triggerTeamTraps(R);
-      if(R.gameType!=='safety')R.g.base.forEach((g, i) => {
+      if(!R.suddenDeath&&R.t>=GAMEPLAY.suddenDeathAt){R.suddenDeath=true;R.collapseAt=R.t+3*60;for(let t=0;t<TEAM_COUNT;t++)if(R.bed[t])killBed(R,t,null);feed(R,'☠ MORTE SÚBITA! Todas as camas foram destruídas.','-1','-1','sudden');bc(R,{t:'phase',phase:'sudden',at:R.t})}
+      if(R.suddenDeath&&R.t>=R.collapseAt&&R.t-R.lastCollapse>=GAMEPLAY.collapseEvery){R.lastCollapse=R.t;feed(R,'⚡ COLAPSO: jogadores restantes estão recebendo dano.','-1','-1','sudden');R.ps.forEach(q=>{if(q.alive&&!q.admin)hurt(R,q,1,0,0,null,false,'collapse',0)})}
+      triggerTeamTraps(R);
+      R.g.base.forEach((g, i) => {
         if(!modeCfg(R).activeTeams.includes(i))return;
         const bp=R.GEN[i]||[S.IS[i][0]+.5,S.BASE_Y+2,S.IS[i][1]+.5],gx=bp[0],gy=bp[1],gz=bp[2];
         const tier=Math.max(0,Math.min(3,R.genTier?.[i]||0)),cfg=BASE_GEN_TIERS[tier];
@@ -1111,7 +1085,7 @@ setInterval(() => {
         if(cfg.gold&&g.gold>=cfg.gold){g.gold-=cfg.gold;addDrop(R,'gold',1,gx+1,gy+.2,gz,10)}
         if(cfg.dia&&g.dia>=cfg.dia){g.dia-=cfg.dia;addDrop(R,'dia',1,gx-1,gy+.2,gz,4)}
       });
-      if(R.gameType!=='safety'){
+      {
       const centralCfg=centralGenCfg(R);
       R.g.dia.forEach((g, i) => {
         g.t += dt;
@@ -1132,7 +1106,7 @@ setInterval(() => {
       tickProjectiles(R,dt);
     }
     if (R.q.length) { bc(R, { t: 'bb', l: R.q }); R.q = []; }
-    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=SNAPSHOT_SEC){R.snapAcc%=SNAPSHOT_SEC;SERVER_METRICS.snapshots++;bc(R,{t:'s',seq:++R.netSeq,serverAt:Date.now(),time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',npcs:R.gameType==='safety'?NPCNAV.snapshot(R):undefined,pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
+    if (R.st === 'play') {R.snapAcc+=dt;if(R.snapAcc>=SNAPSHOT_SEC){R.snapAcc%=SNAPSHOT_SEC;SERVER_METRICS.snapshots++;bc(R,{t:'s',seq:++R.netSeq,serverAt:Date.now(),time:+R.t.toFixed(1),bed:R.bed,mapId:R.mapId,modeId:R.modeId,gen:genSnapshot(R),p:[...R.ps.values()].map(p=>[p.id,+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+p.yaw.toFixed(2),+p.pitch.toFixed(2),Math.ceil(p.hp),p.alive,p.team,p.fx.invis>0?1:0,p.held,p.sw,p.ar,p.disconnected?1:0,p.admin?1:0,p.out?1:0,+Math.max(0,p.rt||0).toFixed(1),p.stats.kills,p.stats.finalKills,p.spawnProtect>0?1:0]),phase:R.suddenDeath?'sudden':'normal',pr:R.projectiles.map(q=>[q.id,q.k,+q.x.toFixed(2),+q.y.toFixed(2),+q.z.toFixed(2),+q.vx.toFixed(2),+q.vy.toFixed(2),+q.vz.toFixed(2)])});}}
     }catch(err){console.error(`[TICK] erro isolado na sala ${R.code}`,err);}
   });
   const tickCost=performance.now()-tickStarted;SERVER_METRICS.ticks++;SERVER_METRICS.lastTickMs=tickCost;SERVER_METRICS.avgTickMs=SERVER_METRICS.avgTickMs?SERVER_METRICS.avgTickMs*.92+tickCost*.08:tickCost;SERVER_METRICS.maxTickMs=Math.max(tickCost,SERVER_METRICS.maxTickMs*.995);if(tickCost>SERVER_TICK_MS)SERVER_METRICS.overruns++;SERVER_METRICS.rooms=rooms.size;let playerCount=0;rooms.forEach(R=>playerCount+=R.ps.size);SERVER_METRICS.players=playerCount;

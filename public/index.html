@@ -42,24 +42,6 @@
 .s.empty.has-icon:hover .hotbar-icon{opacity:.34!important}
 .s.has-icon:not(.empty) .hotbar-icon{opacity:1!important}
 </style>
-<style id="nr-mission-ui">
-#nrMissionHud{display:none;position:fixed;top:68px;left:12px;z-index:17;width:min(305px,45vw);background:#12232de8;color:#fff;border:1px solid #71c6ca;border-radius:12px;padding:12px;font:13px Arial;box-shadow:0 8px 24px #0009}
-#nrMissionHud b{color:#9ef3ef}#nrMissionHud button,#nrMissionMenu button{background:#22677b;color:white;border:1px solid #78bbcb;border-radius:7px;padding:7px;cursor:pointer}
-#nrMissionMenu{display:none;position:fixed;inset:0;z-index:35;align-items:center;justify-content:center;background:#07121acc}
-#nrMissionMenu .nr-sheet{width:min(620px,92vw);max-height:85vh;overflow:auto;background:#142935;color:white;border:2px solid #74c9cd;border-radius:16px;padding:22px;font:15px Arial}
-.nr-task{border:1px solid #41616d;border-radius:10px;padding:11px;margin:10px 0;background:#203a46}.nr-task.done{border-color:#56c595}
-#safetyPanel{max-height:65vh;overflow-y:auto}
-@media(max-width:700px){#nrMissionHud{top:auto;bottom:105px;left:8px;width:min(255px,70vw);font-size:12px}}
-</style><style id="nr-dialogue-style">
-#nrNpcDialogue{position:fixed;inset:0;z-index:55;align-items:center;justify-content:center;background:rgba(6,19,28,.8);color:white;font-family:Arial}
-.nr-talk{width:min(540px,92vw);background:linear-gradient(145deg,#213c4b,#0c222e);border:2px solid #8cdae0;border-radius:18px;padding:20px;box-shadow:0 12px 50px #000b}
-.nr-talk-head{display:flex;justify-content:space-between;color:#a8eff2;font-size:12px;font-weight:bold;letter-spacing:.08em}
-.nr-talk-head button{background:transparent;color:white;border:0;cursor:pointer;font-size:20px}
-.nr-talk h2{margin:8px 0 16px}.nr-talk p{line-height:1.6}.nr-talk-player{background:#304d58;padding:12px;border-radius:9px;margin:16px 0}
-.nr-talk-actions{display:flex;gap:10px;flex-wrap:wrap}.nr-talk-actions button{padding:11px 18px;border-radius:8px;background:#176e80;color:white;border:1px solid #86d5e1;cursor:pointer}
-#nrMissionActions{margin-top:12px;border-top:1px solid #406371;padding-top:12px;display:flex;gap:7px;flex-wrap:wrap}
-#nrMissionActions button{padding:8px 10px}
-</style>
 <link rel="stylesheet" href="/lobby-ui.css?v=1"></head><body>
 <div id="cross"></div><div id="msg"></div><div id="comboHud"></div><div id="eventBanner"></div><div id="matchStatus"></div><div id="killFeed"></div><div id="bar"></div><div id="bowTrajectory"></div>
 <button id="audioSettingsBtn" type="button" aria-label="Configurações de áudio" title="Configurações de áudio">⚙</button>
@@ -70,12 +52,6 @@
   <div class="audio-settings-actions"><button id="audioMuteBtn" type="button">Silenciar</button><button id="audioTestBtn" type="button">Testar som</button></div>
   <small>Máximo de 150% com proteção contra picos.</small>
 </div>
-<div id="nrMissionHud"><b>🦺 OPERAÇÃO SEGURA</b><div id="nrMissionSummary">Converse com um instrutor para receber sua missão.</div><button type="button" onclick="toggleNrMissionMenu(true)">📋 Missões (M)</button></div>
-<div id="nrMissionMenu"><div class="nr-sheet"><h2>📋 Central de Missões</h2><p>Converse com os instrutores usando a tecla E para iniciar cada treinamento.</p><div id="nrMissionCards"></div><div id="nrMissionActions"></div><button type="button" onclick="toggleNrMissionMenu(false)">Fechar · M</button></div></div>
-<div id="safetyNpcPrompt" style="display:none;position:fixed;bottom:22%;left:50%;transform:translateX(-50%);z-index:19;background:#15242cdd;border:1px solid #ffcc41;color:white;border-radius:9px;padding:10px 18px;font:600 15px Arial;pointer-events:none"></div>
-<div id="nrStationMenu" style="display:none;position:fixed;inset:0;z-index:60;background:#05131bbb;align-items:center;justify-content:center"><div style="width:min(470px,90vw);padding:22px;border-radius:16px;background:#153441;border:2px solid #72cde0;color:white;font:15px Arial"><h2 id="nrStationTitle">Estação</h2><p>Treinamento virtual — escolha uma ação na estação.</p><div id="nrStationButtons" style="display:flex;flex-wrap:wrap;gap:9px;margin:16px 0"></div><button type="button" onclick="closeNrStationMenu()">Fechar</button></div></div>
-<style>#nrStationButtons button,#nrStationMenu button{padding:10px 13px;border:1px solid #79d4e0;background:#226979;color:white;border-radius:8px;cursor:pointer}</style>
-<div id="nrNpcDialogue" role="dialog" aria-label="Conversa com instrutor" style="display:none"><div class="nr-talk"><div class="nr-talk-head"><span id="nrTalkRole">INSTRUTOR</span><button type="button" onclick="closeNrNpcDialogue()" aria-label="Fechar">✕</button></div><h2 id="nrTalkName">Instrutor</h2><p id="nrTalkLine"></p><div class="nr-talk-player">🧍 Você: <span id="nrPlayerLine">Gostaria de saber mais sobre a atividade.</span></div><div class="nr-talk-actions"><button type="button" onclick="acceptNrNpcMission()">✓ Aceitar missão</button><button type="button" onclick="closeNrNpcDialogue()">Agora não</button></div></div></div>
 <div id="breakBox"><div id="breakFill"></div></div>
 <div id="bowCharge"><div id="bowChargeFill"></div><span id="bowChargeText"></span></div>
 <div id="reconnectBanner"></div><div id="damageFlash"></div><div id="hitNumbers"></div><div id="respawnOverlay"><div><b id="respawnTitle">VOCÊ MORREU</b><span id="respawnText"></span></div></div>
@@ -117,10 +93,10 @@
       <main class="bw-main">
         <div class="bw-view is-active" data-view="home">
           <section class="bw-hero"><div><div class="bw-eyebrow">TEAM PVP · DEFENDA SUA CAMA</div><h1>Bed Wars<br>Online</h1><p>Proteja sua cama, reúna recursos, construa defesas e dispute partidas multiplayer com seus amigos.</p><div class="bw-actions"><button type="button" id="bwPlayNow" class="bw-primary">▶ JOGAR MULTIPLAYER</button><button type="button" class="bw-secondary" onclick="openRanking()">🏆 Ranking</button></div></div><div class="bw-hero-art" aria-hidden="true">🛏️</div></section>
-          <section class="bw-card" style="margin-top:16px"><h3>🎮 Modos disponíveis</h3><p>Clássico, duplas, trio, 4v4 e modo educativo. Crie uma sala ou entre usando o código enviado por um amigo.</p><button type="button" class="bw-secondary" data-nav="rooms">Criar ou entrar em uma sala</button></section>
+          <section class="bw-card" style="margin-top:16px"><h3>🎮 Modos disponíveis</h3><p>Duelo 1v1, duplas 2v2, trio 3v3, 4v4 e Solo. Crie uma sala ou entre usando o código enviado por um amigo.</p><button type="button" class="bw-secondary" data-nav="rooms">Criar ou entrar em uma sala</button></section>
         </div>
         <div class="bw-view" data-view="rooms">
-          <section class="bw-card"><span class="bw-eyebrow">MULTIPLAYER · SALAS</span><h2>Criar ou entrar em uma sala</h2><p>Escolha um modo, combine um código com seus amigos ou entre numa partida rápida.</p><label class="bw-field" for="gameType">Modo de jogo<select id="gameType"><option value="classic">⚔ BedWars Clássico</option><option value="safety">🦺 Operação Segura · Educativo</option></select></label><label class="bw-field" for="quickMode">Formato de partida<select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>Duplas 2v2</option><option value="3v3">Trio 3v3</option><option value="4v4">4v4</option><option value="solo">Solo</option></select></label></section>
+          <section class="bw-card"><span class="bw-eyebrow">MULTIPLAYER · SALAS</span><h2>Criar ou entrar em uma sala</h2><p>Escolha um modo, combine um código com seus amigos ou entre numa partida rápida.</p><label class="bw-field" for="quickMode">Formato de partida<select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>Duplas 2v2</option><option value="3v3">Trio 3v3</option><option value="4v4">4v4</option><option value="solo">Solo</option></select></label></section>
           <div class="bw-rooms-grid">
             <section class="bw-card"><h3>⚡ Partida rápida</h3><p>Encontre uma partida pelo servidor existente ou jogue com sua party.</p><label class="bw-field" for="partyCode">Código da party (opcional)<input id="partyCode" maxlength="8" autocomplete="off" placeholder="Ex.: BWD42"></label><button class="bw-primary" type="button" onclick="quickPlay()">▶ JOGAR AGORA</button><div class="bw-party-row" style="margin-top:14px"><button class="bw-secondary" type="button" onclick="createPartyCode()">Criar Party</button><button class="bw-secondary" type="button" onclick="copyPartyCode()">Copiar código</button><button class="bw-secondary" type="button" onclick="leavePartyCode()">Sair</button></div><p id="partyStatus" class="party-status"></p></section>
             <section class="bw-card"><h3>＋ Sala personalizada</h3><p>Crie um código de sala e compartilhe com seus amigos; quem entrar com o mesmo código ficará na mesma sala.</p><label class="bw-field" for="rm">Código da sala<input id="rm" maxlength="12" value="sala1" autocomplete="off"></label><div class="bw-party-row"><button id="bwGenerateRoom" class="bw-secondary" type="button">Gerar código</button><button id="go" class="bw-primary" type="button">CRIAR / ENTRAR</button></div><p id="er" role="status" aria-live="polite"></p></section>
