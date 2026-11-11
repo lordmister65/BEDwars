@@ -10,18 +10,19 @@ function setView(view){
  if(['ranking','achievements','store','profile'].includes(view)&&!window.BWPortal?.isMember()){window.BWPortal?.requireAccount(view);return}
  if(view==='ranking')window.openRanking?.();
  if(view==='profile')window.openProfile?.();
- if(!['home','rooms','help','ranking','achievements','store','profile'].includes(view))return;
+ if(!['rooms','help','ranking','achievements','store','profile'].includes(view))return;
  root.querySelectorAll('.bw-view').forEach(v=>v.classList.toggle('is-active',v.dataset.view===view));
  root.querySelectorAll('[data-nav]').forEach(b=>{
   const active=b.dataset.nav===view;
   b.classList.toggle('is-active',active);
-  if(b.closest('.bw-top-tabs'))b.setAttribute('aria-pressed',String(active));
+  b.setAttribute('aria-pressed',String(active));
  });
+ if(view!=='rooms')get('bwMemberNotice').style.display='none';
 }
 root.querySelectorAll('[data-nav]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.nav)));
 get('bwOpenRanking')?.addEventListener('click',()=>window.openRanking?.());
 get('bwOpenProfile')?.addEventListener('click',()=>window.openProfile?.());
-get('bwPlayNow')?.addEventListener('click',()=>setView('rooms'));
+get('bwFastPlay')?.addEventListener('click',()=>{if(typeof quickPlay==='function')quickPlay();});
 get('bwSettings')?.addEventListener('click',()=>get('audioSettingsBtn')?.click());
 const guest=get('nm');
 if(guest){
@@ -68,9 +69,10 @@ function updateAccess(){
 }
 function requireAccount(feature){
  const notice=get('bwMemberNotice');
- if(notice){notice.style.display='block';notice.firstChild.textContent='Disponível apenas para contas cadastradas. '}
+ if(notice){notice.firstChild.textContent='Disponível apenas para contas cadastradas. '}
  if(feature)get('bwAuthIntro').textContent='Crie sua conta ou entre para acessar '+feature+'.';
- setView('home');
+ setView('rooms');
+ if(notice)notice.style.display='flex';
 }
 function openModal(mode){
  authMode=mode;get('bwAuthTitle').textContent=mode==='register'?'Criar conta':'Entrar na conta';

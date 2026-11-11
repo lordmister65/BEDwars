@@ -112,59 +112,63 @@
  </form>
 </div>
 <div class="ov bw-modern bw-portal-locked" id="menu" style="display:none">
- <div class="bw-shell">
-  <header class="bw-head">
-   <div class="bw-account bw-profile-card">
-    <span class="bw-avatar" aria-hidden="true">⚔</span>
-    <div><label for="nm" class="bw-muted">SEU JOGADOR · CONVIDADO</label><input id="nm" maxlength="14" value="Jogador" aria-label="Nome do jogador" autocomplete="nickname"><small>Escolha seu nick antes de jogar</small></div>
+
+ <div class="bw-shell bw-simple-shell">
+  <header class="bw-simple-head">
+   <div class="bw-simple-brand"><span class="bw-simple-brand-mark">⚔</span><div><strong>BED<span>WARS</span></strong><small>ONLINE</small></div></div>
+   <div class="bw-simple-user"><label for="nm">JOGADOR</label><input id="nm" maxlength="14" value="Jogador" autocomplete="nickname" aria-label="Nome do jogador"></div>
+   <div class="bw-simple-head-actions">
+    <button id="bwSettings" type="button" class="bw-simple-icon" aria-label="Configurações de áudio" title="Áudio">⚙</button>
+    <button id="bwSignout" type="button" class="bw-simple-exit">Sair</button>
    </div>
-   <div class="bw-brand"><span class="bw-brand-icon" aria-hidden="true">🛏</span><div>BED<span>WARS</span><small>ONLINE</small></div></div>
-   <div class="bw-head-actions"><button type="button" class="bw-signout" id="bwSignout">Sair</button><span class="bw-server-pill"><span class="bw-dot"></span> MULTIPLAYER</span><button id="bwSettings" class="bw-icon-button" type="button" title="Configurações de áudio" aria-label="Configurações de áudio">⚙</button></div>
   </header>
-  <div class="bw-frame">
-   <nav class="bw-sidebar" aria-label="Menu principal">
-    <button class="is-active" type="button" data-nav="home">⌂ <span>Início</span></button>
-    <button type="button" data-nav="rooms">⚔ <span>Jogar / Criar sala</span></button>
-    <button type="button" data-nav="ranking" data-member-only="true">🏆 <span>Ranking</span></button><button type="button" data-nav="achievements" data-member-only="true">✦ <span>Conquistas</span></button><button type="button" data-nav="store" data-member-only="true">♢ <span>Loja</span></button><button type="button" data-nav="profile" data-member-only="true">♙ <span>Perfil</span></button><button type="button" data-nav="help">? <span>Como jogar</span></button>
-    <div class="bw-side-note"><b>BEDWARS ONLINE</b><p>Defenda sua cama, construa pontes e vença as equipes rivais.</p><span>★ 100% multiplayer</span></div>
-   </nav>
-   <main class="bw-main">
-    <div class="bw-top-tabs"><button type="button" class="is-active" data-nav="home">⌂ Início</button><button type="button" data-nav="rooms">▶ Jogar</button><button type="button" data-nav="help">◎ Guia</button></div>
-    <p class="bw-member-notice" id="bwMemberNotice" role="status" aria-live="polite" style="display:none">Disponível apenas para contas cadastradas. <button type="button" id="bwMemberLogin">Criar conta / Entrar</button></p>
-    <section class="bw-view is-active" data-view="home">
-     <div class="bw-hero"><div><span class="bw-eyebrow">TEAM PVP · DEFENDA SUA CAMA</span><h1>PREPARE-SE<br><em>PARA A BATALHA</em></h1><p>Explore ilhas, colete recursos, proteja sua cama e domine as batalhas com seus amigos.</p><div class="bw-actions"><button class="bw-primary" id="bwPlayNow" type="button">▶ JOGAR MULTIPLAYER</button><button type="button" class="bw-secondary" data-nav="rooms">＋ CRIAR UMA SALA</button></div></div><div class="bw-hero-art" aria-hidden="true"><div class="bw-hero-island"><div>🛏️</div><span>⚔️</span></div></div></div>
-     <div class="bw-feature-grid"><div class="bw-feature"><span>⚔</span><b>Combate competitivo</b><small>Duelo, duplas, trios, 4v4 e solo</small></div><div class="bw-feature"><span>🧱</span><b>Construa sua defesa</b><small>Pontes, blocos e estratégias</small></div><div class="bw-feature"><span>🏆</span><b>Progrida e vença</b><small>XP, estatísticas e ranking</small></div></div>
-    </section>
-    <section class="bw-view" data-view="rooms">
-     <div class="bw-card bw-create-card"><div class="bw-card-heading"><span class="bw-heading-icon">＋</span><div><span class="bw-eyebrow">MULTIPLAYER · CONFIGURAÇÃO</span><h2>CRIAR OU ENTRAR EM UMA SALA</h2><p>Escolha seu formato de partida e compartilhe o código com seus amigos.</p></div></div>
-      <div class="bw-form-row"><label class="bw-field" for="rm">Código da sala<input id="rm" maxlength="12" value="sala1" autocomplete="off" placeholder="Ex.: MINHASALA"></label><div class="bw-field bw-field-action"><label>Gerar um código</label><button type="button" class="bw-secondary" id="bwGenerateRoom">↻ GERAR CÓDIGO</button></div></div>
-      <div class="bw-section-title">⚔ ESCOLHA O FORMATO DA PARTIDA</div>
-      <div class="bw-mode-grid" role="group" aria-label="Formato da partida">
-       <button type="button" data-mode="1v1" class="bw-mode-card"><span>⚔</span><b>Duelo</b><small>1 × 1</small></button>
-       <button type="button" data-mode="2v2" class="bw-mode-card is-selected" aria-pressed="true"><span>🛏️</span><b>Duplas</b><small>2 × 2</small></button>
-       <button type="button" data-mode="3v3" class="bw-mode-card"><span>⚒</span><b>Trio</b><small>3 × 3</small></button>
-       <button type="button" data-mode="4v4" class="bw-mode-card"><span>🛡</span><b>4v4</b><small>4 × 4</small></button>
-       <button type="button" data-mode="solo" class="bw-mode-card"><span>👑</span><b>Solo</b><small>Cada um por si</small></button>
-      </div>
-      <label class="bw-field bw-mode-fallback" for="quickMode">Formato de partida<select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>Duplas 2v2</option><option value="3v3">Trio 3v3</option><option value="4v4">4v4</option><option value="solo">Solo</option></select></label>
-      <div class="bw-create-actions"><button id="go" type="button" class="bw-primary">▶ CRIAR / ENTRAR NA SALA</button><p id="er" role="status" aria-live="polite"></p></div>
+  <main class="bw-simple-main">
+   <div class="bw-simple-intro"><span>PRONTO PARA JOGAR?</span><h1>Escolha como entrar na partida</h1></div>
+   <section class="bw-simple-play bw-view is-active" data-view="rooms">
+    <div class="bw-simple-quick">
+     <div><span class="bw-simple-kicker">⚡ MAIS RÁPIDO</span><h2>Partida rápida</h2><p>Encontre adversários automaticamente.</p></div>
+     <button type="button" id="bwFastPlay" class="bw-primary">▶ JOGAR AGORA</button>
+    </div>
+    <div class="bw-simple-panel">
+     <div class="bw-simple-title"><h2>Modo de jogo</h2><span>Selecione um formato</span></div>
+     <div class="bw-mode-grid" role="group" aria-label="Formato da partida">
+      <button type="button" data-mode="1v1" class="bw-mode-card"><span>⚔</span><b>1v1</b><small>Duelo</small></button>
+      <button type="button" data-mode="2v2" class="bw-mode-card is-selected" aria-pressed="true"><span>🛏</span><b>2v2</b><small>Duplas</small></button>
+      <button type="button" data-mode="3v3" class="bw-mode-card"><span>⚒</span><b>3v3</b><small>Trios</small></button>
+      <button type="button" data-mode="4v4" class="bw-mode-card"><span>🛡</span><b>4v4</b><small>Equipes</small></button>
+      <button type="button" data-mode="solo" class="bw-mode-card"><span>👑</span><b>Solo</b><small>Todos contra todos</small></button>
      </div>
-     <div class="bw-rooms-grid">
-      <div class="bw-card"><h3>⚡ PARTIDA RÁPIDA</h3><p>Encontre outros jogadores em uma partida usando o formato selecionado.</p><button type="button" class="bw-primary" onclick="quickPlay()">▶ JOGAR AGORA</button></div>
-      <div class="bw-card"><h3>🤝 JOGAR EM PARTY</h3><p>Compartilhe um código para entrar na mesma equipe dos amigos.</p><label class="bw-field" for="partyCode">Código da party<input id="partyCode" maxlength="8" autocomplete="off" placeholder="Ex.: BWD42"></label><div class="bw-party-row"><button class="bw-secondary" type="button" onclick="createPartyCode()">Criar</button><button class="bw-secondary" type="button" onclick="copyPartyCode()">Copiar</button><button class="bw-secondary" type="button" onclick="leavePartyCode()">Sair</button></div><p id="partyStatus" class="party-status"></p></div>
+     <label class="bw-mode-fallback" for="quickMode">Formato
+      <select id="quickMode"><option value="1v1">Duelo 1v1</option><option value="2v2" selected>Duplas 2v2</option><option value="3v3">Trio 3v3</option><option value="4v4">4v4</option><option value="solo">Solo</option></select>
+     </label>
+    </div>
+    <details class="bw-simple-more" id="bwCustomRoom">
+     <summary>＋ Criar ou entrar em uma sala privada <span>⌄</span></summary>
+     <div class="bw-simple-more-content">
+      <label for="rm">Código da sala</label>
+      <div class="bw-simple-input-row"><input id="rm" maxlength="12" value="sala1" autocomplete="off" placeholder="Código da sala"><button type="button" class="bw-secondary" id="bwGenerateRoom">Gerar</button></div>
+      <button id="go" type="button" class="bw-primary">CRIAR / ENTRAR NA SALA</button>
+      <p id="er" role="status" aria-live="polite"></p>
      </div>
-    </section>
-    <section class="bw-view" data-view="ranking"><div class="bw-card"><h2>🏆 Ranking</h2><p>Veja a classificação dos jogadores cadastrados.</p><button type="button" class="bw-primary" id="bwOpenRanking">ABRIR RANKING</button></div></section>
-    <section class="bw-view" data-view="achievements"><div class="bw-card"><h2>✦ Conquistas</h2><p>Conquistas e recompensas serão adicionadas em uma próxima atualização.</p></div></section>
-    <section class="bw-view" data-view="store"><div class="bw-card"><h2>♢ Loja</h2><p>A loja de personalização ainda não está disponível. A loja de itens permanece dentro das partidas.</p></div></section>
-    <section class="bw-view" data-view="profile"><div class="bw-card"><h2>♙ Meu Perfil</h2><p>Entre em uma sala para consultar suas estatísticas atualizadas.</p><button type="button" class="bw-primary" id="bwOpenProfile">ABRIR PERFIL</button></div></section>
-    <section class="bw-view" data-view="help"><div class="bw-card"><span class="bw-eyebrow">GUIA PARA INICIANTES</span><h2>COMO JOGAR BEDWARS</h2><div class="bw-guide-grid"><div><b>1. Proteja sua cama</b><p>Enquanto sua cama existir, você poderá renascer.</p></div><div><b>2. Colete recursos</b><p>Use os geradores e a loja para comprar equipamentos.</p></div><div><b>3. Construa pontes</b><p>Conecte as ilhas para alcançar os adversários.</p></div><div><b>4. Vença a partida</b><p>Destrua as camas rivais e elimine os jogadores.</p></div></div><p class="bw-help-hint">Teclado: WASD para andar · Espaço para pular · Mouse para atacar ou colocar blocos.</p><button class="bw-primary" data-nav="rooms" type="button">▶ COMEÇAR A JOGAR</button></div></section>
-   </main>
-   <aside class="bw-right">
-    <section class="bw-card bw-preview"><div class="bw-aside-title"><span>◈ SUA PRÓXIMA SALA</span><span class="bw-pending">PRÉVIA</span></div><div class="bw-preview-art"><span class="bw-preview-bed">🛏️</span><div><strong id="bwPreviewName">SALA1</strong><small id="bwPreviewMap">Mapa definido no lobby</small></div></div><div class="bw-preview-details"><div><small>FORMATO</small><b id="bwPreviewMode">Duplas 2v2</b></div><div><small>CONEXÃO</small><b>Online · Render</b></div><div class="bw-preview-code"><small>CÓDIGO DA SALA</small><b id="bwPreviewCode">SALA1</b></div></div><button id="bwCopyRoom" type="button" class="bw-secondary">▢ COPIAR CÓDIGO</button></section>
-    <section class="bw-card bw-social"><div class="bw-aside-title"><span>♧ JOGUE COM AMIGOS</span></div><p>Após entrar na sala, você verá a lista de jogadores, os times disponíveis, a votação de mapas e o botão para iniciar a partida.</p><div class="bw-lobby-hint">● Aguardando você entrar</div></section>
-   </aside>
-  </div>
+    </details>
+    <details class="bw-simple-more">
+     <summary>🤝 Jogar com amigos (Party) <span>⌄</span></summary>
+     <div class="bw-simple-more-content">
+      <label for="partyCode">Código da party</label>
+      <input id="partyCode" maxlength="8" autocomplete="off" placeholder="Ex.: BWD42">
+      <div class="bw-party-row"><button type="button" class="bw-secondary" onclick="createPartyCode()">Criar</button><button type="button" class="bw-secondary" onclick="copyPartyCode()">Copiar</button><button type="button" class="bw-secondary" onclick="leavePartyCode()">Sair</button></div>
+      <p id="partyStatus" class="party-status"></p>
+     </div>
+    </details>
+   </section>
+   <p class="bw-member-notice" id="bwMemberNotice" role="status" aria-live="polite" style="display:none">Disponível apenas para contas cadastradas. <button type="button" id="bwMemberLogin">Criar conta / Entrar</button></p>
+   <section class="bw-view" data-view="ranking"><div class="bw-card"><h2>🏆 Ranking</h2><button type="button" class="bw-primary" id="bwOpenRanking">Abrir ranking</button></div></section>
+   <section class="bw-view" data-view="achievements"><div class="bw-card"><h2>Conquistas</h2><p>Em desenvolvimento.</p></div></section>
+   <section class="bw-view" data-view="store"><div class="bw-card"><h2>Loja</h2><p>A personalização estará disponível futuramente. A loja de itens funciona nas partidas.</p></div></section>
+   <section class="bw-view" data-view="profile"><div class="bw-card"><h2>Perfil</h2><button type="button" class="bw-primary" id="bwOpenProfile">Abrir perfil</button></div></section>
+   <section class="bw-view" data-view="help"><div class="bw-card"><h2>Como jogar</h2><p>Proteja sua cama, colete recursos, construa pontes e elimine as equipes rivais.</p><p>WASD: mover · Espaço: pular · Mouse: atacar ou construir.</p></div></section>
+   <nav class="bw-simple-nav" aria-label="Navegação"><button type="button" class="is-active" data-nav="rooms">⚔ Jogar</button><button type="button" data-nav="ranking" data-member-only="true">🏆 Ranking</button><details><summary>Mais opções ▾</summary><div class="bw-simple-nav-more"><button type="button" data-nav="profile" data-member-only="true">Perfil</button><button type="button" data-nav="achievements" data-member-only="true">Conquistas</button><button type="button" data-nav="store" data-member-only="true">Loja</button><button type="button" data-nav="help">Ajuda</button></div></details></nav>
+  </main>
  </div>
 </div>
 <div class="ov" id="lobby"><div class="lobby-panel"><h1>Sala <span id="rc"></span></h1>
